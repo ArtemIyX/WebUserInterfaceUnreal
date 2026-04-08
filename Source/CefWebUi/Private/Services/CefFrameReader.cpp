@@ -22,7 +22,8 @@ struct FCefFrameHeader
 	uint32 Sequence;
 	uint32 WriteSlot;
 	uint8 CursorType;
-	uint8 Reserved[3];
+	uint8 LoadState;
+	uint8 Reserved[2];
 };
 
 
@@ -115,18 +116,33 @@ uint32 FCefFrameReader::Run()
 		const uint8* src = reinterpret_cast<const uint8*>(PData)
 			+ sizeof(FCefFrameHeader)
 			+ static_cast<size_t>(writeSlot) * SHM_FRAME_SIZE;
+
 		{
 			FScopeLock lock(&PendingFrameLock);
 			PendingFrame.Width = width;
 			PendingFrame.Height = height;
 			PendingFrame.Sequence = header->Sequence;
+			PendingFrame.CursorType = static_cast<ECefCustomCursorType>(header->CursorType);
+			PendingFrame.LoadState = static_cast<ECefLoadState>(header->LoadState);
 			PendingFrame.Pixels.SetNumUninitialized(size);
 			FMemory::Memcpy(PendingFrame.Pixels.GetData(), src, size);
 		}
 
 		bFramePending = true;
 
-		PendingFrame.CursorType = header->CursorType;
+		// Fire load state delegate on game thread if changed
+		ECefLoadState currentLoad = static_cast<ECefLoadState>(header->LoadState);
+		if (currentLoad != LastLoadState)
+		{
+			LastLoadState = currentLoad;
+			AsyncTask(ENamedThreads::GameThread, [this, currentLoad]()
+			{
+				UE_LOG(LogCefWebUi, Log, TEXT("FCefFrameReader: Loading state changed %s (%d)"),
+				       *UEnum::GetValueAsString(currentLoad),
+				       static_cast<uint8>(currentLoad));
+				OnLoadStateChanged.Broadcast(static_cast<uint8>(currentLoad));
+			});
+		}
 	}
 
 	return 0;

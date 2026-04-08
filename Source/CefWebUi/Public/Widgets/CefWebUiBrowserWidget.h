@@ -6,6 +6,7 @@
 #include "Blueprint/UserWidget.h"
 #include "CefWebUiBrowserWidget.generated.h"
 
+enum class ECefLoadState : uint8;
 enum class ECefMouseButton : uint8;
 /**
  * 
@@ -37,7 +38,12 @@ protected:
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="CefBrowser")
 	int32 BrowserHeight = 1080;
+	
+#pragma region Handlers
+	UFUNCTION()
+	virtual void OnLoadStateChanged(uint8 InState);
 
+#pragma endregion 
 #pragma endregion Config
 
 public:

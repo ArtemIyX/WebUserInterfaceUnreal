@@ -3,6 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Data/CefCustomCursorType.h"
+#include "Data/CefLoadState.h"
 
 
 namespace Windows
@@ -16,63 +18,11 @@ struct FCefFrame
 	uint32 Width = 0;
 	uint32 Height = 0;
 	uint32 Sequence = 0;
-	uint8 CursorType = 0;
+	ECefCustomCursorType CursorType = ECefCustomCursorType::CT_NONE;
+	ECefLoadState LoadState = ECefLoadState::Idle;
 };
 
-enum class ECefCustomCursorType : uint8
-{
-	CT_POINTER,
-	CT_CROSS,
-	CT_HAND,
-	CT_IBEAM,
-	CT_WAIT,
-	CT_HELP,
-	CT_EASTRESIZE,
-	CT_NORTHRESIZE,
-	CT_NORTHEASTRESIZE,
-	CT_NORTHWESTRESIZE,
-	CT_SOUTHRESIZE,
-	CT_SOUTHEASTRESIZE,
-	CT_SOUTHWESTRESIZE,
-	CT_WESTRESIZE,
-	CT_NORTHSOUTHRESIZE,
-	CT_EASTWESTRESIZE,
-	CT_NORTHEASTSOUTHWESTRESIZE,
-	CT_NORTHWESTSOUTHEASTRESIZE,
-	CT_COLUMNRESIZE,
-	CT_ROWRESIZE,
-	CT_MIDDLEPANNING,
-	CT_EASTPANNING,
-	CT_NORTHPANNING,
-	CT_NORTHEASTPANNING,
-	CT_NORTHWESTPANNING,
-	CT_SOUTHPANNING,
-	CT_SOUTHEASTPANNING,
-	CT_SOUTHWESTPANNING,
-	CT_WESTPANNING,
-	CT_MOVE,
-	CT_VERTICALTEXT,
-	CT_CELL,
-	CT_CONTEXTMENU,
-	CT_ALIAS,
-	CT_PROGRESS,
-	CT_NODROP,
-	CT_COPY,
-	CT_NONE,
-	CT_NOTALLOWED,
-	CT_ZOOMIN,
-	CT_ZOOMOUT,
-	CT_GRAB,
-	CT_GRABBING,
-	CT_MIDDLE_PANNING_VERTICAL,
-	CT_MIDDLE_PANNING_HORIZONTAL,
-	CT_CUSTOM,
-	CT_DND_NONE,
-	CT_DND_MOVE,
-	CT_DND_COPY,
-	CT_DND_LINK,
-	CT_NUM_VALUES,
-};
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnCefLoadStateChanged, uint8);
 
 class CEFWEBUI_API FCefFrameReader : public FRunnable
 {
@@ -103,10 +53,15 @@ public:
 	bool PollFrame(FCefFrame& OutFrame);
 
 	static EMouseCursor::Type MapCefCursor(ECefCustomCursorType Type);
+
+public:
+	FOnCefLoadStateChanged OnLoadStateChanged;
+
 private:
 	void CloseHandles();
 
 private:
+	ECefLoadState LastLoadState = ECefLoadState::Idle;
 	FCefFrame PendingFrame;
 	FCriticalSection PendingFrameLock;
 

@@ -23,7 +23,13 @@ UCefWebUiBrowserWidget::UCefWebUiBrowserWidget(const FObjectInitializer& ObjectI
 	BrowserHeight = 1080;
 }
 
-void UCefWebUiBrowserWidget::NativeConstruct()
+
+void UCefWebUiBrowserWidget::OnLoadStateChanged(uint8 InState)
+{
+	UE_LOG(LogTemp, Log, TEXT("Cef loading state changed: %d"), InState);
+}
+
+void UCefWebUiBrowserWidget::NativeConstruct()	
 {
 	Super::NativeConstruct();
 
@@ -36,6 +42,8 @@ void UCefWebUiBrowserWidget::NativeConstruct()
 		TSharedPtr<FCefInputWriter> writer = InputWriter.Pin();
 		if (writer && !writer->IsOpen())
 			writer->Open();
+
+		FrameReader.Pin()->OnLoadStateChanged.AddUObject(this, &UCefWebUiBrowserWidget::OnLoadStateChanged);
 	}
 }
 
@@ -206,8 +214,7 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 	}
 
 	{
-		EMouseCursor::Type cursorType = FCefFrameReader::MapCefCursor(
-			static_cast<ECefCustomCursorType>(frame.CursorType));
+		EMouseCursor::Type cursorType = FCefFrameReader::MapCefCursor(frame.CursorType);
 		SetCursor(cursorType);
 	}
 
