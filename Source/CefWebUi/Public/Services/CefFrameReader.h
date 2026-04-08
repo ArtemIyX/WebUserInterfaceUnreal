@@ -39,7 +39,7 @@ public:
 	/**
 	 * @brief Stops thread and closes handles.
 	 */
-	void Stop();
+	virtual void Stop() override;
 
 
 	// FRunnable

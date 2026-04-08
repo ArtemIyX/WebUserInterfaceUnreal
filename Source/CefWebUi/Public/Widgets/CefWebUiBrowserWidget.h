@@ -11,7 +11,7 @@ enum class ECefMouseButton : uint8;
 /**
  * 
  */
-UCLASS()
+UCLASS(Blueprintable, BlueprintType)
 class CEFWEBUI_API UCefWebUiBrowserWidget : public UUserWidget
 {
 	GENERATED_BODY()
@@ -19,10 +19,39 @@ class CEFWEBUI_API UCefWebUiBrowserWidget : public UUserWidget
 public:
 	UCefWebUiBrowserWidget(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
+private:
+#pragma region LifeCycle
+	void PollAndUpload();
 
 protected:
+	void EnsureTexture(uint32 InWidth, uint32 InHeight);
+#pragma endregion
+
+private:
+#pragma region ServiceVariables
+	float AccumulatedTime = 0.0f;
+	uint32 TextureWidth = 0;
+	uint32 TextureHeight = 0;
+
+	TWeakPtr<class FCefInputWriter> InputWriter;
+	TWeakPtr<class FCefFrameReader> FrameReader;
+	TWeakPtr<class FCefControlWriter> ControlWriter;
+
+#pragma endregion
+
+protected:
+#pragma region Bindings
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidget), Category="Display")
 	TObjectPtr<class UImage> DisplayImage;
+
+#pragma endregion
+
+protected:
+#pragma region Cached
+	UPROPERTY()
+	TObjectPtr<UTexture2D> DisplayTexture;
+
+#pragma endregion
 
 protected:
 #pragma region Config
@@ -38,12 +67,14 @@ protected:
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="CefBrowser")
 	int32 BrowserHeight = 1080;
-	
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="CefBrowser")
+	float TargetFPS = 60.0f;
 #pragma region Handlers
 	UFUNCTION()
 	virtual void OnLoadStateChanged(uint8 InState);
 
-#pragma endregion 
+#pragma endregion
 #pragma endregion Config
 
 public:
@@ -88,21 +119,11 @@ private:
 
 #pragma endregion Helpers
 
+public:
+#pragma region Getters
+	TSharedRef<class FCefInputWriter> GetInputWriter() const;
+	TSharedRef<class FCefFrameReader> GetFrameReader() const;
+	TSharedRef<class FCefControlWriter> GetControlWriter() const;
 
-
-private:
-	void PollAndUpload();
-	void EnsureTexture(uint32 InWidth, uint32 InHeight);
-
-protected:
-	UPROPERTY()
-	TObjectPtr<UTexture2D> DisplayTexture;
-
-	float TargetFPS = 60.0f;
-	float AccumulatedTime = 0.0f;
-	uint32 TextureWidth = 0;
-	uint32 TextureHeight = 0;
-
-	TWeakPtr<class FCefInputWriter> InputWriter;
-	TWeakPtr<class FCefFrameReader> FrameReader;
+#pragma endregion
 };

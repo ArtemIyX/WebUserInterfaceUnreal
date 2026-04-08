@@ -29,34 +29,53 @@ void UCefWebUiBrowserWidget::OnLoadStateChanged(uint8 InState)
 	UE_LOG(LogTemp, Log, TEXT("Cef loading state changed: %d"), InState);
 }
 
-void UCefWebUiBrowserWidget::NativeConstruct()	
+void UCefWebUiBrowserWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	if (FCefWebUiModule::IsAvailable())
+	if (!ensureMsgf(FCefWebUiModule::IsAvailable(), TEXT("FCefWebUiModule is not available")))
 	{
-		FCefWebUiModule& moduleRef = FCefWebUiModule::Get();
-		FrameReader = moduleRef.GetFrameReaderPtr();
-		InputWriter = moduleRef.GeInputWriterPtr();
-
-		TSharedPtr<FCefInputWriter> writer = InputWriter.Pin();
-		if (writer && !writer->IsOpen())
-			writer->Open();
-
-		FrameReader.Pin()->OnLoadStateChanged.AddUObject(this, &UCefWebUiBrowserWidget::OnLoadStateChanged);
+		return;
 	}
+
+	FCefWebUiModule& moduleRef = FCefWebUiModule::Get();
+	FrameReader = moduleRef.GetFrameReaderPtr();
+	InputWriter = moduleRef.GeInputWriterPtr();
+	ControlWriter = moduleRef.GetControlWriterPtr();
+
+	TSharedRef<FCefInputWriter> inputWriter = InputWriter.Pin().ToSharedRef();
+	if (!inputWriter->IsOpen())
+	{
+		inputWriter->Open();
+	}
+
+	TSharedRef<FCefControlWriter> controlWriter = ControlWriter.Pin().ToSharedRef();
+	if (!controlWriter->IsOpen())
+	{
+		controlWriter->Open();
+	}
+
+	FrameReader.Pin()->OnLoadStateChanged.AddUObject(this, &UCefWebUiBrowserWidget::OnLoadStateChanged);
+
+	//controlWriter->SetURL("https://www.youtube.com/");
 }
 
 void UCefWebUiBrowserWidget::NativeDestruct()
 {
 	FrameReader.Reset();
 	InputWriter.Reset();
+	ControlWriter.Reset();
 	Super::NativeDestruct();
 }
 
 void UCefWebUiBrowserWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
+
+	if (!FrameReader.IsValid())
+	{
+		return;
+	}
 
 	AccumulatedTime += InDeltaTime;
 	if (AccumulatedTime < (1.0f / TargetFPS))
@@ -167,6 +186,21 @@ void UCefWebUiBrowserWidget::EnsureTexture(uint32 InWidth, uint32 InHeight)
 
 	if (DisplayImage)
 		DisplayImage->SetBrushFromTexture(DisplayTexture);
+}
+
+TSharedRef<FCefControlWriter> UCefWebUiBrowserWidget::GetControlWriter() const
+{
+	return ControlWriter.Pin().ToSharedRef();
+}
+
+TSharedRef<FCefFrameReader> UCefWebUiBrowserWidget::GetFrameReader() const
+{
+	return FrameReader.Pin().ToSharedRef();
+}
+
+TSharedRef<FCefInputWriter> UCefWebUiBrowserWidget::GetInputWriter() const
+{
+	return InputWriter.Pin().ToSharedRef();
 }
 
 void UCefWebUiBrowserWidget::GetBrowserCoords(const FGeometry& InGeometry, const FVector2D& InScreenPosition,

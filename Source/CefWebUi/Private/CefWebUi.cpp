@@ -36,6 +36,11 @@ void FCefWebUiModule::StartupModule()
 	{
 		UE_LOG(LogCefWebUi, Warning, TEXT("FCefInputWriter: Open failed - Host not ready yet."));
 	}
+	ControlWriter = MakeShared<FCefControlWriter>();
+	if (!ControlWriter->Open())
+	{
+		UE_LOG(LogCefWebUi, Warning, TEXT("FCefControlWriter: Open failed - Host not ready yet."));
+	}
 
 	FTSTicker::GetCoreTicker().AddTicker(
 		FTickerDelegate::CreateLambda([this](float) -> bool
@@ -56,6 +61,10 @@ void FCefWebUiModule::ShutdownModule()
 	if (InputWriter.IsValid())
 	{
 		InputWriter.Reset();
+	}
+	if (ControlWriter.IsValid())
+	{
+		ControlWriter.Reset();
 	}
 	KillHostProcess();
 }
@@ -143,7 +152,7 @@ TWeakPtr<FCefFrameReader> FCefWebUiModule::GetFrameReaderPtr() const
 	return FrameReader.ToWeakPtr();
 }
 
-TSharedRef<FCefInputWriter> FCefWebUiModule::GetInputWriteRef() const
+TSharedRef<FCefInputWriter> FCefWebUiModule::GetInputWriterRef() const
 {
 	ensure(InputWriter.IsValid());
 	return InputWriter.ToSharedRef();
@@ -153,4 +162,16 @@ TWeakPtr<FCefInputWriter> FCefWebUiModule::GeInputWriterPtr() const
 {
 	ensure(InputWriter.IsValid());
 	return InputWriter.ToWeakPtr();
+}
+
+TSharedRef<FCefControlWriter> FCefWebUiModule::GetControlWriterRef() const
+{
+	ensure(ControlWriter.IsValid());
+	return ControlWriter.ToSharedRef();
+}
+
+TWeakPtr<FCefControlWriter> FCefWebUiModule::GetControlWriterPtr() const
+{
+	ensure(ControlWriter.IsValid());
+	return ControlWriter.ToWeakPtr();
 }
