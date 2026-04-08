@@ -1,0 +1,34 @@
+# Binaries
+Binaries/
+Intermediate/
+Saved/
+
+# Build artifacts
+*.pdb
+*.exp
+*.lib
+*.dll
+*.exe
+*.log
+
+# Generated
+*.generated.h
+*.gen.cpp
+
+# IDE
+.vs/
+.vscode/
+*.sln
+*.suo
+*.user
+*.VC.db
+*.VC.opendb
+
+# Rider
+.idea/
+*.DotSettings.user
+
+# ThirdParty CEF runtime - track everything
+Source/ThirdParty/Cef/
+
+!Source/ThirdParty/Cef/PUT_CEF_HOST_HERE
