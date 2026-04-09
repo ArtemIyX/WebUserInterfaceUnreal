@@ -18,16 +18,13 @@ constexpr uint32 SHM_FRAME_SIZE = SHM_MAX_WIDTH * SHM_MAX_HEIGHT * 4;
 #pragma pack(push, 1)
 struct FCefFrameHeader
 {
-	uint32 Width;
-	uint32 Height;
-	uint32 Sequence;
-	uint32 WriteSlot;
-	uint8 CursorType;
-	uint8 LoadState;
-	uint8 Reserved[2];
-	uint32 CefPid;
-	uint32 Reserved2;
-	uint64 SharedTextureHandle;
+	uint32 width;
+	uint32 height;
+	uint32 sequence;
+	uint32 write_slot;
+	uint8 cursor_type;
+	uint8 load_state;
+	uint8 reserved[2];
 };
 #pragma pack(pop)
 
@@ -111,14 +108,10 @@ uint32 FCefFrameReader::Run()
 		       header->Sequence, LastSequence, header->SharedTextureHandle);
 		       */
 
-		if (header->Sequence == LastSequence)
+		if (header->sequence == LastSequence)
 			continue;
 
-		LastSequence = header->Sequence;
-
-		const uint64 rawHandle = header->SharedTextureHandle;
-		if (rawHandle == 0)
-			continue; // CEF hasn't written a texture yet
+		LastSequence = header->sequence;
 
 		// Duplicate the NT handle into this process so the game thread can open it safely
 		HANDLE cefProcessHandle = GetCurrentProcess(); // same process since CEF wrote a cross-process NT handle
@@ -129,19 +122,18 @@ uint32 FCefFrameReader::Run()
 
 		{
 			FScopeLock Lock(&PendingFrameLock);
-			PendingFrame.SharedTextureHandle = reinterpret_cast<void*>(rawHandle);
-			PendingFrame.Width = header->Width;
-			PendingFrame.Height = header->Height;
-			PendingFrame.Sequence = header->Sequence;
-			PendingFrame.CefPid = header->CefPid;
-			PendingFrame.CursorType = static_cast<ECefCustomCursorType>(header->CursorType);
-			PendingFrame.LoadState = static_cast<ECefLoadState>(header->LoadState);
+			PendingFrame.WriteSlot = header->write_slot;
+			PendingFrame.Width = header->width;
+			PendingFrame.Height = header->height;
+			PendingFrame.Sequence = header->sequence;
+			PendingFrame.CursorType = static_cast<ECefCustomCursorType>(header->cursor_type);
+			PendingFrame.LoadState = static_cast<ECefLoadState>(header->load_state);
 		}
 
 		bFramePending = true;
 
 		// Fire load state delegate on game thread if changed
-		ECefLoadState CurrentLoad = static_cast<ECefLoadState>(header->LoadState);
+		ECefLoadState CurrentLoad = static_cast<ECefLoadState>(header->load_state);
 		if (CurrentLoad != LastLoadState)
 		{
 			LastLoadState = CurrentLoad;

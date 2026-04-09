@@ -21,16 +21,16 @@ public:
 
 private:
 	void PollAndUpload();
-	void EnsureSharedRHI(void* InNTHandle, uint32 InWidth, uint32 InHeight, uint32 InCefPid);
+	void EnsureSharedRHI();
 	void EnsureRenderTarget(uint32 InWidth, uint32 InHeight);
 
 private:
 	float AccumulatedTime = 0.0f;
 	uint32 TextureWidth = 0;
 	uint32 TextureHeight = 0;
-	void* LastSharedHandle = nullptr;
 
-	FTextureRHIRef SharedTextureRHI;
+	void* LastSharedHandle[2] = {nullptr, nullptr};
+	FTextureRHIRef SharedTextureRHI[2];
 
 	TWeakPtr<class FCefInputWriter> InputWriter;
 	TWeakPtr<class FCefFrameReader> FrameReader;

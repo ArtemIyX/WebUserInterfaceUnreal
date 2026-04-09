@@ -13,15 +13,13 @@ namespace Windows
 
 struct FCefSharedFrame
 {
-	Windows::HANDLE SharedTextureHandle = nullptr; // NT handle from CEF process
+	uint32 WriteSlot = 0;
 	uint32 Width = 0;
 	uint32 Height = 0;
 	uint32 Sequence = 0;
-	uint32 CefPid = 0;
 	ECefCustomCursorType CursorType = ECefCustomCursorType::CT_NONE;
 	ECefLoadState LoadState = ECefLoadState::Idle;
 };
-
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnCefLoadStateChanged, uint8);
 
 class CEFWEBUI_API FCefFrameReader : public FRunnable
