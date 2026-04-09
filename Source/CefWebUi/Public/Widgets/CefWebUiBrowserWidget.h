@@ -25,7 +25,7 @@ private:
 	void EnsureRenderTarget(uint32 InWidth, uint32 InHeight);
 
 private:
-	float AccumulatedTime = 0.0f;
+
 	uint32 TextureWidth = 0;
 	uint32 TextureHeight = 0;
 

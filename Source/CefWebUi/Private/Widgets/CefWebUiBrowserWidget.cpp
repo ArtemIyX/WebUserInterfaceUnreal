@@ -89,11 +89,6 @@ void UCefWebUiBrowserWidget::NativeTick(const FGeometry& MyGeometry, float InDel
 	if (!FrameReader.IsValid())
 		return;
 
-	AccumulatedTime += InDeltaTime;
-	if (AccumulatedTime < (1.0f / TargetFPS))
-		return;
-
-	AccumulatedTime = 0.0f;
 	PollAndUpload();
 }
 
