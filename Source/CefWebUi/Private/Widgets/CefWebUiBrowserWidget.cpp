@@ -172,6 +172,35 @@ FReply UCefWebUiBrowserWidget::NativeOnKeyChar(const FGeometry& InGeometry, cons
 	return FReply::Handled();
 }
 
+#define CEF_CTRL(expr) \
+if (GetControlWriter()->IsOpen()) { GetControlWriter()->expr; }
+
+void UCefWebUiBrowserWidget::BP_GoBack() { CEF_CTRL(GoBack()) }
+void UCefWebUiBrowserWidget::BP_GoForward() { CEF_CTRL(GoForward()) }
+void UCefWebUiBrowserWidget::BP_StopLoad() { CEF_CTRL(StopLoad()) }
+void UCefWebUiBrowserWidget::BP_Reload() { CEF_CTRL(Reload()) }
+void UCefWebUiBrowserWidget::BP_SetURL(const FString& InURL) { CEF_CTRL(SetURL(InURL)) }
+void UCefWebUiBrowserWidget::BP_SetPaused(bool bInPaused) { CEF_CTRL(SetPaused(bInPaused)) }
+void UCefWebUiBrowserWidget::BP_SetHidden(bool bInHidden) { CEF_CTRL(SetHidden(bInHidden)) }
+void UCefWebUiBrowserWidget::BP_SetFocus(bool bInFocus) { CEF_CTRL(SetFocus(bInFocus)) }
+void UCefWebUiBrowserWidget::BP_SetZoomLevel(float InLevel) { CEF_CTRL(SetZoomLevel(InLevel)) }
+void UCefWebUiBrowserWidget::BP_SetFrameRate(int32 InRate) { CEF_CTRL(SetFrameRate(static_cast<uint32>(InRate))) }
+void UCefWebUiBrowserWidget::BP_ScrollTo(int32 InX, int32 InY) { CEF_CTRL(ScrollTo(InX, InY)) }
+
+void UCefWebUiBrowserWidget::BP_Resize(int32 InWidth, int32 InHeight)
+{
+	CEF_CTRL(Resize(static_cast<uint32>(InWidth), static_cast<uint32>(InHeight)))
+}
+
+void UCefWebUiBrowserWidget::BP_SetMuted(bool bInMuted) { CEF_CTRL(SetMuted(bInMuted)) }
+void UCefWebUiBrowserWidget::BP_OpenDevTools() { CEF_CTRL(OpenDevTools()) }
+void UCefWebUiBrowserWidget::BP_CloseDevTools() { CEF_CTRL(CloseDevTools()) }
+void UCefWebUiBrowserWidget::BP_SetInputEnabled(bool bInEnabled) { CEF_CTRL(SetInputEnabled(bInEnabled)) }
+void UCefWebUiBrowserWidget::BP_ExecuteJS(const FString& InScript) { CEF_CTRL(ExecuteJS(InScript)) }
+void UCefWebUiBrowserWidget::BP_ClearCookies() { CEF_CTRL(ClearCookies()) }
+
+#undef CEF_CTRL
+
 void UCefWebUiBrowserWidget::EnsureTexture(uint32 InWidth, uint32 InHeight)
 {
 	if (DisplayTexture && TextureWidth == InWidth && TextureHeight == InHeight)

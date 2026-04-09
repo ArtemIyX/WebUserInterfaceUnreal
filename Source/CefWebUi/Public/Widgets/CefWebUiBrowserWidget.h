@@ -96,6 +96,62 @@ public:
 
 #pragma endregion UUserWidget overrides
 
+#pragma region Blueprint Browser Control
+	UFUNCTION(BlueprintCallable, meta=(DisplayName="Go Back"), Category="CefWebUI|Control")
+	virtual void BP_GoBack();
+
+	UFUNCTION(BlueprintCallable, meta=(DisplayName="Go Forward"), Category="CefWebUI|Control")
+	virtual void BP_GoForward();
+
+	UFUNCTION(BlueprintCallable, meta=(DisplayName="Stop Load"), Category="CefWebUI|Control")
+	virtual void BP_StopLoad();
+
+	UFUNCTION(BlueprintCallable, meta=(DisplayName="Reload"), Category="CefWebUI|Control")
+	virtual void BP_Reload();
+
+	UFUNCTION(BlueprintCallable, meta=(DisplayName="Set URL"), Category="CefWebUI|Control")
+	virtual void BP_SetURL(const FString& InURL);
+
+	UFUNCTION(BlueprintCallable, meta=(DisplayName="Set Paused"), Category="CefWebUI|Control")
+	virtual void BP_SetPaused(bool bInPaused);
+
+	UFUNCTION(BlueprintCallable, meta=(DisplayName="Set Hidden"), Category="CefWebUI|Control")
+	virtual void BP_SetHidden(bool bInHidden);
+
+	UFUNCTION(BlueprintCallable, meta=(DisplayName="Set Focus"), Category="CefWebUI|Control")
+	virtual void BP_SetFocus(bool bInFocus);
+
+	UFUNCTION(BlueprintCallable, meta=(DisplayName="Set Zoom Level"), Category="CefWebUI|Control")
+	virtual void BP_SetZoomLevel(float InLevel);
+
+	UFUNCTION(BlueprintCallable, meta=(DisplayName="Set Frame Rate"), Category="CefWebUI|Control")
+	virtual void BP_SetFrameRate(int32 InRate);
+
+	UFUNCTION(BlueprintCallable, meta=(DisplayName="Scroll To"), Category="CefWebUI|Control")
+	virtual void BP_ScrollTo(int32 InX, int32 InY);
+
+	UFUNCTION(BlueprintCallable, meta=(DisplayName="Resize"), Category="CefWebUI|Control")
+	virtual void BP_Resize(int32 InWidth, int32 InHeight);
+
+	UFUNCTION(BlueprintCallable, meta=(DisplayName="Set Muted"), Category="CefWebUI|Control")
+	virtual void BP_SetMuted(bool bInMuted);
+
+	UFUNCTION(BlueprintCallable, meta=(DisplayName="Open Dev Tools"), Category="CefWebUI|Control")
+	virtual void BP_OpenDevTools();
+
+	UFUNCTION(BlueprintCallable, meta=(DisplayName="Close Dev Tools"), Category="CefWebUI|Control")
+	virtual void BP_CloseDevTools();
+
+	UFUNCTION(BlueprintCallable, meta=(DisplayName="Set Input Enabled"), Category="CefWebUI|Control")
+	virtual void BP_SetInputEnabled(bool bInEnabled);
+
+	UFUNCTION(BlueprintCallable, meta=(DisplayName="Execute JS"), Category="CefWebUI|Control")
+	virtual void BP_ExecuteJS(const FString& InScript);
+
+	UFUNCTION(BlueprintCallable, meta=(DisplayName="Clear Cookies"), Category="CefWebUI|Control")
+	virtual void BP_ClearCookies();
+#pragma endregion
+
 private:
 #pragma region Helpers
 
