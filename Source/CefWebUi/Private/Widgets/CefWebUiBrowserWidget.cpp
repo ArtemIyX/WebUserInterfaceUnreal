@@ -134,15 +134,11 @@ FReply UCefWebUiBrowserWidget::NativeOnMouseWheel(const FGeometry& InGeometry, c
 	TSharedPtr<FCefInputWriter> writer = InputWriter.Pin();
 	if (writer)
 	{
-		ECefMouseButton btn;
-		if (SlateButtonToCef(InMouseEvent.GetEffectingButton(), btn))
-		{
-			int32 x, y;
-			GetBrowserCoords(InGeometry, InMouseEvent.GetScreenSpacePosition(), x, y);
-			writer->WriteMouseButton(x, y, btn, true);
-		}
+		int32 x, y;
+		GetBrowserCoords(InGeometry, InMouseEvent.GetScreenSpacePosition(), x, y);
+		writer->WriteMouseScroll(x, y, 0.f, InMouseEvent.GetWheelDelta() * 120.f);
 	}
-	return FReply::Handled().ReleaseMouseCapture();
+	return FReply::Handled();
 }
 
 FReply UCefWebUiBrowserWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
