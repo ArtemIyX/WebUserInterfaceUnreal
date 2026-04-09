@@ -6,18 +6,18 @@
 #include "Data/CefCustomCursorType.h"
 #include "Data/CefLoadState.h"
 
-
 namespace Windows
 {
 	typedef void* HANDLE;
 }
 
-struct FCefFrame
+struct FCefSharedFrame
 {
-	TArray<uint8> Pixels;
+	Windows::HANDLE SharedTextureHandle = nullptr; // NT handle from CEF process
 	uint32 Width = 0;
 	uint32 Height = 0;
 	uint32 Sequence = 0;
+	uint32 CefPid = 0;
 	ECefCustomCursorType CursorType = ECefCustomCursorType::CT_NONE;
 	ECefLoadState LoadState = ECefLoadState::Idle;
 };
@@ -41,16 +41,16 @@ public:
 	 */
 	virtual void Stop() override;
 
-
 	// FRunnable
 	virtual uint32 Run() override;
 
 public:
 	/**
-	 * @brief Call from game thread. Returns true if a new frame was available.
-	 * @param OutFrame Output frame data.
+	 * @brief Call from game thread. Returns true if a new frame is available.
+	 *        OutFrame.SharedTextureHandle is a duplicated NT handle valid in this process.
+	 *        Caller must CloseHandle() it when done opening the D3D12 resource.
 	 */
-	bool PollFrame(FCefFrame& OutFrame);
+	bool PollSharedTexture(FCefSharedFrame& OutFrame);
 
 	static EMouseCursor::Type MapCefCursor(ECefCustomCursorType Type);
 
@@ -62,7 +62,8 @@ private:
 
 private:
 	ECefLoadState LastLoadState = ECefLoadState::Idle;
-	FCefFrame PendingFrame;
+
+	FCefSharedFrame PendingFrame;
 	FCriticalSection PendingFrameLock;
 
 	Windows::HANDLE HMap = nullptr;
@@ -70,7 +71,8 @@ private:
 	void* PData = nullptr;
 
 	FRunnableThread* Thread = nullptr;
-	std::atomic<bool> bFramePending{false};
-	std::atomic<bool> bRunning{false};
+	std::atomic<bool> bFramePending{ false };
+	std::atomic<bool> bRunning{ false };
 	uint32 LastSequence = 0;
+	uint64 LastSharedHandle = 0; // track handle value to detect texture recreation
 };

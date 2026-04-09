@@ -5,16 +5,17 @@
 #include "Async/Async.h"
 
 #include "Windows/AllowWindowsPlatformTypes.h"
-#include "Windows/PreWindowsApi.h"
+
 #include <Windows.h>
-#include "Windows/PostWindowsApi.h"
+
 #include "Windows/HideWindowsPlatformTypes.h"
 
-// Copy layout from CEF side - keep in sync with SharedMemoryLayout.h
+// Must match SharedMemoryLayout.h on CEF side
 constexpr uint32 SHM_MAX_WIDTH = 3840;
 constexpr uint32 SHM_MAX_HEIGHT = 2160;
 constexpr uint32 SHM_FRAME_SIZE = SHM_MAX_WIDTH * SHM_MAX_HEIGHT * 4;
 
+#pragma pack(push, 1)
 struct FCefFrameHeader
 {
 	uint32 Width;
@@ -24,8 +25,11 @@ struct FCefFrameHeader
 	uint8 CursorType;
 	uint8 LoadState;
 	uint8 Reserved[2];
+	uint32 CefPid;
+	uint32 Reserved2;
+	uint64 SharedTextureHandle;
 };
-
+#pragma pack(pop)
 
 constexpr uint32 SHM_FRAME_TOTAL = sizeof(FCefFrameHeader) + SHM_FRAME_SIZE * 2;
 
@@ -40,7 +44,7 @@ FCefFrameReader::~FCefFrameReader()
 
 bool FCefFrameReader::Start()
 {
-	HMap = OpenFileMappingW(FILE_MAP_READ, Windows::FALSE, L"CEFHost_Frame");
+	HMap = OpenFileMappingW(FILE_MAP_READ, false, L"CEFHost_Frame");
 	if (!HMap)
 	{
 		UE_LOG(LogCefWebUi, Warning, TEXT("FCefFrameReader: Shared memory not available yet."));
@@ -55,8 +59,7 @@ bool FCefFrameReader::Start()
 		return false;
 	}
 
-	HEvent = OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE,
-	                    Windows::FALSE, L"CEFHost_FrameReady");
+	HEvent = OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE, false, L"CEFHost_FrameReady");
 	if (!HEvent)
 	{
 		UE_LOG(LogCefWebUi, Error, TEXT("FCefFrameReader: OpenEvent failed."));
@@ -76,14 +79,14 @@ void FCefFrameReader::Stop()
 	bRunning = false;
 
 	if (HEvent)
-		SetEvent(HEvent); // wake thread if waiting
+		SetEvent(HEvent);
 
 	if (Thread)
 	{
-		FRunnableThread* threadToDelete = Thread;
-		Thread = nullptr; // null BEFORE delete to break recursion
-		threadToDelete->WaitForCompletion();
-		delete threadToDelete;
+		FRunnableThread* ThreadToDelete = Thread;
+		Thread = nullptr;
+		ThreadToDelete->WaitForCompletion();
+		delete ThreadToDelete;
 	}
 
 	CloseHandles();
@@ -95,7 +98,7 @@ uint32 FCefFrameReader::Run()
 	while (bRunning)
 	{
 		DWORD result = WaitForSingleObject(HEvent, 500);
-
+		//UE_LOG(LogCefWebUi, Log, TEXT("FCefFrameReader: WaitForSingleObject result=%d"), result);
 		if (!bRunning)
 			break;
 
@@ -103,44 +106,50 @@ uint32 FCefFrameReader::Run()
 			continue;
 
 		const FCefFrameHeader* header = reinterpret_cast<const FCefFrameHeader*>(PData);
+		/*
+		UE_LOG(LogCefWebUi, Log, TEXT("FCefFrameReader: seq=%u lastSeq=%u handle=%llu"),
+		       header->Sequence, LastSequence, header->SharedTextureHandle);
+		       */
 
 		if (header->Sequence == LastSequence)
 			continue;
 
 		LastSequence = header->Sequence;
 
-		const uint32 width = header->Width;
-		const uint32 height = header->Height;
-		const size_t size = static_cast<size_t>(width) * height * 4;
-		const uint32 writeSlot = header->WriteSlot & 1u;
-		const uint8* src = reinterpret_cast<const uint8*>(PData)
-			+ sizeof(FCefFrameHeader)
-			+ static_cast<size_t>(writeSlot) * SHM_FRAME_SIZE;
+		const uint64 rawHandle = header->SharedTextureHandle;
+		if (rawHandle == 0)
+			continue; // CEF hasn't written a texture yet
+
+		// Duplicate the NT handle into this process so the game thread can open it safely
+		HANDLE cefProcessHandle = GetCurrentProcess(); // same process since CEF wrote a cross-process NT handle
+		HANDLE duplicated = nullptr;
+		// NT handles from CreateSharedHandle are process-agnostic (no duplication needed),
+		// but we snapshot the value so the game thread has a stable copy.
+		// We simply pass the raw value — OpenSharedHandle on D3D12 accepts it directly.
 
 		{
-			FScopeLock lock(&PendingFrameLock);
-			PendingFrame.Width = width;
-			PendingFrame.Height = height;
+			FScopeLock Lock(&PendingFrameLock);
+			PendingFrame.SharedTextureHandle = reinterpret_cast<void*>(rawHandle);
+			PendingFrame.Width = header->Width;
+			PendingFrame.Height = header->Height;
 			PendingFrame.Sequence = header->Sequence;
+			PendingFrame.CefPid = header->CefPid;
 			PendingFrame.CursorType = static_cast<ECefCustomCursorType>(header->CursorType);
 			PendingFrame.LoadState = static_cast<ECefLoadState>(header->LoadState);
-			PendingFrame.Pixels.SetNumUninitialized(size);
-			FMemory::Memcpy(PendingFrame.Pixels.GetData(), src, size);
 		}
 
 		bFramePending = true;
 
 		// Fire load state delegate on game thread if changed
-		ECefLoadState currentLoad = static_cast<ECefLoadState>(header->LoadState);
-		if (currentLoad != LastLoadState)
+		ECefLoadState CurrentLoad = static_cast<ECefLoadState>(header->LoadState);
+		if (CurrentLoad != LastLoadState)
 		{
-			LastLoadState = currentLoad;
-			AsyncTask(ENamedThreads::GameThread, [this, currentLoad]()
+			LastLoadState = CurrentLoad;
+			AsyncTask(ENamedThreads::GameThread, [this, CurrentLoad]()
 			{
-				UE_LOG(LogCefWebUi, Log, TEXT("FCefFrameReader: Loading state changed %s (%d)"),
-				       *UEnum::GetValueAsString(currentLoad),
-				       static_cast<uint8>(currentLoad));
-				OnLoadStateChanged.Broadcast(static_cast<uint8>(currentLoad));
+				UE_LOG(LogCefWebUi, Log, TEXT("FCefFrameReader: Load state changed to %d"),
+				       static_cast<uint8>(CurrentLoad));
+				OnLoadStateChanged.Broadcast(static_cast<uint8>(CurrentLoad));
 			});
 		}
 	}
@@ -148,13 +157,13 @@ uint32 FCefFrameReader::Run()
 	return 0;
 }
 
-bool FCefFrameReader::PollFrame(FCefFrame& OutFrame)
+bool FCefFrameReader::PollSharedTexture(FCefSharedFrame& OutFrame)
 {
 	if (!bFramePending)
 		return false;
 
-	FScopeLock lock(&PendingFrameLock);
-	OutFrame = MoveTemp(PendingFrame);
+	FScopeLock Lock(&PendingFrameLock);
+	OutFrame = PendingFrame;
 	bFramePending = false;
 	return true;
 }
@@ -167,7 +176,6 @@ EMouseCursor::Type FCefFrameReader::MapCefCursor(ECefCustomCursorType Type)
 	case ECefCustomCursorType::CT_CROSS: return EMouseCursor::Crosshairs;
 	case ECefCustomCursorType::CT_HAND: return EMouseCursor::Hand;
 	case ECefCustomCursorType::CT_IBEAM: return EMouseCursor::TextEditBeam;
-	case ECefCustomCursorType::CT_WAIT: return EMouseCursor::Default; // no UE equivalent, use Default
 	case ECefCustomCursorType::CT_EASTRESIZE:
 	case ECefCustomCursorType::CT_WESTRESIZE:
 	case ECefCustomCursorType::CT_EASTWESTRESIZE:
@@ -188,35 +196,9 @@ EMouseCursor::Type FCefFrameReader::MapCefCursor(ECefCustomCursorType Type)
 	case ECefCustomCursorType::CT_NODROP:
 	case ECefCustomCursorType::CT_NOTALLOWED: return EMouseCursor::SlashedCircle;
 	case ECefCustomCursorType::CT_NONE: return EMouseCursor::None;
-	case ECefCustomCursorType::CT_ALIAS:
-	case ECefCustomCursorType::CT_PROGRESS:
-	case ECefCustomCursorType::CT_COPY:
-	case ECefCustomCursorType::CT_ZOOMIN:
-	case ECefCustomCursorType::CT_ZOOMOUT:
-	case ECefCustomCursorType::CT_CELL:
-	case ECefCustomCursorType::CT_CONTEXTMENU:
-	case ECefCustomCursorType::CT_VERTICALTEXT:
-	case ECefCustomCursorType::CT_HELP:
-	case ECefCustomCursorType::CT_MIDDLEPANNING:
-	case ECefCustomCursorType::CT_EASTPANNING:
-	case ECefCustomCursorType::CT_NORTHPANNING:
-	case ECefCustomCursorType::CT_NORTHEASTPANNING:
-	case ECefCustomCursorType::CT_NORTHWESTPANNING:
-	case ECefCustomCursorType::CT_SOUTHPANNING:
-	case ECefCustomCursorType::CT_SOUTHEASTPANNING:
-	case ECefCustomCursorType::CT_SOUTHWESTPANNING:
-	case ECefCustomCursorType::CT_WESTPANNING:
-	case ECefCustomCursorType::CT_MIDDLE_PANNING_VERTICAL:
-	case ECefCustomCursorType::CT_MIDDLE_PANNING_HORIZONTAL:
-	case ECefCustomCursorType::CT_DND_NONE:
-	case ECefCustomCursorType::CT_DND_MOVE:
-	case ECefCustomCursorType::CT_DND_COPY:
-	case ECefCustomCursorType::CT_DND_LINK:
-	case ECefCustomCursorType::CT_CUSTOM:
 	default: return EMouseCursor::Default;
 	}
 }
-
 
 void FCefFrameReader::CloseHandles()
 {

@@ -21,10 +21,13 @@ public:
 
 private:
 #pragma region LifeCycle
+private:
 	void PollAndUpload();
-
+	void EnsureExternalTexture(void* InNTHandle, uint32 InWidth, uint32 InHeight, uint32 InCefPid);
+ 
 protected:
 	void EnsureTexture(uint32 InWidth, uint32 InHeight);
+	
 #pragma endregion
 
 private:
@@ -33,6 +36,10 @@ private:
 	uint32 TextureWidth = 0;
 	uint32 TextureHeight = 0;
 
+	// Shared texture state
+	void*    LastSharedHandle = nullptr; // raw NT handle value — used to detect recreation
+	FTextureRHIRef SharedTextureRHI;   // D3D12 resource opened from NT handle
+	
 	TWeakPtr<class FCefInputWriter> InputWriter;
 	TWeakPtr<class FCefFrameReader> FrameReader;
 	TWeakPtr<class FCefControlWriter> ControlWriter;
@@ -69,7 +76,14 @@ protected:
 	int32 BrowserHeight = 1080;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="CefBrowser")
-	float TargetFPS = 60.0f;
+	float TargetFPS = 120.0f;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="CefBrowser|Texture")
+	TEnumAsByte<TextureFilter> TextureFilter;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="CefBrowser|Texture")
+	uint8 bUseSRGB:1;
+	
 #pragma region Handlers
 	UFUNCTION()
 	virtual void OnLoadStateChanged(uint8 InState);

@@ -45,6 +45,7 @@ public class CefWebUi : ModuleRules
 				"Projects",
 				"UMG",
 				"RHI",
+				"D3D12RHI",
 				"RenderCore"
 				// ... add private dependencies that you statically link with here ...	
 			}
@@ -74,5 +75,9 @@ public class CefWebUi : ModuleRules
 			Path.Combine("$(BinaryOutputDir)", "Cef", "locales", "..."),
 			Path.Combine(CefDir, "locales", "...")
 		);
+		string EnginePath = Path.GetFullPath(Target.RelativeEnginePath);
+		PrivateIncludePaths.Add(Path.Combine(EnginePath, "Source/Runtime/D3D12RHI/Private"));
+		PrivateIncludePaths.Add(Path.Combine(EnginePath, "Source/ThirdParty/Windows/DirectX/include"));
+		AddEngineThirdPartyPrivateStaticDependencies(Target, "DX12");
 	}
 }

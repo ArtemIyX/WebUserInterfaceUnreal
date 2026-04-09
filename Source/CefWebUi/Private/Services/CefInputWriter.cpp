@@ -9,10 +9,8 @@
 #include "CefWebUi.h"
 
 #include "Windows/AllowWindowsPlatformTypes.h"
-#include "Windows/PreWindowsApi.h"
 #include <Windows.h>
 #include <atomic>
-#include "Windows/PostWindowsApi.h"
 #include "Windows/HideWindowsPlatformTypes.h"
 
 // ---- Mirror of SharedMemoryLayout.h (keep in sync) -------------------------

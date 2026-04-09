@@ -5,12 +5,12 @@
 #include "CefWebUi.h"
 
 #include "Windows/AllowWindowsPlatformTypes.h"
-#include "Windows/PreWindowsApi.h"
+
 #include <Windows.h>
 #include <atomic>
 
 #include "Data/CefControlEventType.h"
-#include "Windows/PostWindowsApi.h"
+
 #include "Windows/HideWindowsPlatformTypes.h"
 
 static constexpr uint32 CONTROL_RING_CAPACITY = 64;
