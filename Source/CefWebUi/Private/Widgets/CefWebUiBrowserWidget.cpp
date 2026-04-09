@@ -5,7 +5,7 @@
 #include "CefWebUi.h"
 #include "Services/CefFrameReader.h"
 #include "Components/Image.h"
-#include "Engine/Texture2D.h"
+#include "Engine/TextureRenderTarget2D.h"
 #include "TextureResource.h"
 #include "RenderingThread.h"
 #include "RHICommandList.h"
@@ -21,16 +21,13 @@
 #include "Windows/HideWindowsPlatformTypes.h"
 
 DECLARE_CYCLE_STAT(TEXT("CefWidget: PollFrame"), STAT_CefWidget_PollFrame, STATGROUP_Game);
-DECLARE_CYCLE_STAT(TEXT("CefWidget: BindShared"), STAT_CefWidget_BindShared, STATGROUP_Game);
+DECLARE_CYCLE_STAT(TEXT("CefWidget: GPUBlit"), STAT_CefWidget_GPUBlit, STATGROUP_Game);
 
 UCefWebUiBrowserWidget::UCefWebUiBrowserWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
 	BrowserWidth = 1920;
 	BrowserHeight = 1080;
-
-	TextureFilter = TextureFilter::TF_Bilinear;
-	bUseSRGB = false;
 }
 
 void UCefWebUiBrowserWidget::OnLoadStateChanged(uint8 InState)
@@ -63,7 +60,6 @@ void UCefWebUiBrowserWidget::NativeConstruct()
 
 void UCefWebUiBrowserWidget::NativeDestruct()
 {
-	// Release RHI texture on render thread before destroying
 	FTextureRHIRef CapturedRHI = SharedTextureRHI;
 	if (CapturedRHI.IsValid())
 	{
@@ -75,6 +71,7 @@ void UCefWebUiBrowserWidget::NativeDestruct()
 	}
 	SharedTextureRHI = nullptr;
 	LastSharedHandle = nullptr;
+	RenderTarget = nullptr;
 
 	FrameReader.Reset();
 	InputWriter.Reset();
@@ -97,7 +94,29 @@ void UCefWebUiBrowserWidget::NativeTick(const FGeometry& MyGeometry, float InDel
 	PollAndUpload();
 }
 
-void UCefWebUiBrowserWidget::EnsureExternalTexture(void* InNTHandle, uint32 InWidth, uint32 InHeight, uint32 InCefPid)
+void UCefWebUiBrowserWidget::EnsureRenderTarget(uint32 InWidth, uint32 InHeight)
+{
+	if (RenderTarget && TextureWidth == InWidth && TextureHeight == InHeight)
+		return;
+
+	TextureWidth = InWidth;
+	TextureHeight = InHeight;
+
+	RenderTarget = NewObject<UTextureRenderTarget2D>(this);
+	RenderTarget->InitCustomFormat(InWidth, InHeight, PF_B8G8R8A8, false);
+	RenderTarget->bAutoGenerateMips = false;
+	RenderTarget->UpdateResource();
+
+	if (DisplayImage)
+	{
+		FSlateBrush Brush;
+		Brush.SetResourceObject(RenderTarget);
+		Brush.ImageSize = FVector2D(InWidth, InHeight);
+		DisplayImage->SetBrush(Brush);
+	}
+}
+
+void UCefWebUiBrowserWidget::EnsureSharedRHI(void* InNTHandle, uint32 InWidth, uint32 InHeight, uint32 InCefPid)
 {
 	if (InNTHandle == LastSharedHandle && SharedTextureRHI.IsValid())
 		return;
@@ -107,7 +126,7 @@ void UCefWebUiBrowserWidget::EnsureExternalTexture(void* InNTHandle, uint32 InWi
 	FTextureRHIRef OldRHI = SharedTextureRHI;
 	SharedTextureRHI = nullptr;
 
-	// Duplicate the CEF process handle into this process
+	// Duplicate NT handle from CEF process into this process
 	HANDLE CefProcess = OpenProcess(PROCESS_DUP_HANDLE, Windows::FALSE, InCefPid);
 	if (!CefProcess)
 	{
@@ -121,8 +140,7 @@ void UCefWebUiBrowserWidget::EnsureExternalTexture(void* InNTHandle, uint32 InWi
 		reinterpret_cast<HANDLE>(InNTHandle),
 		GetCurrentProcess(),
 		&LocalHandle,
-		0,
-		Windows::FALSE,
+		0, Windows::FALSE,
 		DUPLICATE_SAME_ACCESS
 	);
 	CloseHandle(CefProcess);
@@ -134,7 +152,7 @@ void UCefWebUiBrowserWidget::EnsureExternalTexture(void* InNTHandle, uint32 InWi
 	}
 
 	ENQUEUE_RENDER_COMMAND(CefOpenSharedTexture)(
-		[this, LocalHandle, InWidth, InHeight, OldRHI](FRHICommandListImmediate& RHICmdList) mutable
+		[this, LocalHandle, OldRHI](FRHICommandListImmediate&) mutable
 		{
 			OldRHI.SafeRelease();
 
@@ -156,7 +174,7 @@ void UCefWebUiBrowserWidget::EnsureExternalTexture(void* InNTHandle, uint32 InWi
 
 			ID3D12Resource* D3DResource = nullptr;
 			HRESULT hr = D3DDevice->OpenSharedHandle(LocalHandle, IID_PPV_ARGS(&D3DResource));
-			CloseHandle(LocalHandle); // always close after OpenSharedHandle attempt
+			CloseHandle(LocalHandle);
 
 			if (FAILED(hr) || !D3DResource)
 			{
@@ -178,53 +196,7 @@ void UCefWebUiBrowserWidget::EnsureExternalTexture(void* InNTHandle, uint32 InWi
 				return;
 			}
 
-			UE_LOG(LogCefWebUi, Log, TEXT("CefWidget: Shared texture bound %ux%u"), InWidth, InHeight);
-
-			if (!SharedTextureRHI.IsValid())
-			{
-				UE_LOG(LogCefWebUi, Error, TEXT("CefWidget: RHICreateTexture2DFromResource failed"));
-				return;
-			}
-
-			UE_LOG(LogCefWebUi, Log, TEXT("CefWidget: SharedTextureRHI is valid"));
-
-			AsyncTask(ENamedThreads::GameThread, [this]()
-			{
-				UE_LOG(LogCefWebUi, Log, TEXT("CefWidget: GameThread bind, DisplayImage=%s DisplayTexture=%s"),
-				       DisplayImage ? TEXT("valid") : TEXT("null"),
-				       DisplayTexture ? TEXT("valid") : TEXT("null"));
-
-				// ...
-			});
-
-			AsyncTask(ENamedThreads::GameThread, [this, InWidth, InHeight]()
-			{
-				// Create a proper transient texture as the carrier
-				if (!DisplayTexture || TextureWidth != InWidth || TextureHeight != InHeight)
-				{
-					TextureWidth = InWidth;
-					TextureHeight = InHeight;
-					DisplayTexture = UTexture2D::CreateTransient(InWidth, InHeight, PF_B8G8R8A8);
-					DisplayTexture->Filter = TextureFilter;
-					DisplayTexture->SRGB = bUseSRGB;
-					DisplayTexture->UpdateResource();
-				}
-
-				// Replace its RHI with our shared texture
-				FTextureRHIRef texRhi = SharedTextureRHI;
-				FTextureResource* resource = DisplayTexture->GetResource();
-				if (resource)
-				{
-					ENQUEUE_RENDER_COMMAND(CefSetRHI)(
-						[resource, texRhi](FRHICommandListImmediate&)
-						{
-							resource->TextureRHI = texRhi;
-						});
-				}
-
-				if (DisplayImage)
-					DisplayImage->SetBrushFromTexture(DisplayTexture);
-			});
+			UE_LOG(LogCefWebUi, Log, TEXT("CefWidget: SharedTextureRHI ready"));
 		}
 	);
 }
@@ -243,38 +215,39 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 			return;
 	}
 
-	if (Frame.SharedTextureHandle == nullptr)
+	if (Frame.SharedTextureHandle == nullptr || Frame.CefPid == 0)
 		return;
 
-	/*UE_LOG(LogCefWebUi, Log, TEXT("CefWidget: Frame %dx%d has been pooled!"),
-	       Frame.Width, Frame.Height);*/
 	SetCursor(FCefFrameReader::MapCefCursor(Frame.CursorType));
 
-	{
-		SCOPE_CYCLE_COUNTER(STAT_CefWidget_BindShared);
-		EnsureExternalTexture(Frame.SharedTextureHandle, Frame.Width, Frame.Height, Frame.CefPid);
-	}
-}
+	// Ensure render target exists on game thread
+	EnsureRenderTarget(Frame.Width, Frame.Height);
 
-// ---- EnsureTexture kept for fallback / legacy ---------------------------------
+	// Ensure shared RHI is opened (only when handle changes)
+	EnsureSharedRHI(Frame.SharedTextureHandle, Frame.Width, Frame.Height, Frame.CefPid);
 
-void UCefWebUiBrowserWidget::EnsureTexture(uint32 InWidth, uint32 InHeight)
-{
-	if (DisplayTexture && TextureWidth == InWidth && TextureHeight == InHeight)
+	// GPU blit shared texture → render target every frame
+	if (!SharedTextureRHI.IsValid() || !RenderTarget || !RenderTarget->GetResource())
 		return;
 
-	TextureWidth = InWidth;
-	TextureHeight = InHeight;
+	FTextureRHIRef SrcRHI = SharedTextureRHI;
+	FTextureResource* DstRes = RenderTarget->GetResource();
 
-	DisplayTexture = UTexture2D::CreateTransient(InWidth, InHeight, PF_B8G8R8A8);
-	DisplayTexture->Filter = TF_Bilinear;
-	DisplayTexture->UpdateResource();
+	ENQUEUE_RENDER_COMMAND(CefBlitToRenderTarget)(
+		[SrcRHI, DstRes](FRHICommandListImmediate& RHICmdList)
+		{
+			SCOPE_CYCLE_COUNTER(STAT_CefWidget_GPUBlit);
 
-	if (DisplayImage)
-		DisplayImage->SetBrushFromTexture(DisplayTexture);
+			if (!SrcRHI.IsValid() || !DstRes || !DstRes->TextureRHI)
+				return;
+
+			FRHICopyTextureInfo CopyInfo;
+			RHICmdList.CopyTexture(SrcRHI, DstRes->TextureRHI, CopyInfo);
+		}
+	);
 }
 
-// ---- Input -------------------------------------------------------------------
+// ---- Input ------------------------------------------------------------------
 
 FReply UCefWebUiBrowserWidget::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
