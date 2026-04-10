@@ -25,7 +25,6 @@ private:
 	void EnsureRenderTarget(uint32 InWidth, uint32 InHeight);
 
 private:
-
 	uint32 TextureWidth = 0;
 	uint32 TextureHeight = 0;
 
@@ -40,6 +39,7 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidget), Category="Display")
 	TObjectPtr<class UImage> DisplayImage;
 
+protected:
 	UPROPERTY()
 	TObjectPtr<class UTextureRenderTarget2D> RenderTarget;
 
@@ -50,9 +50,21 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="CefBrowser")
 	int32 BrowserHeight = 1080;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="CefBrowser")
-	float TargetFPS = 60.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="CefBrowser|Texture")
+	uint8 bAutoGenerateMips:1;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="CefBrowser|Texture")
+	TEnumAsByte<enum TextureFilter> RenderFilter;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="CefBrowser|Texture")
+	uint8 bSRGB : 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="CefBrowser|Texture")
+	TEnumAsByte<TextureCompressionSettings> RenderCompression;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="CefBrowser|Texture")
+	ETextureMipLoadOptions RenderMipLoadOptions;
+	
 	UFUNCTION()
 	virtual void OnLoadStateChanged(uint8 InState);
 

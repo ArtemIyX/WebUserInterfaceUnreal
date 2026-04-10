@@ -28,7 +28,37 @@ UCefWebUiBrowserWidget::UCefWebUiBrowserWidget(const FObjectInitializer& ObjectI
 {
 	BrowserWidth = 1920;
 	BrowserHeight = 1080;
+	bAutoGenerateMips = false;
+	RenderFilter = TextureFilter::TF_Bilinear;
+	bSRGB = false;
+	RenderCompression = TextureCompressionSettings::TC_Default;
+	RenderMipLoadOptions = ETextureMipLoadOptions::OnlyFirstMip;
 }
+
+void UCefWebUiBrowserWidget::EnsureRenderTarget(uint32 InWidth, uint32 InHeight)
+{
+	if (RenderTarget && TextureWidth == InWidth && TextureHeight == InHeight)
+		return;
+
+	TextureWidth = InWidth;
+	TextureHeight = InHeight;
+
+	RenderTarget = NewObject<UTextureRenderTarget2D>(this);
+	RenderTarget->InitCustomFormat(InWidth, InHeight, PF_B8G8R8A8, false);
+	RenderTarget->bAutoGenerateMips = bAutoGenerateMips;
+	RenderTarget->Filter = RenderFilter;
+	RenderTarget->SRGB = bSRGB;
+	RenderTarget->CompressionSettings = RenderCompression;
+	RenderTarget->MipLoadOptions = RenderMipLoadOptions;
+	RenderTarget->UpdateResource();
+
+	FSlateBrush Brush;
+	Brush.SetResourceObject(RenderTarget);
+	Brush.ImageSize = FVector2D(InWidth, InHeight);
+	if (DisplayImage)
+		DisplayImage->SetBrush(Brush);
+}
+
 
 void UCefWebUiBrowserWidget::OnLoadStateChanged(uint8 InState)
 {
@@ -90,26 +120,6 @@ void UCefWebUiBrowserWidget::NativeTick(const FGeometry& MyGeometry, float InDel
 		return;
 
 	PollAndUpload();
-}
-
-void UCefWebUiBrowserWidget::EnsureRenderTarget(uint32 InWidth, uint32 InHeight)
-{
-	if (RenderTarget && TextureWidth == InWidth && TextureHeight == InHeight)
-		return;
-
-	TextureWidth = InWidth;
-	TextureHeight = InHeight;
-
-	RenderTarget = NewObject<UTextureRenderTarget2D>(this);
-	RenderTarget->InitCustomFormat(InWidth, InHeight, PF_B8G8R8A8, false);
-	RenderTarget->bAutoGenerateMips = false;
-	RenderTarget->UpdateResource();
-
-	FSlateBrush Brush;
-	Brush.SetResourceObject(RenderTarget);
-	Brush.ImageSize = FVector2D(InWidth, InHeight);
-	if (DisplayImage)
-		DisplayImage->SetBrush(Brush);
 }
 
 void UCefWebUiBrowserWidget::EnsureSharedRHI()
