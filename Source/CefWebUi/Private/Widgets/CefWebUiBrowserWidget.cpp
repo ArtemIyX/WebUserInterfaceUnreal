@@ -212,36 +212,13 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 	FTextureRHIRef SrcRHI = SharedTextureRHI[index];
 	FTextureResource* DstRes = RenderTarget ? RenderTarget->GetResource() : nullptr;
 
-	struct FDirtyBatch
-	{
-		uint8 Count = 0;
-		FCefDirtyRect Rects[MAX_CEF_DIRTY_RECTS];
-	};
-	FDirtyBatch Dirty;
-	Dirty.Count = Frame.DirtyCount;
-	FMemory::Memcpy(Dirty.Rects, Frame.DirtyRects, sizeof(FCefDirtyRect) * Frame.DirtyCount);
-
 	ENQUEUE_RENDER_COMMAND(CefBlitToRenderTarget)(
-		[SrcRHI, DstRes, Dirty](FRHICommandListImmediate& RHICmdList)
+		[SrcRHI, DstRes](FRHICommandListImmediate& RHICmdList)
 		{
 			SCOPE_CYCLE_COUNTER(STAT_CefWidget_GPUBlit);
 			if (!SrcRHI.IsValid() || !DstRes || !DstRes->TextureRHI)
 				return;
-			if (Dirty.Count == 0)
-			{
-				RHICmdList.CopyTexture(SrcRHI, DstRes->TextureRHI, FRHICopyTextureInfo{});
-			}
-			else
-			{
-				for (uint8 i = 0; i < Dirty.Count; ++i)
-				{
-					FRHICopyTextureInfo Info;
-					Info.SourcePosition = FIntVector(Dirty.Rects[i].X, Dirty.Rects[i].Y, 0);
-					Info.DestPosition   = FIntVector(Dirty.Rects[i].X, Dirty.Rects[i].Y, 0);
-					Info.Size           = FIntVector(Dirty.Rects[i].W, Dirty.Rects[i].H, 1);
-					RHICmdList.CopyTexture(SrcRHI, DstRes->TextureRHI, Info);
-				}
-			}
+			RHICmdList.CopyTexture(SrcRHI, DstRes->TextureRHI, FRHICopyTextureInfo{});
 		}
 	);
 }

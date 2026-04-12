@@ -116,13 +116,6 @@ uint32 FCefFrameReader::Run()
 
 		LastSequence = header->sequence;
 
-		// Duplicate the NT handle into this process so the game thread can open it safely
-		HANDLE cefProcessHandle = GetCurrentProcess(); // same process since CEF wrote a cross-process NT handle
-		HANDLE duplicated = nullptr;
-		// NT handles from CreateSharedHandle are process-agnostic (no duplication needed),
-		// but we snapshot the value so the game thread has a stable copy.
-		// We simply pass the raw value — OpenSharedHandle on D3D12 accepts it directly.
-
 		{
 			FScopeLock Lock(&PendingFrameLock);
 			PendingFrame.WriteSlot = header->write_slot;
@@ -131,15 +124,6 @@ uint32 FCefFrameReader::Run()
 			PendingFrame.Sequence = header->sequence;
 			PendingFrame.CursorType = static_cast<ECefCustomCursorType>(header->cursor_type);
 			PendingFrame.LoadState = static_cast<ECefLoadState>(header->load_state);
-			const uint8 cnt = FMath::Min<uint8>(header->dirty_count, MAX_CEF_DIRTY_RECTS);
-			PendingFrame.DirtyCount = cnt;
-			for (uint8 i = 0; i < cnt; ++i)
-			{
-				PendingFrame.DirtyRects[i] = {
-					header->dirty_rects[i].x, header->dirty_rects[i].y,
-					header->dirty_rects[i].w, header->dirty_rects[i].h
-				};
-			}
 		}
 
 		bFramePending = true;
