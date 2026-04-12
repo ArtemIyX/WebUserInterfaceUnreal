@@ -11,6 +11,13 @@ namespace Windows
 	typedef void* HANDLE;
 }
 
+constexpr uint32 MAX_CEF_DIRTY_RECTS = 16;
+
+struct FCefDirtyRect
+{
+	int32 X = 0, Y = 0, W = 0, H = 0;
+};
+
 struct FCefSharedFrame
 {
 	uint32 WriteSlot = 0;
@@ -19,6 +26,8 @@ struct FCefSharedFrame
 	uint32 Sequence = 0;
 	ECefCustomCursorType CursorType = ECefCustomCursorType::CT_NONE;
 	ECefLoadState LoadState = ECefLoadState::Idle;
+	uint8 DirtyCount = 0; // 0 = full frame
+	FCefDirtyRect DirtyRects[MAX_CEF_DIRTY_RECTS];
 };
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnCefLoadStateChanged, uint8);
 

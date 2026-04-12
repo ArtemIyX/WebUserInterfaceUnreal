@@ -16,6 +16,7 @@ constexpr uint32 SHM_MAX_HEIGHT = 2160;
 constexpr uint32 SHM_FRAME_SIZE = SHM_MAX_WIDTH * SHM_MAX_HEIGHT * 4;
 
 #pragma pack(push, 1)
+struct FCefFrameHeaderDirtyRect { int32 x, y, w, h; };
 struct FCefFrameHeader
 {
 	uint32 width;
@@ -24,7 +25,9 @@ struct FCefFrameHeader
 	uint32 write_slot;
 	uint8 cursor_type;
 	uint8 load_state;
-	uint8 reserved[2];
+	uint8 dirty_count;
+	uint8 reserved;
+	FCefFrameHeaderDirtyRect dirty_rects[16];
 };
 #pragma pack(pop)
 
@@ -128,6 +131,15 @@ uint32 FCefFrameReader::Run()
 			PendingFrame.Sequence = header->sequence;
 			PendingFrame.CursorType = static_cast<ECefCustomCursorType>(header->cursor_type);
 			PendingFrame.LoadState = static_cast<ECefLoadState>(header->load_state);
+			const uint8 cnt = FMath::Min<uint8>(header->dirty_count, MAX_CEF_DIRTY_RECTS);
+			PendingFrame.DirtyCount = cnt;
+			for (uint8 i = 0; i < cnt; ++i)
+			{
+				PendingFrame.DirtyRects[i] = {
+					header->dirty_rects[i].x, header->dirty_rects[i].y,
+					header->dirty_rects[i].w, header->dirty_rects[i].h
+				};
+			}
 		}
 
 		bFramePending = true;
