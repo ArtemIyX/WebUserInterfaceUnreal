@@ -41,6 +41,9 @@ public:
 
 	void ClearCookies();
 	void SetConsumerCadenceUs(uint32 CadenceUs);
+	void SetMaxInFlightBeginFrames(uint32 MaxInFlight);
+	void SetFlushIntervalFrames(uint32 FlushIntervalFrames);
+	void SetKeyframeIntervalUs(uint32 KeyframeIntervalUs);
 
 #pragma endregion
 

@@ -295,6 +295,30 @@ void FCefControlWriter::SetConsumerCadenceUs(uint32 CadenceUs)
 	WriteEvent(evt);
 }
 
+void FCefControlWriter::SetMaxInFlightBeginFrames(uint32 MaxInFlight)
+{
+	FCefControlEvent evt{};
+	evt.Type = ECefControlEventType::SetMaxInFlightBeginFrames;
+	evt.FrameRate.Value = MaxInFlight;
+	WriteEvent(evt);
+}
+
+void FCefControlWriter::SetFlushIntervalFrames(uint32 FlushIntervalFrames)
+{
+	FCefControlEvent evt{};
+	evt.Type = ECefControlEventType::SetFlushIntervalFrames;
+	evt.FrameRate.Value = FlushIntervalFrames;
+	WriteEvent(evt);
+}
+
+void FCefControlWriter::SetKeyframeIntervalUs(uint32 KeyframeIntervalUs)
+{
+	FCefControlEvent evt{};
+	evt.Type = ECefControlEventType::SetKeyframeIntervalUs;
+	evt.CadenceUs.Value = KeyframeIntervalUs;
+	WriteEvent(evt);
+}
+
 void FCefControlWriter::CloseHandles()
 {
 	if (PData)

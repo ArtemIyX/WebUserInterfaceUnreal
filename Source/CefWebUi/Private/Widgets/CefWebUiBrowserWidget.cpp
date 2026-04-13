@@ -127,6 +127,31 @@ static TAutoConsoleVariable<int32> CVarCefWebUiGpuFenceWaitMode(
 	1,
 	TEXT("0=auto, 1=timeout-no-block, 2=block-only, 3=no-wait"));
 
+static TAutoConsoleVariable<int32> CVarCefWebUiUsePopupDedicatedPlane(
+	TEXT("CefWebUi.UsePopupDedicatedPlane"),
+	1,
+	TEXT("Use dedicated popup shared plane when host provides it (0/1)."));
+
+static TAutoConsoleVariable<float> CVarCefWebUiHostTuningPushPeriodSec(
+	TEXT("CefWebUi.HostTuningPushPeriodSec"),
+	0.5f,
+	TEXT("How often to push host tuning CVars via control channel."));
+
+static TAutoConsoleVariable<int32> CVarCefWebUiHostMaxInFlightBeginFrames(
+	TEXT("CefWebUi.HostMaxInFlightBeginFrames"),
+	0,
+	TEXT("Host tuning: max in-flight begin frames (0 disables cap)."));
+
+static TAutoConsoleVariable<int32> CVarCefWebUiHostFlushIntervalFrames(
+	TEXT("CefWebUi.HostFlushIntervalFrames"),
+	4,
+	TEXT("Host tuning: flush every N frames (0=only special cases)."));
+
+static TAutoConsoleVariable<int32> CVarCefWebUiHostKeyframeIntervalUs(
+	TEXT("CefWebUi.HostKeyframeIntervalUs"),
+	300000,
+	TEXT("Host tuning: time-based keyframe full refresh interval in microseconds."));
+
 UCefWebUiBrowserWidget::UCefWebUiBrowserWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
@@ -149,6 +174,7 @@ void UCefWebUiBrowserWidget::ResetRuntimeState()
 	LastInputEventTimeSec = 0.0;
 	LastCursorUpdateTimeSec = 0.0;
 	GpuFenceAutoBlockUntilSec = 0.0;
+	LastHostTuningPushTimeSec = 0.0;
 	LastTelemetryLogTimeSec = 0.0;
 	SmoothedCadenceUs = 0;
 	LastSeenFrameId = 0;
@@ -233,13 +259,15 @@ void UCefWebUiBrowserWidget::NativeDestruct()
 	FTextureRHIRef OldRHI0 = SharedTextureRHI[0];
 	FTextureRHIRef OldRHI1 = SharedTextureRHI[1];
 	FTextureRHIRef OldRHI2 = SharedTextureRHI[2];
+	FTextureRHIRef OldPopup = SharedPopupTextureRHI;
 
 	ENQUEUE_RENDER_COMMAND(CefReleaseSharedTextures)(
-		[OldRHI0, OldRHI1, OldRHI2](FRHICommandListImmediate&) mutable
+		[OldRHI0, OldRHI1, OldRHI2, OldPopup](FRHICommandListImmediate&) mutable
 		{
 			OldRHI0.SafeRelease();
 			OldRHI1.SafeRelease();
 			OldRHI2.SafeRelease();
+			OldPopup.SafeRelease();
 		});
 
 	for (uint32 i = 0; i < MaxSharedSlots; ++i)
@@ -257,6 +285,7 @@ void UCefWebUiBrowserWidget::NativeDestruct()
 		CloseHandle(static_cast<HANDLE>(GpuFenceWaitEvent));
 		GpuFenceWaitEvent = nullptr;
 	}
+	SharedPopupTextureRHI = nullptr;
 	SharedSlotCount = 2;
 	ResetRuntimeState();
 	RenderTarget = nullptr;
@@ -387,6 +416,55 @@ bool UCefWebUiBrowserWidget::EnsureGpuFence()
 
 	UE_LOG(LogCefWebUi, Log, TEXT("CefWidget: Opened shared GPU fence"));
 	return true;
+}
+
+bool UCefWebUiBrowserWidget::EnsurePopupPlaneRHI()
+{
+	if (SharedPopupTextureRHI.IsValid())
+		return true;
+
+	ID3D12DynamicRHI* D3D12RHI = GetID3D12DynamicRHI();
+	if (!D3D12RHI)
+		return false;
+
+	ID3D12Device* D3DDevice = D3D12RHI->RHIGetDevice(0);
+	if (!D3DDevice)
+		return false;
+
+	HANDLE SharedHandle = nullptr;
+	HRESULT hr = D3DDevice->OpenSharedHandleByName(L"Global\\CEFHost_SharedPopupTex", GENERIC_ALL, &SharedHandle);
+	if (FAILED(hr) || !SharedHandle)
+		return false;
+
+	ID3D12Resource* D3DResource = nullptr;
+	hr = D3DDevice->OpenSharedHandle(SharedHandle, IID_PPV_ARGS(&D3DResource));
+	CloseHandle(SharedHandle);
+	if (FAILED(hr) || !D3DResource)
+		return false;
+
+	SharedPopupTextureRHI = D3D12RHI->RHICreateTexture2DFromResource(
+		PF_B8G8R8A8,
+		ETextureCreateFlags::External | ETextureCreateFlags::ShaderResource,
+		FClearValueBinding::None,
+		D3DResource);
+	D3DResource->Release();
+	return SharedPopupTextureRHI.IsValid();
+}
+
+void UCefWebUiBrowserWidget::PushHostTuningIfNeeded(double NowSec)
+{
+	const double periodSec = FMath::Max(0.05, static_cast<double>(CVarCefWebUiHostTuningPushPeriodSec.GetValueOnAnyThread()));
+	if (LastHostTuningPushTimeSec > 0.0 && (NowSec - LastHostTuningPushTimeSec) < periodSec)
+		return;
+
+	TSharedPtr<FCefControlWriter> Ctrl = ControlWriter.Pin();
+	if (!Ctrl || !Ctrl->IsOpen())
+		return;
+
+	Ctrl->SetMaxInFlightBeginFrames(static_cast<uint32>(FMath::Max(0, CVarCefWebUiHostMaxInFlightBeginFrames.GetValueOnAnyThread())));
+	Ctrl->SetFlushIntervalFrames(static_cast<uint32>(FMath::Max(0, CVarCefWebUiHostFlushIntervalFrames.GetValueOnAnyThread())));
+	Ctrl->SetKeyframeIntervalUs(static_cast<uint32>(FMath::Max(0, CVarCefWebUiHostKeyframeIntervalUs.GetValueOnAnyThread())));
+	LastHostTuningPushTimeSec = NowSec;
 }
 
 void UCefWebUiBrowserWidget::WaitForProducerGpuFence(uint64 FenceValue)
@@ -652,6 +730,7 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 	UpdateFrameGapTelemetry(Frame, bIdleRecoveryFullCopy);
 	UpdateCadenceFeedback(nowSec, bIdleRecoveryFullCopy);
 	MaybeUpdateCursor(Frame, nowSec);
+	PushHostTuningIfNeeded(nowSec);
 
 	SharedSlotCount = FMath::Clamp(Frame.SlotCount, 1u, MaxSharedSlots);
 	EnsureRenderTarget(Frame.Width, Frame.Height);
@@ -660,6 +739,11 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 	const uint32 slotCount = FMath::Clamp(SharedSlotCount, 1u, MaxSharedSlots);
 	const uint32 index = Frame.WriteSlot % slotCount;
 	FTextureRHIRef SrcRHI = SharedTextureRHI[index];
+	const bool bUsePopupPlane = (CVarCefWebUiUsePopupDedicatedPlane.GetValueOnAnyThread() != 0) &&
+		((Frame.Flags & CefFrameFlag_PopupPlane) != 0);
+	if (bUsePopupPlane)
+		EnsurePopupPlaneRHI();
+	FTextureRHIRef PopupSrcRHI = SharedPopupTextureRHI;
 	FTextureResource* DstRes = RenderTarget ? RenderTarget->GetResource() : nullptr;
 	WaitForProducerGpuFence(Frame.GpuFenceValue);
 	const bool bUseDirtyRects = ResolveUseDirtyRects(Frame, nowSec);
@@ -675,7 +759,7 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 	const float dirtyAreaThreshold = FMath::Clamp(CVarCefWebUiDirtyAreaFullCopyThreshold.GetValueOnAnyThread(), 0.0f, 1.0f);
 
 	ENQUEUE_RENDER_COMMAND(CefBlitToRenderTarget)(
-		[SrcRHI, DstRes, Frame, bUseDirtyRects, dirtyInflatePx, coalesceGapPx, dirtyAreaThreshold](FRHICommandListImmediate& RHICmdList)
+		[SrcRHI, PopupSrcRHI, DstRes, Frame, bUseDirtyRects, bUsePopupPlane, dirtyInflatePx, coalesceGapPx, dirtyAreaThreshold](FRHICommandListImmediate& RHICmdList)
 		{
 			SCOPE_CYCLE_COUNTER(STAT_CefWidget_GPUBlit);
 			if (!SrcRHI.IsValid() || !DstRes || !DstRes->TextureRHI)
@@ -685,103 +769,126 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 			{
 				SCOPE_CYCLE_COUNTER(STAT_CefWidget_GPUBlitFull);
 				RHICmdList.CopyTexture(SrcRHI, DstRes->TextureRHI, FRHICopyTextureInfo{});
-				return;
 			}
-			SCOPE_CYCLE_COUNTER(STAT_CefWidget_GPUBlitDirty);
-
-			FIntRect mergedRects[MAX_CEF_DIRTY_RECTS];
-			uint32 mergedCount = 0;
-			auto intersectsOrAdjacent = [coalesceGapPx](const FIntRect& a, const FIntRect& b)
+			else
 			{
-				// FIntRect uses min-inclusive/max-exclusive bounds.
-				const int32 ax0 = a.Min.X - coalesceGapPx;
-				const int32 ay0 = a.Min.Y - coalesceGapPx;
-				const int32 ax1 = a.Max.X + coalesceGapPx;
-				const int32 ay1 = a.Max.Y + coalesceGapPx;
-				return !(ax1 < b.Min.X || b.Max.X < ax0 || ay1 < b.Min.Y || b.Max.Y < ay0);
-			};
-			auto unionRect = [](const FIntRect& a, const FIntRect& b)
-			{
-				return FIntRect(
-					FMath::Min(a.Min.X, b.Min.X),
-					FMath::Min(a.Min.Y, b.Min.Y),
-					FMath::Max(a.Max.X, b.Max.X),
-					FMath::Max(a.Max.Y, b.Max.Y));
-			};
+				SCOPE_CYCLE_COUNTER(STAT_CefWidget_GPUBlitDirty);
 
-			const uint8 rectCount = FMath::Min<uint8>(Frame.DirtyCount, MAX_CEF_DIRTY_RECTS);
-			for (uint8 i = 0; i < rectCount; ++i)
-			{
-				const FCefDirtyRect& r = Frame.DirtyRects[i];
-				if (r.W <= 0 || r.H <= 0)
-					continue;
-
-				const int32 x0 = FMath::Clamp(r.X - dirtyInflatePx, 0, static_cast<int32>(Frame.Width));
-				const int32 y0 = FMath::Clamp(r.Y - dirtyInflatePx, 0, static_cast<int32>(Frame.Height));
-				const int32 x1 = FMath::Clamp(r.X + r.W + dirtyInflatePx, 0, static_cast<int32>(Frame.Width));
-				const int32 y1 = FMath::Clamp(r.Y + r.H + dirtyInflatePx, 0, static_cast<int32>(Frame.Height));
-				if (x1 <= x0 || y1 <= y0)
-					continue;
-
-				FIntRect rect(x0, y0, x1, y1);
-				bool merged = false;
-				for (uint32 m = 0; m < mergedCount; ++m)
+				FIntRect mergedRects[MAX_CEF_DIRTY_RECTS];
+				uint32 mergedCount = 0;
+				auto intersectsOrAdjacent = [coalesceGapPx](const FIntRect& a, const FIntRect& b)
 				{
-					if (intersectsOrAdjacent(mergedRects[m], rect))
+					// FIntRect uses min-inclusive/max-exclusive bounds.
+					const int32 ax0 = a.Min.X - coalesceGapPx;
+					const int32 ay0 = a.Min.Y - coalesceGapPx;
+					const int32 ax1 = a.Max.X + coalesceGapPx;
+					const int32 ay1 = a.Max.Y + coalesceGapPx;
+					return !(ax1 < b.Min.X || b.Max.X < ax0 || ay1 < b.Min.Y || b.Max.Y < ay0);
+				};
+				auto unionRect = [](const FIntRect& a, const FIntRect& b)
+				{
+					return FIntRect(
+						FMath::Min(a.Min.X, b.Min.X),
+						FMath::Min(a.Min.Y, b.Min.Y),
+						FMath::Max(a.Max.X, b.Max.X),
+						FMath::Max(a.Max.Y, b.Max.Y));
+				};
+
+				const uint8 rectCount = FMath::Min<uint8>(Frame.DirtyCount, MAX_CEF_DIRTY_RECTS);
+				for (uint8 i = 0; i < rectCount; ++i)
+				{
+					const FCefDirtyRect& r = Frame.DirtyRects[i];
+					if (r.W <= 0 || r.H <= 0)
+						continue;
+
+					const int32 x0 = FMath::Clamp(r.X - dirtyInflatePx, 0, static_cast<int32>(Frame.Width));
+					const int32 y0 = FMath::Clamp(r.Y - dirtyInflatePx, 0, static_cast<int32>(Frame.Height));
+					const int32 x1 = FMath::Clamp(r.X + r.W + dirtyInflatePx, 0, static_cast<int32>(Frame.Width));
+					const int32 y1 = FMath::Clamp(r.Y + r.H + dirtyInflatePx, 0, static_cast<int32>(Frame.Height));
+					if (x1 <= x0 || y1 <= y0)
+						continue;
+
+					FIntRect rect(x0, y0, x1, y1);
+					bool merged = false;
+					for (uint32 m = 0; m < mergedCount; ++m)
 					{
-						mergedRects[m] = unionRect(mergedRects[m], rect);
-						merged = true;
-						break;
+						if (intersectsOrAdjacent(mergedRects[m], rect))
+						{
+							mergedRects[m] = unionRect(mergedRects[m], rect);
+							merged = true;
+							break;
+						}
+					}
+					if (!merged && mergedCount < MAX_CEF_DIRTY_RECTS)
+						mergedRects[mergedCount++] = rect;
+				}
+
+				// Stable coalesce pass for merge chains.
+				bool changed = true;
+				while (changed)
+				{
+					changed = false;
+					for (uint32 i = 0; i < mergedCount; ++i)
+					{
+						for (uint32 j = i + 1; j < mergedCount; )
+						{
+							if (intersectsOrAdjacent(mergedRects[i], mergedRects[j]))
+							{
+								mergedRects[i] = unionRect(mergedRects[i], mergedRects[j]);
+								mergedRects[j] = mergedRects[mergedCount - 1];
+								--mergedCount;
+								changed = true;
+								continue;
+							}
+							++j;
+						}
 					}
 				}
-				if (!merged && mergedCount < MAX_CEF_DIRTY_RECTS)
-					mergedRects[mergedCount++] = rect;
-			}
 
-			// Stable coalesce pass for merge chains.
-			bool changed = true;
-			while (changed)
-			{
-				changed = false;
+				const int32 maxRectsPerFrame = FMath::Max(0, CVarCefWebUiMaxDirtyRectsPerFrame.GetValueOnAnyThread());
+				uint64 mergedArea = 0;
 				for (uint32 i = 0; i < mergedCount; ++i)
 				{
-					for (uint32 j = i + 1; j < mergedCount; )
+					const int32 w = FMath::Max(0, mergedRects[i].Width());
+					const int32 h = FMath::Max(0, mergedRects[i].Height());
+					mergedArea += static_cast<uint64>(w) * static_cast<uint64>(h);
+				}
+				const uint64 fullArea = static_cast<uint64>(Frame.Width) * static_cast<uint64>(Frame.Height);
+				const bool useFullCopy = (mergedCount == 0) ||
+					(maxRectsPerFrame > 0 && mergedCount > static_cast<uint32>(maxRectsPerFrame)) ||
+					(fullArea > 0 && (static_cast<double>(mergedArea) / static_cast<double>(fullArea)) > static_cast<double>(dirtyAreaThreshold));
+				if (useFullCopy)
+				{
+					RHICmdList.CopyTexture(SrcRHI, DstRes->TextureRHI, FRHICopyTextureInfo{});
+				}
+				else
+				{
+					for (uint32 i = 0; i < mergedCount; ++i)
 					{
-						if (intersectsOrAdjacent(mergedRects[i], mergedRects[j]))
-						{
-							mergedRects[i] = unionRect(mergedRects[i], mergedRects[j]);
-							mergedRects[j] = mergedRects[mergedCount - 1];
-							--mergedCount;
-							changed = true;
-							continue;
-						}
-						++j;
+						FRHICopyTextureInfo info;
+						info.SourcePosition = FIntVector(mergedRects[i].Min.X, mergedRects[i].Min.Y, 0);
+						info.DestPosition = FIntVector(mergedRects[i].Min.X, mergedRects[i].Min.Y, 0);
+						info.Size = FIntVector(mergedRects[i].Width(), mergedRects[i].Height(), 1);
+						RHICmdList.CopyTexture(SrcRHI, DstRes->TextureRHI, info);
 					}
 				}
 			}
 
-			uint64 mergedArea = 0;
-			for (uint32 i = 0; i < mergedCount; ++i)
+			// Overlay popup plane after main copy.
+			if (bUsePopupPlane && PopupSrcRHI.IsValid() && Frame.bPopupVisible && Frame.PopupRect.W > 0 && Frame.PopupRect.H > 0)
 			{
-				const int32 w = FMath::Max(0, mergedRects[i].Width());
-				const int32 h = FMath::Max(0, mergedRects[i].Height());
-				mergedArea += static_cast<uint64>(w) * static_cast<uint64>(h);
-			}
-			const uint64 fullArea = static_cast<uint64>(Frame.Width) * static_cast<uint64>(Frame.Height);
-			const bool useFullCopy = (mergedCount == 0) || (fullArea > 0 && (static_cast<double>(mergedArea) / static_cast<double>(fullArea)) > static_cast<double>(dirtyAreaThreshold));
-			if (useFullCopy)
-			{
-				RHICmdList.CopyTexture(SrcRHI, DstRes->TextureRHI, FRHICopyTextureInfo{});
-				return;
-			}
-
-			for (uint32 i = 0; i < mergedCount; ++i)
-			{
-				FRHICopyTextureInfo info;
-				info.SourcePosition = FIntVector(mergedRects[i].Min.X, mergedRects[i].Min.Y, 0);
-				info.DestPosition = FIntVector(mergedRects[i].Min.X, mergedRects[i].Min.Y, 0);
-				info.Size = FIntVector(mergedRects[i].Width(), mergedRects[i].Height(), 1);
-				RHICmdList.CopyTexture(SrcRHI, DstRes->TextureRHI, info);
+				const int32 x0 = FMath::Clamp(Frame.PopupRect.X, 0, static_cast<int32>(Frame.Width));
+				const int32 y0 = FMath::Clamp(Frame.PopupRect.Y, 0, static_cast<int32>(Frame.Height));
+				const int32 x1 = FMath::Clamp(Frame.PopupRect.X + Frame.PopupRect.W, 0, static_cast<int32>(Frame.Width));
+				const int32 y1 = FMath::Clamp(Frame.PopupRect.Y + Frame.PopupRect.H, 0, static_cast<int32>(Frame.Height));
+				if (x1 > x0 && y1 > y0)
+				{
+					FRHICopyTextureInfo popupInfo;
+					popupInfo.SourcePosition = FIntVector(x0, y0, 0);
+					popupInfo.DestPosition = FIntVector(x0, y0, 0);
+					popupInfo.Size = FIntVector(x1 - x0, y1 - y0, 1);
+					RHICmdList.CopyTexture(PopupSrcRHI, DstRes->TextureRHI, popupInfo);
+				}
 			}
 		}
 	);

@@ -31,6 +31,8 @@ private:
 	void MaybeUpdateCursor(const FCefSharedFrame& Frame, double NowSec);
 	bool EnsureGpuFence();
 	void WaitForProducerGpuFence(uint64 FenceValue);
+	bool EnsurePopupPlaneRHI();
+	void PushHostTuningIfNeeded(double NowSec);
 	void PollAndUpload();
 	void EnsureSharedRHI();
 	void EnsureRenderTarget(uint32 InWidth, uint32 InHeight);
@@ -48,6 +50,7 @@ private:
 	double LastInputEventTimeSec = 0.0;
 	double LastCursorUpdateTimeSec = 0.0;
 	double GpuFenceAutoBlockUntilSec = 0.0;
+	double LastHostTuningPushTimeSec = 0.0;
 	double LastTelemetryLogTimeSec = 0.0;
 	uint32 SmoothedCadenceUs = 0;
 	uint64 LastSeenFrameId = 0;
@@ -67,6 +70,7 @@ private:
 
 	void* LastSharedHandle[MaxSharedSlots] = { nullptr };
 	FTextureRHIRef SharedTextureRHI[MaxSharedSlots];
+	FTextureRHIRef SharedPopupTextureRHI;
 	void* SharedGpuFence = nullptr;      // ID3D12Fence*
 	void* GpuFenceWaitEvent = nullptr;   // HANDLE
 

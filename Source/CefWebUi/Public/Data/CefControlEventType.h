@@ -27,4 +27,7 @@ enum class ECefControlEventType : uint8
 	ExecuteJS = 16,
 	ClearCookies = 17,
 	SetConsumerCadenceUs = 18,
+	SetMaxInFlightBeginFrames = 19,
+	SetFlushIntervalFrames = 20,
+	SetKeyframeIntervalUs = 21,
 };

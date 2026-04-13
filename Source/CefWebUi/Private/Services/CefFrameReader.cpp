@@ -83,8 +83,10 @@ struct FCefFrameHeader
 	uint32 flags;
 	uint8 cursor_type;
 	uint8 load_state;
+	uint8 popup_visible;
 	uint8 dirty_count;
-	uint8 reserved[3];
+	uint8 reserved[2];
+	FCefFrameHeaderDirtyRect popup_rect;
 	FCefFrameHeaderDirtyRect dirty_rects[16];
 };
 
@@ -229,6 +231,11 @@ uint32 FCefFrameReader::Run()
 			PendingFrame.PresentId = header->present_id;
 			PendingFrame.GpuFenceValue = header->gpu_fence_value;
 			PendingFrame.Flags = header->flags;
+			PendingFrame.bPopupVisible = (header->popup_visible != 0);
+			PendingFrame.PopupRect.X = header->popup_rect.x;
+			PendingFrame.PopupRect.Y = header->popup_rect.y;
+			PendingFrame.PopupRect.W = header->popup_rect.w;
+			PendingFrame.PopupRect.H = header->popup_rect.h;
 			PendingFrame.bForceFullRefresh = bForceFull;
 			PendingFrame.DirtyCount = bForceFull ? 0 : header->dirty_count;
 			if (!bForceFull)
