@@ -10,6 +10,7 @@ class FCefInputWriter;
 class FCefFrameReader;
 class FCefControlWriter;
 CEFWEBUI_API DECLARE_LOG_CATEGORY_EXTERN(LogCefWebUi, Log, All);
+CEFWEBUI_API DECLARE_LOG_CATEGORY_EXTERN(LogCefWebUiTelemetry, Log, All);
 
 class FCefWebUiModule : public IModuleInterface
 {

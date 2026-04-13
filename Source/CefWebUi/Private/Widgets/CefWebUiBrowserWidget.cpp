@@ -20,8 +20,18 @@
 #include <dxgi1_4.h>
 #include "Windows/HideWindowsPlatformTypes.h"
 
-DECLARE_CYCLE_STAT(TEXT("CefWidget: PollFrame"), STAT_CefWidget_PollFrame, STATGROUP_Game);
-DECLARE_CYCLE_STAT(TEXT("CefWidget: GPUBlit"), STAT_CefWidget_GPUBlit, STATGROUP_Game);
+DECLARE_STATS_GROUP(TEXT("CefWebUiTelemetry"), STATGROUP_CefWebUiTelemetry, STATCAT_Advanced);
+DECLARE_CYCLE_STAT(TEXT("CefWidget: PollFrame"), STAT_CefWidget_PollFrame, STATGROUP_CefWebUiTelemetry);
+DECLARE_CYCLE_STAT(TEXT("CefWidget: GPUBlit"), STAT_CefWidget_GPUBlit, STATGROUP_CefWebUiTelemetry);
+DECLARE_CYCLE_STAT(TEXT("CefWidget: GPUBlit Full"), STAT_CefWidget_GPUBlitFull, STATGROUP_CefWebUiTelemetry);
+DECLARE_CYCLE_STAT(TEXT("CefWidget: GPUBlit Dirty"), STAT_CefWidget_GPUBlitDirty, STATGROUP_CefWebUiTelemetry);
+DECLARE_DWORD_COUNTER_STAT(TEXT("Consumed Frames"), STAT_CefTel_ConsumedFrames, STATGROUP_CefWebUiTelemetry);
+DECLARE_DWORD_COUNTER_STAT(TEXT("Frame Gaps"), STAT_CefTel_FrameGaps, STATGROUP_CefWebUiTelemetry);
+DECLARE_DWORD_COUNTER_STAT(TEXT("Forced Full"), STAT_CefTel_ForcedFull, STATGROUP_CefWebUiTelemetry);
+DECLARE_DWORD_COUNTER_STAT(TEXT("Full Copy"), STAT_CefTel_FullCopy, STATGROUP_CefWebUiTelemetry);
+DECLARE_DWORD_COUNTER_STAT(TEXT("Dirty Copy"), STAT_CefTel_DirtyCopy, STATGROUP_CefWebUiTelemetry);
+DECLARE_DWORD_COUNTER_STAT(TEXT("Dirty Rect Count Sum"), STAT_CefTel_DirtyRectCountSum, STATGROUP_CefWebUiTelemetry);
+DECLARE_DWORD_COUNTER_STAT(TEXT("Dirty Rect Area Sum"), STAT_CefTel_DirtyRectAreaSum, STATGROUP_CefWebUiTelemetry);
 
 UCefWebUiBrowserWidget::UCefWebUiBrowserWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -70,7 +80,23 @@ void UCefWebUiBrowserWidget::NativeConstruct()
 	Super::NativeConstruct();
 	LastConsumerFrameTimeSec = 0.0;
 	LastCadenceSentTimeSec = 0.0;
+	LastTelemetryLogTimeSec = 0.0;
 	SmoothedCadenceUs = 0;
+	LastSeenFrameId = 0;
+	TelemetryConsumedFrames = 0;
+	TelemetryFrameGapCount = 0;
+	TelemetryForcedFullCount = 0;
+	TelemetryFullCopyCount = 0;
+	TelemetryDirtyCopyCount = 0;
+	TelemetryDirtyRectCountSum = 0;
+	TelemetryDirtyRectAreaSum = 0;
+	SET_DWORD_STAT(STAT_CefTel_ConsumedFrames, 0);
+	SET_DWORD_STAT(STAT_CefTel_FrameGaps, 0);
+	SET_DWORD_STAT(STAT_CefTel_ForcedFull, 0);
+	SET_DWORD_STAT(STAT_CefTel_FullCopy, 0);
+	SET_DWORD_STAT(STAT_CefTel_DirtyCopy, 0);
+	SET_DWORD_STAT(STAT_CefTel_DirtyRectCountSum, 0);
+	SET_DWORD_STAT(STAT_CefTel_DirtyRectAreaSum, 0);
 
 	if (!ensureMsgf(FCefWebUiModule::IsAvailable(), TEXT("FCefWebUiModule is not available")))
 		return;
@@ -113,7 +139,23 @@ void UCefWebUiBrowserWidget::NativeDestruct()
 	SharedSlotCount = 2;
 	LastConsumerFrameTimeSec = 0.0;
 	LastCadenceSentTimeSec = 0.0;
+	LastTelemetryLogTimeSec = 0.0;
 	SmoothedCadenceUs = 0;
+	LastSeenFrameId = 0;
+	TelemetryConsumedFrames = 0;
+	TelemetryFrameGapCount = 0;
+	TelemetryForcedFullCount = 0;
+	TelemetryFullCopyCount = 0;
+	TelemetryDirtyCopyCount = 0;
+	TelemetryDirtyRectCountSum = 0;
+	TelemetryDirtyRectAreaSum = 0;
+	SET_DWORD_STAT(STAT_CefTel_ConsumedFrames, 0);
+	SET_DWORD_STAT(STAT_CefTel_FrameGaps, 0);
+	SET_DWORD_STAT(STAT_CefTel_ForcedFull, 0);
+	SET_DWORD_STAT(STAT_CefTel_FullCopy, 0);
+	SET_DWORD_STAT(STAT_CefTel_DirtyCopy, 0);
+	SET_DWORD_STAT(STAT_CefTel_DirtyRectCountSum, 0);
+	SET_DWORD_STAT(STAT_CefTel_DirtyRectAreaSum, 0);
 	RenderTarget = nullptr;
 
 	FrameReader.Reset();
@@ -224,6 +266,13 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 			return;
 	}
 
+	++TelemetryConsumedFrames;
+	if (LastSeenFrameId != 0 && Frame.FrameId != (LastSeenFrameId + 1))
+		++TelemetryFrameGapCount;
+	LastSeenFrameId = Frame.FrameId;
+	SET_DWORD_STAT(STAT_CefTel_ConsumedFrames, TelemetryConsumedFrames);
+	SET_DWORD_STAT(STAT_CefTel_FrameGaps, TelemetryFrameGapCount);
+
 	// Feed host pacing with observed consumer cadence (throttled).
 	{
 		const double nowSec = FPlatformTime::Seconds();
@@ -262,6 +311,31 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 	FTextureRHIRef SrcRHI = SharedTextureRHI[index];
 	FTextureResource* DstRes = RenderTarget ? RenderTarget->GetResource() : nullptr;
 	const bool bUseDirtyRects = !Frame.bForceFullRefresh && Frame.DirtyCount > 0;
+	if (Frame.bForceFullRefresh)
+		++TelemetryForcedFullCount;
+	if (bUseDirtyRects)
+	{
+		++TelemetryDirtyCopyCount;
+		TelemetryDirtyRectCountSum += Frame.DirtyCount;
+		uint64 rectArea = 0;
+		const uint8 rectCount = FMath::Min<uint8>(Frame.DirtyCount, MAX_CEF_DIRTY_RECTS);
+		for (uint8 i = 0; i < rectCount; ++i)
+		{
+			const FCefDirtyRect& r = Frame.DirtyRects[i];
+			rectArea += static_cast<uint64>(FMath::Max(0, r.W)) * static_cast<uint64>(FMath::Max(0, r.H));
+		}
+		const uint64 remaining = (TelemetryDirtyRectAreaSum < MAX_uint32) ? (MAX_uint32 - TelemetryDirtyRectAreaSum) : 0;
+		TelemetryDirtyRectAreaSum += static_cast<uint32>(FMath::Min<uint64>(rectArea, remaining));
+	}
+	else
+	{
+		++TelemetryFullCopyCount;
+	}
+	SET_DWORD_STAT(STAT_CefTel_ForcedFull, TelemetryForcedFullCount);
+	SET_DWORD_STAT(STAT_CefTel_FullCopy, TelemetryFullCopyCount);
+	SET_DWORD_STAT(STAT_CefTel_DirtyCopy, TelemetryDirtyCopyCount);
+	SET_DWORD_STAT(STAT_CefTel_DirtyRectCountSum, TelemetryDirtyRectCountSum);
+	SET_DWORD_STAT(STAT_CefTel_DirtyRectAreaSum, TelemetryDirtyRectAreaSum);
 
 	ENQUEUE_RENDER_COMMAND(CefBlitToRenderTarget)(
 		[SrcRHI, DstRes, Frame, bUseDirtyRects](FRHICommandListImmediate& RHICmdList)
@@ -272,9 +346,11 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 
 			if (!bUseDirtyRects)
 			{
+				SCOPE_CYCLE_COUNTER(STAT_CefWidget_GPUBlitFull);
 				RHICmdList.CopyTexture(SrcRHI, DstRes->TextureRHI, FRHICopyTextureInfo{});
 				return;
 			}
+			SCOPE_CYCLE_COUNTER(STAT_CefWidget_GPUBlitDirty);
 
 			uint32 copiedRects = 0;
 			const uint8 rectCount = FMath::Min<uint8>(Frame.DirtyCount, MAX_CEF_DIRTY_RECTS);
@@ -304,6 +380,43 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 				RHICmdList.CopyTexture(SrcRHI, DstRes->TextureRHI, FRHICopyTextureInfo{});
 		}
 	);
+
+	{
+		const double nowSec = FPlatformTime::Seconds();
+		if (LastTelemetryLogTimeSec <= 0.0)
+			LastTelemetryLogTimeSec = nowSec;
+		else if (nowSec - LastTelemetryLogTimeSec >= 2.0)
+		{
+			const uint32 frames = TelemetryConsumedFrames;
+			const uint32 avgRects = (TelemetryDirtyCopyCount > 0) ? (TelemetryDirtyRectCountSum / TelemetryDirtyCopyCount) : 0;
+			const uint32 avgArea = (TelemetryDirtyCopyCount > 0) ? (TelemetryDirtyRectAreaSum / TelemetryDirtyCopyCount) : 0;
+			UE_LOG(LogCefWebUiTelemetry, Log,
+				TEXT("[CefWidgetTelemetry] frames=%u gaps=%u forced_full=%u full_copy=%u dirty_copy=%u dirty_rects_avg=%u dirty_area_avg=%u"),
+				frames,
+				TelemetryFrameGapCount,
+				TelemetryForcedFullCount,
+				TelemetryFullCopyCount,
+				TelemetryDirtyCopyCount,
+				avgRects,
+				avgArea);
+
+			LastTelemetryLogTimeSec = nowSec;
+			TelemetryConsumedFrames = 0;
+			TelemetryFrameGapCount = 0;
+			TelemetryForcedFullCount = 0;
+			TelemetryFullCopyCount = 0;
+			TelemetryDirtyCopyCount = 0;
+			TelemetryDirtyRectCountSum = 0;
+			TelemetryDirtyRectAreaSum = 0;
+			SET_DWORD_STAT(STAT_CefTel_ConsumedFrames, 0);
+			SET_DWORD_STAT(STAT_CefTel_FrameGaps, 0);
+			SET_DWORD_STAT(STAT_CefTel_ForcedFull, 0);
+			SET_DWORD_STAT(STAT_CefTel_FullCopy, 0);
+			SET_DWORD_STAT(STAT_CefTel_DirtyCopy, 0);
+			SET_DWORD_STAT(STAT_CefTel_DirtyRectCountSum, 0);
+			SET_DWORD_STAT(STAT_CefTel_DirtyRectAreaSum, 0);
+		}
+	}
 }
 
 // ---- Input ------------------------------------------------------------------

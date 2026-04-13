@@ -31,7 +31,16 @@ private:
 	uint32 SharedSlotCount = 2;
 	double LastConsumerFrameTimeSec = 0.0;
 	double LastCadenceSentTimeSec = 0.0;
+	double LastTelemetryLogTimeSec = 0.0;
 	uint32 SmoothedCadenceUs = 0;
+	uint64 LastSeenFrameId = 0;
+	uint32 TelemetryConsumedFrames = 0;
+	uint32 TelemetryFrameGapCount = 0;
+	uint32 TelemetryForcedFullCount = 0;
+	uint32 TelemetryFullCopyCount = 0;
+	uint32 TelemetryDirtyCopyCount = 0;
+	uint32 TelemetryDirtyRectCountSum = 0;
+	uint32 TelemetryDirtyRectAreaSum = 0;
 
 	void* LastSharedHandle[MaxSharedSlots] = { nullptr };
 	FTextureRHIRef SharedTextureRHI[MaxSharedSlots];
