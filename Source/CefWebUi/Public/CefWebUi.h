@@ -4,11 +4,13 @@
 
 #include "Modules/ModuleManager.h"
 #include "Services/CefControlWriter.h"
+#include "Templates/UniquePtr.h"
 
 
 class FCefInputWriter;
 class FCefFrameReader;
 class FCefControlWriter;
+class FCefWebUiRuntime;
 CEFWEBUI_API DECLARE_LOG_CATEGORY_EXTERN(LogCefWebUi, Log, All);
 CEFWEBUI_API DECLARE_LOG_CATEGORY_EXTERN(LogCefWebUiTelemetry, Log, All);
 
@@ -32,15 +34,8 @@ public:
 	TWeakPtr<FCefControlWriter> GetControlWriterPtr() const;
 
 private:
-	TSharedPtr<FCefFrameReader> FrameReader;
-	TSharedPtr<FCefInputWriter> InputWriter;
-	TSharedPtr<FCefControlWriter> ControlWriter;
+	void EnsureRuntimeStarted() const;
 
 private:
-	void LaunchHostProcess();
-	void KillHostProcess();
-
-private:
-	FProcHandle HostProcess;
-	Windows::HANDLE JobHandle = nullptr;
+	mutable TUniquePtr<FCefWebUiRuntime> Runtime;
 };
