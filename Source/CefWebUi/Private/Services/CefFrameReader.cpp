@@ -19,6 +19,7 @@ constexpr uint32 SHM_FRAME_SIZE = SHM_MAX_WIDTH * SHM_MAX_HEIGHT * 4;
 struct FCefFrameHeaderDirtyRect { int32 x, y, w, h; };
 struct FCefFrameHeader
 {
+	uint32 protocol_magic;
 	uint32 version;
 	uint32 slot_count;
 	uint32 width;
@@ -60,6 +61,16 @@ bool FCefFrameReader::Start()
 	if (!PData)
 	{
 		UE_LOG(LogCefWebUi, Error, TEXT("FCefFrameReader: MapViewOfFile failed."));
+		CloseHandles();
+		return false;
+	}
+
+	const FCefFrameHeader* startupHeader = reinterpret_cast<const FCefFrameHeader*>(PData);
+	if (startupHeader->protocol_magic != CEF_SHM_PROTOCOL_MAGIC || startupHeader->version != CEF_SHM_PROTOCOL_V2)
+	{
+		UE_LOG(LogCefWebUi, Error,
+			TEXT("FCefFrameReader: Protocol handshake failed. Expected magic=0x%08X ver=%u, got magic=0x%08X ver=%u"),
+			CEF_SHM_PROTOCOL_MAGIC, CEF_SHM_PROTOCOL_V2, startupHeader->protocol_magic, startupHeader->version);
 		CloseHandles();
 		return false;
 	}
@@ -111,6 +122,14 @@ uint32 FCefFrameReader::Run()
 			continue;
 
 		const FCefFrameHeader* header = reinterpret_cast<const FCefFrameHeader*>(PData);
+		if (header->protocol_magic != CEF_SHM_PROTOCOL_MAGIC || header->version != CEF_SHM_PROTOCOL_V2)
+		{
+			UE_LOG(LogCefWebUi, Error,
+				TEXT("FCefFrameReader: Protocol mismatch at runtime. magic=0x%08X ver=%u"),
+				header->protocol_magic, header->version);
+			bRunning = false;
+			break;
+		}
 		/*
 		UE_LOG(LogCefWebUi, Log, TEXT("FCefFrameReader: seq=%u lastSeq=%u handle=%llu"),
 		       header->Sequence, LastSequence, header->SharedTextureHandle);

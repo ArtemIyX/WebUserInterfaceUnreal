@@ -14,6 +14,7 @@ namespace Windows
 constexpr uint32 MAX_CEF_DIRTY_RECTS = 16;
 constexpr uint32 CEF_SHM_PROTOCOL_V2 = 2;
 constexpr uint32 CEF_SHM_MAX_SLOTS = 3;
+constexpr uint32 CEF_SHM_PROTOCOL_MAGIC = 0x43454648; // 'CEFH'
 
 enum ECefFrameFlags : uint32
 {
