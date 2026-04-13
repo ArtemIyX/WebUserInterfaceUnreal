@@ -92,18 +92,22 @@ void UCefWebUiBrowserWidget::NativeDestruct()
 {
 	FTextureRHIRef OldRHI0 = SharedTextureRHI[0];
 	FTextureRHIRef OldRHI1 = SharedTextureRHI[1];
+	FTextureRHIRef OldRHI2 = SharedTextureRHI[2];
 
 	ENQUEUE_RENDER_COMMAND(CefReleaseSharedTextures)(
-		[OldRHI0, OldRHI1](FRHICommandListImmediate&) mutable
+		[OldRHI0, OldRHI1, OldRHI2](FRHICommandListImmediate&) mutable
 		{
 			OldRHI0.SafeRelease();
 			OldRHI1.SafeRelease();
+			OldRHI2.SafeRelease();
 		});
 
-	SharedTextureRHI[0] = nullptr;
-	SharedTextureRHI[1] = nullptr;
-	LastSharedHandle[0] = nullptr;
-	LastSharedHandle[1] = nullptr;
+	for (uint32 i = 0; i < MaxSharedSlots; ++i)
+	{
+		SharedTextureRHI[i] = nullptr;
+		LastSharedHandle[i] = nullptr;
+	}
+	SharedSlotCount = 2;
 	RenderTarget = nullptr;
 
 	FrameReader.Reset();
@@ -124,7 +128,17 @@ void UCefWebUiBrowserWidget::NativeTick(const FGeometry& MyGeometry, float InDel
 
 void UCefWebUiBrowserWidget::EnsureSharedRHI()
 {
-	if (SharedTextureRHI[0].IsValid() && SharedTextureRHI[1].IsValid())
+	bool bReady = true;
+	const uint32 slotCount = FMath::Clamp(SharedSlotCount, 1u, MaxSharedSlots);
+	for (uint32 i = 0; i < slotCount; ++i)
+	{
+		if (!SharedTextureRHI[i].IsValid())
+		{
+			bReady = false;
+			break;
+		}
+	}
+	if (bReady)
 		return;
 
 	ENQUEUE_RENDER_COMMAND(CefOpenSharedTextures)(
@@ -144,7 +158,8 @@ void UCefWebUiBrowserWidget::EnsureSharedRHI()
 				return;
 			}
 
-			for (int i = 0; i < 2; ++i)
+			const uint32 slotCountInner = FMath::Clamp(SharedSlotCount, 1u, MaxSharedSlots);
+			for (uint32 i = 0; i < slotCountInner; ++i)
 			{
 				if (SharedTextureRHI[i].IsValid())
 					continue;
@@ -155,7 +170,7 @@ void UCefWebUiBrowserWidget::EnsureSharedRHI()
 				HRESULT hr = D3DDevice->OpenSharedHandleByName(Name, GENERIC_ALL, &SharedHandle);
 				if (FAILED(hr) || !SharedHandle)
 				{
-					UE_LOG(LogCefWebUi, Error, TEXT("CefWidget: OpenSharedHandleByName[%d] failed: 0x%08X"), i, hr);
+					UE_LOG(LogCefWebUi, Error, TEXT("CefWidget: OpenSharedHandleByName[%u] failed: 0x%08X"), i, hr);
 					return;
 				}
 
@@ -165,7 +180,7 @@ void UCefWebUiBrowserWidget::EnsureSharedRHI()
 
 				if (FAILED(hr) || !D3DResource)
 				{
-					UE_LOG(LogCefWebUi, Error, TEXT("CefWidget: OpenSharedHandle[%d] failed: 0x%08X"), i, hr);
+					UE_LOG(LogCefWebUi, Error, TEXT("CefWidget: OpenSharedHandle[%u] failed: 0x%08X"), i, hr);
 					return;
 				}
 				SharedTextureRHI[i] = D3D12RHI->RHICreateTexture2DFromResource(
@@ -179,12 +194,12 @@ void UCefWebUiBrowserWidget::EnsureSharedRHI()
 				if (!SharedTextureRHI[i].IsValid())
 				{
 					UE_LOG(LogCefWebUi, Error,
-					       TEXT("CefWidget: RHICreateTexture2DFromResource[%d] failed"), i);
+					       TEXT("CefWidget: RHICreateTexture2DFromResource[%u] failed"), i);
 					return;
 				}
 			}
 
-			UE_LOG(LogCefWebUi, Log, TEXT("CefWidget: Both shared textures opened by name"));
+			UE_LOG(LogCefWebUi, Log, TEXT("CefWidget: Opened %u shared textures by name"), slotCountInner);
 		}
 	);
 }
@@ -205,10 +220,12 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 
 	SetCursor(FCefFrameReader::MapCefCursor(Frame.CursorType));
 
+	SharedSlotCount = FMath::Clamp(Frame.SlotCount, 1u, MaxSharedSlots);
 	EnsureRenderTarget(Frame.Width, Frame.Height);
 	EnsureSharedRHI();
 
-	const uint32 index = Frame.WriteSlot & 1u;
+	const uint32 slotCount = FMath::Clamp(SharedSlotCount, 1u, MaxSharedSlots);
+	const uint32 index = Frame.WriteSlot % slotCount;
 	FTextureRHIRef SrcRHI = SharedTextureRHI[index];
 	FTextureResource* DstRes = RenderTarget ? RenderTarget->GetResource() : nullptr;
 

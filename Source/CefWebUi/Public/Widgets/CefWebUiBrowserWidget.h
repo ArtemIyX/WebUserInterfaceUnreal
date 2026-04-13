@@ -25,11 +25,13 @@ private:
 	void EnsureRenderTarget(uint32 InWidth, uint32 InHeight);
 
 private:
+	static constexpr uint32 MaxSharedSlots = 3;
 	uint32 TextureWidth = 0;
 	uint32 TextureHeight = 0;
+	uint32 SharedSlotCount = 2;
 
-	void* LastSharedHandle[2] = {nullptr, nullptr};
-	FTextureRHIRef SharedTextureRHI[2];
+	void* LastSharedHandle[MaxSharedSlots] = { nullptr };
+	FTextureRHIRef SharedTextureRHI[MaxSharedSlots];
 
 	TWeakPtr<class FCefInputWriter> InputWriter;
 	TWeakPtr<class FCefFrameReader> FrameReader;

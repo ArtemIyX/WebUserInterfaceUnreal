@@ -3,6 +3,7 @@
 #include "Services/CefFrameReader.h"
 #include "CefWebUi.h"
 #include "Async/Async.h"
+#include <atomic>
 
 #include "Windows/AllowWindowsPlatformTypes.h"
 
@@ -15,23 +16,27 @@ constexpr uint32 SHM_MAX_WIDTH = 3840;
 constexpr uint32 SHM_MAX_HEIGHT = 2160;
 constexpr uint32 SHM_FRAME_SIZE = SHM_MAX_WIDTH * SHM_MAX_HEIGHT * 4;
 
-#pragma pack(push, 1)
 struct FCefFrameHeaderDirtyRect { int32 x, y, w, h; };
 struct FCefFrameHeader
 {
+	uint32 version;
+	uint32 slot_count;
 	uint32 width;
 	uint32 height;
+	uint64 frame_id;
+	uint64 present_id;
 	uint32 sequence;
 	uint32 write_slot;
+	uint32 flags;
 	uint8 cursor_type;
 	uint8 load_state;
 	uint8 dirty_count;
-	uint8 reserved;
+	uint8 reserved[3];
 	FCefFrameHeaderDirtyRect dirty_rects[16];
 };
-#pragma pack(pop)
 
-constexpr uint32 SHM_FRAME_TOTAL = sizeof(FCefFrameHeader) + SHM_FRAME_SIZE * 2;
+constexpr uint32 SHM_FRAME_SLOT_COUNT = 3;
+constexpr uint32 SHM_FRAME_TOTAL = sizeof(FCefFrameHeader) + SHM_FRAME_SIZE * SHM_FRAME_SLOT_COUNT;
 
 FCefFrameReader::FCefFrameReader()
 {
@@ -114,14 +119,44 @@ uint32 FCefFrameReader::Run()
 		if (header->sequence == LastSequence)
 			continue;
 
+		std::atomic_thread_fence(std::memory_order_acquire);
+
 		LastSequence = header->sequence;
+
+		uint32 slotCount = header->slot_count;
+		if (slotCount == 0 || slotCount > CEF_SHM_MAX_SLOTS)
+			slotCount = CEF_SHM_MAX_SLOTS;
+
+		const bool bFrameGap = (LastFrameId != 0 && header->frame_id != (LastFrameId + 1));
+		const bool bForceFull = bFrameGap ||
+			((header->flags & (CefFrameFlag_FullFrame | CefFrameFlag_Overflow | CefFrameFlag_Resized)) != 0) ||
+			header->dirty_count == 0;
+		LastFrameId = header->frame_id;
 
 		{
 			FScopeLock Lock(&PendingFrameLock);
+			PendingFrame.Version = header->version;
+			PendingFrame.SlotCount = slotCount;
 			PendingFrame.WriteSlot = header->write_slot;
 			PendingFrame.Width = header->width;
 			PendingFrame.Height = header->height;
 			PendingFrame.Sequence = header->sequence;
+			PendingFrame.FrameId = header->frame_id;
+			PendingFrame.PresentId = header->present_id;
+			PendingFrame.Flags = header->flags;
+			PendingFrame.bForceFullRefresh = bForceFull;
+			PendingFrame.DirtyCount = bForceFull ? 0 : header->dirty_count;
+			if (!bForceFull)
+			{
+				const uint8 n = FMath::Min<uint8>(header->dirty_count, MAX_CEF_DIRTY_RECTS);
+				for (uint8 i = 0; i < n; ++i)
+				{
+					PendingFrame.DirtyRects[i].X = header->dirty_rects[i].x;
+					PendingFrame.DirtyRects[i].Y = header->dirty_rects[i].y;
+					PendingFrame.DirtyRects[i].W = header->dirty_rects[i].w;
+					PendingFrame.DirtyRects[i].H = header->dirty_rects[i].h;
+				}
+			}
 			PendingFrame.CursorType = static_cast<ECefCustomCursorType>(header->cursor_type);
 			PendingFrame.LoadState = static_cast<ECefLoadState>(header->load_state);
 		}

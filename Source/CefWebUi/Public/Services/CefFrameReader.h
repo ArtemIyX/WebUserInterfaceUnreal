@@ -12,6 +12,17 @@ namespace Windows
 }
 
 constexpr uint32 MAX_CEF_DIRTY_RECTS = 16;
+constexpr uint32 CEF_SHM_PROTOCOL_V2 = 2;
+constexpr uint32 CEF_SHM_MAX_SLOTS = 3;
+
+enum ECefFrameFlags : uint32
+{
+	CefFrameFlag_None = 0,
+	CefFrameFlag_FullFrame = 1u << 0,
+	CefFrameFlag_DirtyOnly = 1u << 1,
+	CefFrameFlag_Overflow = 1u << 2,
+	CefFrameFlag_Resized = 1u << 3,
+};
 
 struct FCefDirtyRect
 {
@@ -20,12 +31,18 @@ struct FCefDirtyRect
 
 struct FCefSharedFrame
 {
+	uint32 Version = 0;
+	uint32 SlotCount = 2;
 	uint32 WriteSlot = 0;
 	uint32 Width = 0;
 	uint32 Height = 0;
 	uint32 Sequence = 0;
+	uint64 FrameId = 0;
+	uint64 PresentId = 0;
+	uint32 Flags = 0;
 	ECefCustomCursorType CursorType = ECefCustomCursorType::CT_NONE;
 	ECefLoadState LoadState = ECefLoadState::Idle;
+	bool bForceFullRefresh = true;
 	uint8 DirtyCount = 0; // 0 = full frame
 	FCefDirtyRect DirtyRects[MAX_CEF_DIRTY_RECTS];
 };
@@ -81,5 +98,6 @@ private:
 	std::atomic<bool> bFramePending{ false };
 	std::atomic<bool> bRunning{ false };
 	uint32 LastSequence = 0;
+	uint64 LastFrameId = 0;
 	uint64 LastSharedHandle = 0; // track handle value to detect texture recreation
 };
