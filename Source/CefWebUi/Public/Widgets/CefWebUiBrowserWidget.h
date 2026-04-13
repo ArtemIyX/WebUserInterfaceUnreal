@@ -6,6 +6,7 @@
 #include "Blueprint/UserWidget.h"
 #include "RHI.h"
 #include "RHIResources.h"
+#include "Services/CefFrameReader.h"
 #include "CefWebUiBrowserWidget.generated.h"
 
 enum class ECefLoadState : uint8;
@@ -31,9 +32,15 @@ private:
 	uint32 SharedSlotCount = 2;
 	double LastConsumerFrameTimeSec = 0.0;
 	double LastCadenceSentTimeSec = 0.0;
+	double LastUploadTimeSec = 0.0;
+	double LastIdleRecoveryCopyTimeSec = 0.0;
+	double LastSafetyFullCopyTimeSec = 0.0;
 	double LastTelemetryLogTimeSec = 0.0;
 	uint32 SmoothedCadenceUs = 0;
 	uint64 LastSeenFrameId = 0;
+	bool bLastUploadUsedDirty = false;
+	bool bHasLastUploadedFrame = false;
+	FCefSharedFrame LastUploadedFrame;
 	uint32 TelemetryConsumedFrames = 0;
 	uint32 TelemetryFrameGapCount = 0;
 	uint32 TelemetryForcedFullCount = 0;

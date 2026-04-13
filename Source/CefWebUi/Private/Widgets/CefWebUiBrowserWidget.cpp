@@ -12,6 +12,7 @@
 #include "RHIResources.h"
 #include "Services/CefInputWriter.h"
 #include "InputCoreTypes.h"
+#include "HAL/IConsoleManager.h"
 
 #include "ID3D12DynamicRHI.h"
 
@@ -23,6 +24,9 @@
 namespace
 {
 constexpr double kCadenceFeedbackPeriodSec = 0.10;      // 10 Hz feedback
+constexpr double kIdleDirtyRecoverySec = 0.15;          // one-shot full copy after dirty-idle period
+constexpr double kDirtySafetyFullCopySec = 0.25;        // periodic keyframe full copy while dirty mode is active
+constexpr int32  kDirtyRectInflatePx = 1;               // pad dirty rect edges to avoid seam ghosts
 constexpr float  kDirtyAreaFullCopyThreshold = 0.45f;   // fallback to full copy above 45% area
 constexpr int32  kDirtyRectCoalesceGapPx = 2;            // merge near-adjacent rects (small gaps)
 }
@@ -39,6 +43,11 @@ DECLARE_DWORD_COUNTER_STAT(TEXT("Full Copy"), STAT_CefTel_FullCopy, STATGROUP_Ce
 DECLARE_DWORD_COUNTER_STAT(TEXT("Dirty Copy"), STAT_CefTel_DirtyCopy, STATGROUP_CefWebUiTelemetry);
 DECLARE_DWORD_COUNTER_STAT(TEXT("Dirty Rect Count Sum"), STAT_CefTel_DirtyRectCountSum, STATGROUP_CefWebUiTelemetry);
 DECLARE_DWORD_COUNTER_STAT(TEXT("Dirty Rect Area Sum"), STAT_CefTel_DirtyRectAreaSum, STATGROUP_CefWebUiTelemetry);
+
+static TAutoConsoleVariable<int32> CVarCefWebUiUseDirtyRects(
+	TEXT("CefWebUi.UseDirtyRects"),
+	0,
+	TEXT("Enable dirty-rect copy path (0=full copy default, 1=dirty rect copy)."));
 
 UCefWebUiBrowserWidget::UCefWebUiBrowserWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -87,9 +96,15 @@ void UCefWebUiBrowserWidget::NativeConstruct()
 	Super::NativeConstruct();
 	LastConsumerFrameTimeSec = 0.0;
 	LastCadenceSentTimeSec = 0.0;
+	LastUploadTimeSec = 0.0;
+	LastIdleRecoveryCopyTimeSec = 0.0;
+	LastSafetyFullCopyTimeSec = 0.0;
 	LastTelemetryLogTimeSec = 0.0;
 	SmoothedCadenceUs = 0;
 	LastSeenFrameId = 0;
+	bLastUploadUsedDirty = false;
+	bHasLastUploadedFrame = false;
+	LastUploadedFrame = FCefSharedFrame{};
 	TelemetryConsumedFrames = 0;
 	TelemetryFrameGapCount = 0;
 	TelemetryForcedFullCount = 0;
@@ -146,9 +161,15 @@ void UCefWebUiBrowserWidget::NativeDestruct()
 	SharedSlotCount = 2;
 	LastConsumerFrameTimeSec = 0.0;
 	LastCadenceSentTimeSec = 0.0;
+	LastUploadTimeSec = 0.0;
+	LastIdleRecoveryCopyTimeSec = 0.0;
+	LastSafetyFullCopyTimeSec = 0.0;
 	LastTelemetryLogTimeSec = 0.0;
 	SmoothedCadenceUs = 0;
 	LastSeenFrameId = 0;
+	bLastUploadUsedDirty = false;
+	bHasLastUploadedFrame = false;
+	LastUploadedFrame = FCefSharedFrame{};
 	TelemetryConsumedFrames = 0;
 	TelemetryFrameGapCount = 0;
 	TelemetryForcedFullCount = 0;
@@ -266,23 +287,42 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 		return;
 
 	FCefSharedFrame Frame;
+	double nowSec = FPlatformTime::Seconds();
+	bool bIdleRecoveryFullCopy = false;
 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_CefWidget_PollFrame);
 		if (!Reader->PollSharedTexture(Frame))
-			return;
+		{
+			// If the last update was dirty-only and stream went idle, force one full copy to clear residual seams.
+			if (!bHasLastUploadedFrame || !bLastUploadUsedDirty)
+				return;
+			if ((nowSec - LastUploadTimeSec) < kIdleDirtyRecoverySec)
+				return;
+			if ((nowSec - LastIdleRecoveryCopyTimeSec) < kIdleDirtyRecoverySec)
+				return;
+
+			Frame = LastUploadedFrame;
+			Frame.bForceFullRefresh = true;
+			Frame.DirtyCount = 0;
+			bIdleRecoveryFullCopy = true;
+			LastIdleRecoveryCopyTimeSec = nowSec;
+		}
 	}
 
-	++TelemetryConsumedFrames;
-	if (LastSeenFrameId != 0 && Frame.FrameId != (LastSeenFrameId + 1))
-		++TelemetryFrameGapCount;
-	LastSeenFrameId = Frame.FrameId;
-	SET_DWORD_STAT(STAT_CefTel_ConsumedFrames, TelemetryConsumedFrames);
-	SET_DWORD_STAT(STAT_CefTel_FrameGaps, TelemetryFrameGapCount);
+	if (!bIdleRecoveryFullCopy)
+	{
+		++TelemetryConsumedFrames;
+		if (LastSeenFrameId != 0 && Frame.FrameId != (LastSeenFrameId + 1))
+			++TelemetryFrameGapCount;
+		LastSeenFrameId = Frame.FrameId;
+		SET_DWORD_STAT(STAT_CefTel_ConsumedFrames, TelemetryConsumedFrames);
+		SET_DWORD_STAT(STAT_CefTel_FrameGaps, TelemetryFrameGapCount);
+	}
 
 	// Feed host pacing with observed consumer cadence (throttled).
+	if (!bIdleRecoveryFullCopy)
 	{
-		const double nowSec = FPlatformTime::Seconds();
 		if (LastConsumerFrameTimeSec > 0.0)
 		{
 			const double dtSec = nowSec - LastConsumerFrameTimeSec;
@@ -317,7 +357,13 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 	const uint32 index = Frame.WriteSlot % slotCount;
 	FTextureRHIRef SrcRHI = SharedTextureRHI[index];
 	FTextureResource* DstRes = RenderTarget ? RenderTarget->GetResource() : nullptr;
-	const bool bUseDirtyRects = !Frame.bForceFullRefresh && Frame.DirtyCount > 0;
+	const bool bDirtyRectsEnabled = (CVarCefWebUiUseDirtyRects.GetValueOnAnyThread() != 0);
+	const bool bUseDirtyRectsRaw = bDirtyRectsEnabled && !Frame.bForceFullRefresh && Frame.DirtyCount > 0;
+	const bool bSafetyFullCopy = bUseDirtyRectsRaw &&
+		((nowSec - LastSafetyFullCopyTimeSec) >= kDirtySafetyFullCopySec);
+	const bool bUseDirtyRects = bUseDirtyRectsRaw && !bSafetyFullCopy;
+	if (bSafetyFullCopy)
+		LastSafetyFullCopyTimeSec = nowSec;
 	if (Frame.bForceFullRefresh)
 		++TelemetryForcedFullCount;
 	if (bUseDirtyRects)
@@ -343,6 +389,11 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 	SET_DWORD_STAT(STAT_CefTel_DirtyCopy, TelemetryDirtyCopyCount);
 	SET_DWORD_STAT(STAT_CefTel_DirtyRectCountSum, TelemetryDirtyRectCountSum);
 	SET_DWORD_STAT(STAT_CefTel_DirtyRectAreaSum, TelemetryDirtyRectAreaSum);
+
+	LastUploadedFrame = Frame;
+	bHasLastUploadedFrame = true;
+	bLastUploadUsedDirty = bUseDirtyRects;
+	LastUploadTimeSec = nowSec;
 
 	ENQUEUE_RENDER_COMMAND(CefBlitToRenderTarget)(
 		[SrcRHI, DstRes, Frame, bUseDirtyRects](FRHICommandListImmediate& RHICmdList)
@@ -386,10 +437,10 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 				if (r.W <= 0 || r.H <= 0)
 					continue;
 
-				const int32 x0 = FMath::Clamp(r.X, 0, static_cast<int32>(Frame.Width));
-				const int32 y0 = FMath::Clamp(r.Y, 0, static_cast<int32>(Frame.Height));
-				const int32 x1 = FMath::Clamp(r.X + r.W, 0, static_cast<int32>(Frame.Width));
-				const int32 y1 = FMath::Clamp(r.Y + r.H, 0, static_cast<int32>(Frame.Height));
+				const int32 x0 = FMath::Clamp(r.X - kDirtyRectInflatePx, 0, static_cast<int32>(Frame.Width));
+				const int32 y0 = FMath::Clamp(r.Y - kDirtyRectInflatePx, 0, static_cast<int32>(Frame.Height));
+				const int32 x1 = FMath::Clamp(r.X + r.W + kDirtyRectInflatePx, 0, static_cast<int32>(Frame.Width));
+				const int32 y1 = FMath::Clamp(r.Y + r.H + kDirtyRectInflatePx, 0, static_cast<int32>(Frame.Height));
 				if (x1 <= x0 || y1 <= y0)
 					continue;
 
@@ -457,7 +508,7 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 	);
 
 	{
-		const double nowSec = FPlatformTime::Seconds();
+		nowSec = FPlatformTime::Seconds();
 		if (LastTelemetryLogTimeSec <= 0.0)
 			LastTelemetryLogTimeSec = nowSec;
 		else if (nowSec - LastTelemetryLogTimeSec >= 2.0)
