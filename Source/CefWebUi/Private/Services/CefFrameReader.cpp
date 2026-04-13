@@ -71,6 +71,7 @@ struct FCefFrameHeader
 	uint32 height;
 	uint64 frame_id;
 	uint64 present_id;
+	uint64 gpu_fence_value;
 	uint32 sequence;
 	uint32 write_slot;
 	uint32 flags;
@@ -212,6 +213,7 @@ uint32 FCefFrameReader::Run()
 			PendingFrame.Sequence = header->sequence;
 			PendingFrame.FrameId = header->frame_id;
 			PendingFrame.PresentId = header->present_id;
+			PendingFrame.GpuFenceValue = header->gpu_fence_value;
 			PendingFrame.Flags = header->flags;
 			PendingFrame.bForceFullRefresh = bForceFull;
 			PendingFrame.DirtyCount = bForceFull ? 0 : header->dirty_count;

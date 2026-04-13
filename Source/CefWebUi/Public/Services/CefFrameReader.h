@@ -12,7 +12,7 @@ namespace Windows
 }
 
 constexpr uint32 MAX_CEF_DIRTY_RECTS = 16;
-constexpr uint32 CEF_SHM_PROTOCOL_V2 = 2;
+constexpr uint32 CEF_SHM_PROTOCOL_V2 = 3;
 constexpr uint32 CEF_SHM_MAX_SLOTS = 3;
 constexpr uint32 CEF_SHM_PROTOCOL_MAGIC = 0x43454648; // 'CEFH'
 
@@ -40,6 +40,7 @@ struct FCefSharedFrame
 	uint32 Sequence = 0;
 	uint64 FrameId = 0;
 	uint64 PresentId = 0;
+	uint64 GpuFenceValue = 0;
 	uint32 Flags = 0;
 	ECefCustomCursorType CursorType = ECefCustomCursorType::CT_NONE;
 	ECefLoadState LoadState = ECefLoadState::Idle;

@@ -19,6 +19,8 @@
 #include "Windows/AllowWindowsPlatformTypes.h"
 #include <d3d12.h>
 #include <dxgi1_4.h>
+
+#include "tiffiop.h"
 #include "Windows/HideWindowsPlatformTypes.h"
 
 namespace
@@ -109,6 +111,16 @@ static TAutoConsoleVariable<float> CVarCefWebUiCursorUpdateRateHz(
 	TEXT("CefWebUi.CursorUpdateRateHz"),
 	120.0f,
 	TEXT("Max cursor updates per second (0 disables limit)."));
+
+static TAutoConsoleVariable<int32> CVarCefWebUiGpuFenceSync(
+	TEXT("CefWebUi.GpuFenceSync"),
+	1,
+	TEXT("Wait on host-published shared GPU fence before copying shared texture (0/1)."));
+
+static TAutoConsoleVariable<int32> CVarCefWebUiGpuFenceWaitTimeoutMs(
+	TEXT("CefWebUi.GpuFenceWaitTimeoutMs"),
+	8,
+	TEXT("Initial timeout in ms for GPU fence wait before falling back to blocking wait."));
 
 UCefWebUiBrowserWidget::UCefWebUiBrowserWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -228,6 +240,16 @@ void UCefWebUiBrowserWidget::NativeDestruct()
 		SharedTextureRHI[i] = nullptr;
 		LastSharedHandle[i] = nullptr;
 	}
+	if (SharedGpuFence)
+	{
+		reinterpret_cast<ID3D12Fence*>(SharedGpuFence)->Release();
+		SharedGpuFence = nullptr;
+	}
+	if (GpuFenceWaitEvent)
+	{
+		CloseHandle(static_cast<HANDLE>(GpuFenceWaitEvent));
+		GpuFenceWaitEvent = nullptr;
+	}
 	SharedSlotCount = 2;
 	ResetRuntimeState();
 	RenderTarget = nullptr;
@@ -326,6 +348,66 @@ void UCefWebUiBrowserWidget::EnsureSharedRHI()
 			UE_LOG(LogCefWebUi, Log, TEXT("CefWidget: Opened %u shared textures by name"), slotCountInner);
 		}
 	);
+}
+
+bool UCefWebUiBrowserWidget::EnsureGpuFence()
+{
+	if (SharedGpuFence)
+		return true;
+
+	ID3D12DynamicRHI* D3D12RHI = GetID3D12DynamicRHI();
+	if (!D3D12RHI)
+		return false;
+
+	ID3D12Device* D3DDevice = D3D12RHI->RHIGetDevice(0);
+	if (!D3DDevice)
+		return false;
+
+	HANDLE SharedHandle = nullptr;
+	HRESULT hr = D3DDevice->OpenSharedHandleByName(L"Global\\CEFHost_SharedFence", GENERIC_ALL, &SharedHandle);
+	if (FAILED(hr) || !SharedHandle)
+		return false;
+
+	ID3D12Fence* Fence = nullptr;
+	hr = D3DDevice->OpenSharedHandle(SharedHandle, IID_PPV_ARGS(&Fence));
+	CloseHandle(SharedHandle);
+	if (FAILED(hr) || !Fence)
+		return false;
+
+	SharedGpuFence = Fence;
+	if (!GpuFenceWaitEvent)
+		GpuFenceWaitEvent = CreateEventW(nullptr, Windows::FALSE, Windows::FALSE, nullptr);
+
+	UE_LOG(LogCefWebUi, Log, TEXT("CefWidget: Opened shared GPU fence"));
+	return true;
+}
+
+void UCefWebUiBrowserWidget::WaitForProducerGpuFence(uint64 FenceValue)
+{
+	if (CVarCefWebUiGpuFenceSync.GetValueOnAnyThread() == 0)
+		return;
+	if (FenceValue == 0)
+		return;
+	if (!EnsureGpuFence())
+		return;
+	if (!GpuFenceWaitEvent || !SharedGpuFence)
+		return;
+
+	ID3D12Fence* Fence = reinterpret_cast<ID3D12Fence*>(SharedGpuFence);
+	if (Fence->GetCompletedValue() >= FenceValue)
+		return;
+
+	HRESULT hr = Fence->SetEventOnCompletion(FenceValue, static_cast<HANDLE>(GpuFenceWaitEvent));
+	if (FAILED(hr))
+		return;
+
+	const DWORD timeoutMs = static_cast<DWORD>(FMath::Clamp(CVarCefWebUiGpuFenceWaitTimeoutMs.GetValueOnAnyThread(), 1, 1000));
+	const DWORD wr = WaitForSingleObject(static_cast<HANDLE>(GpuFenceWaitEvent), timeoutMs);
+	if (wr == WAIT_TIMEOUT)
+	{
+		UE_LOG(LogCefWebUiTelemetry, Warning, TEXT("CefWidget: GPU fence wait timeout, blocking until completion"));
+		WaitForSingleObject(static_cast<HANDLE>(GpuFenceWaitEvent), INFINITE);
+	}
 }
 
 bool UCefWebUiBrowserWidget::TryAcquireFrame(FCefSharedFrame& OutFrame, bool& bOutIdleRecoveryFullCopy, double NowSec)
@@ -539,6 +621,7 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 	const uint32 index = Frame.WriteSlot % slotCount;
 	FTextureRHIRef SrcRHI = SharedTextureRHI[index];
 	FTextureResource* DstRes = RenderTarget ? RenderTarget->GetResource() : nullptr;
+	WaitForProducerGpuFence(Frame.GpuFenceValue);
 	const bool bUseDirtyRects = ResolveUseDirtyRects(Frame, nowSec);
 	UpdateCopyTelemetry(Frame, bUseDirtyRects);
 

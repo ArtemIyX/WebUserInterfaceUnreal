@@ -29,6 +29,8 @@ private:
 	void UpdateCopyTelemetry(const FCefSharedFrame& Frame, bool bUseDirtyRects);
 	void MaybeLogAndResetTelemetry(double NowSec);
 	void MaybeUpdateCursor(const FCefSharedFrame& Frame, double NowSec);
+	bool EnsureGpuFence();
+	void WaitForProducerGpuFence(uint64 FenceValue);
 	void PollAndUpload();
 	void EnsureSharedRHI();
 	void EnsureRenderTarget(uint32 InWidth, uint32 InHeight);
@@ -63,6 +65,8 @@ private:
 
 	void* LastSharedHandle[MaxSharedSlots] = { nullptr };
 	FTextureRHIRef SharedTextureRHI[MaxSharedSlots];
+	void* SharedGpuFence = nullptr;      // ID3D12Fence*
+	void* GpuFenceWaitEvent = nullptr;   // HANDLE
 
 	TWeakPtr<class FCefInputWriter> InputWriter;
 	TWeakPtr<class FCefFrameReader> FrameReader;
