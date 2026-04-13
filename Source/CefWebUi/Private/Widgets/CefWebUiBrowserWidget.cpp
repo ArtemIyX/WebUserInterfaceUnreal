@@ -228,14 +228,47 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 	const uint32 index = Frame.WriteSlot % slotCount;
 	FTextureRHIRef SrcRHI = SharedTextureRHI[index];
 	FTextureResource* DstRes = RenderTarget ? RenderTarget->GetResource() : nullptr;
+	const bool bUseDirtyRects = !Frame.bForceFullRefresh && Frame.DirtyCount > 0;
 
 	ENQUEUE_RENDER_COMMAND(CefBlitToRenderTarget)(
-		[SrcRHI, DstRes](FRHICommandListImmediate& RHICmdList)
+		[SrcRHI, DstRes, Frame, bUseDirtyRects](FRHICommandListImmediate& RHICmdList)
 		{
 			SCOPE_CYCLE_COUNTER(STAT_CefWidget_GPUBlit);
 			if (!SrcRHI.IsValid() || !DstRes || !DstRes->TextureRHI)
 				return;
-			RHICmdList.CopyTexture(SrcRHI, DstRes->TextureRHI, FRHICopyTextureInfo{});
+
+			if (!bUseDirtyRects)
+			{
+				RHICmdList.CopyTexture(SrcRHI, DstRes->TextureRHI, FRHICopyTextureInfo{});
+				return;
+			}
+
+			uint32 copiedRects = 0;
+			const uint8 rectCount = FMath::Min<uint8>(Frame.DirtyCount, MAX_CEF_DIRTY_RECTS);
+			for (uint8 i = 0; i < rectCount; ++i)
+			{
+				const FCefDirtyRect& r = Frame.DirtyRects[i];
+				if (r.W <= 0 || r.H <= 0)
+					continue;
+
+				const int32 x0 = FMath::Clamp(r.X, 0, static_cast<int32>(Frame.Width));
+				const int32 y0 = FMath::Clamp(r.Y, 0, static_cast<int32>(Frame.Height));
+				const int32 x1 = FMath::Clamp(r.X + r.W, 0, static_cast<int32>(Frame.Width));
+				const int32 y1 = FMath::Clamp(r.Y + r.H, 0, static_cast<int32>(Frame.Height));
+				if (x1 <= x0 || y1 <= y0)
+					continue;
+
+				FRHICopyTextureInfo info;
+				info.SourcePosition = FIntVector(x0, y0, 0);
+				info.DestPosition = FIntVector(x0, y0, 0);
+				info.Size = FIntVector(x1 - x0, y1 - y0, 1);
+				RHICmdList.CopyTexture(SrcRHI, DstRes->TextureRHI, info);
+				++copiedRects;
+			}
+
+			// Safety net: if metadata was unusable this frame, force full copy.
+			if (copiedRects == 0)
+				RHICmdList.CopyTexture(SrcRHI, DstRes->TextureRHI, FRHICopyTextureInfo{});
 		}
 	);
 }

@@ -99,5 +99,6 @@ private:
 	std::atomic<bool> bRunning{ false };
 	uint32 LastSequence = 0;
 	uint64 LastFrameId = 0;
+	uint64 LastDeliveredFrameId = 0;
 	uint64 LastSharedHandle = 0; // track handle value to detect texture recreation
 };

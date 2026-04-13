@@ -187,6 +187,17 @@ bool FCefFrameReader::PollSharedTexture(FCefSharedFrame& OutFrame)
 
 	FScopeLock Lock(&PendingFrameLock);
 	OutFrame = PendingFrame;
+
+	// Final continuity check at delivery point (game thread).
+	// Reader thread may observe all frames, but game thread can still skip pending
+	// updates between ticks. If that happens, force full refresh for safety.
+	if (LastDeliveredFrameId != 0 && OutFrame.FrameId != (LastDeliveredFrameId + 1))
+	{
+		OutFrame.bForceFullRefresh = true;
+		OutFrame.DirtyCount = 0;
+	}
+	LastDeliveredFrameId = OutFrame.FrameId;
+
 	bFramePending = false;
 	return true;
 }
