@@ -26,4 +26,5 @@ enum class ECefControlEventType : uint8
 	SetInputEnabled = 15,
 	ExecuteJS = 16,
 	ClearCookies = 17,
+	SetConsumerCadenceUs = 18,
 };

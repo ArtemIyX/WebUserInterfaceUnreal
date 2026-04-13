@@ -40,6 +40,7 @@ public:
 	void ExecuteJS(const FString& Script);
 
 	void ClearCookies();
+	void SetConsumerCadenceUs(uint32 CadenceUs);
 
 #pragma endregion
 

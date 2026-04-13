@@ -51,6 +51,11 @@ struct FCefControlWriter::FCefControlEvent
 
 		struct
 		{
+			uint32 Value;
+		} CadenceUs;
+
+		struct
+		{
 			bool Value;
 		} Flag;
 
@@ -279,6 +284,14 @@ void FCefControlWriter::ClearCookies()
 {
 	FCefControlEvent evt{};
 	evt.Type = ECefControlEventType::ClearCookies;
+	WriteEvent(evt);
+}
+
+void FCefControlWriter::SetConsumerCadenceUs(uint32 CadenceUs)
+{
+	FCefControlEvent evt{};
+	evt.Type = ECefControlEventType::SetConsumerCadenceUs;
+	evt.CadenceUs.Value = CadenceUs;
 	WriteEvent(evt);
 }
 

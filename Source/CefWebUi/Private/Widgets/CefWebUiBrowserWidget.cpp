@@ -68,6 +68,9 @@ void UCefWebUiBrowserWidget::OnLoadStateChanged(uint8 InState)
 void UCefWebUiBrowserWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+	LastConsumerFrameTimeSec = 0.0;
+	LastCadenceSentTimeSec = 0.0;
+	SmoothedCadenceUs = 0;
 
 	if (!ensureMsgf(FCefWebUiModule::IsAvailable(), TEXT("FCefWebUiModule is not available")))
 		return;
@@ -108,6 +111,9 @@ void UCefWebUiBrowserWidget::NativeDestruct()
 		LastSharedHandle[i] = nullptr;
 	}
 	SharedSlotCount = 2;
+	LastConsumerFrameTimeSec = 0.0;
+	LastCadenceSentTimeSec = 0.0;
+	SmoothedCadenceUs = 0;
 	RenderTarget = nullptr;
 
 	FrameReader.Reset();
@@ -216,6 +222,33 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 		SCOPE_CYCLE_COUNTER(STAT_CefWidget_PollFrame);
 		if (!Reader->PollSharedTexture(Frame))
 			return;
+	}
+
+	// Feed host pacing with observed consumer cadence (throttled).
+	{
+		const double nowSec = FPlatformTime::Seconds();
+		if (LastConsumerFrameTimeSec > 0.0)
+		{
+			const double dtSec = nowSec - LastConsumerFrameTimeSec;
+			if (dtSec > 0.0)
+			{
+				const uint32 rawUs = static_cast<uint32>(FMath::Clamp(dtSec * 1000000.0, 4000.0, 66666.0));
+				SmoothedCadenceUs = (SmoothedCadenceUs == 0) ? rawUs : ((SmoothedCadenceUs * 7u + rawUs * 3u) / 10u);
+
+				if (nowSec - LastCadenceSentTimeSec >= 0.25)
+				{
+					if (TSharedPtr<FCefControlWriter> Ctrl = ControlWriter.Pin())
+					{
+						if (Ctrl->IsOpen())
+						{
+							Ctrl->SetConsumerCadenceUs(SmoothedCadenceUs);
+							LastCadenceSentTimeSec = nowSec;
+						}
+					}
+				}
+			}
+		}
+		LastConsumerFrameTimeSec = nowSec;
 	}
 
 	SetCursor(FCefFrameReader::MapCefCursor(Frame.CursorType));

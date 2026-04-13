@@ -29,6 +29,9 @@ private:
 	uint32 TextureWidth = 0;
 	uint32 TextureHeight = 0;
 	uint32 SharedSlotCount = 2;
+	double LastConsumerFrameTimeSec = 0.0;
+	double LastCadenceSentTimeSec = 0.0;
+	uint32 SmoothedCadenceUs = 0;
 
 	void* LastSharedHandle[MaxSharedSlots] = { nullptr };
 	FTextureRHIRef SharedTextureRHI[MaxSharedSlots];
