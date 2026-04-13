@@ -24,6 +24,7 @@ namespace
 {
 constexpr double kCadenceFeedbackPeriodSec = 0.10;      // 10 Hz feedback
 constexpr float  kDirtyAreaFullCopyThreshold = 0.45f;   // fallback to full copy above 45% area
+constexpr int32  kDirtyRectCoalesceGapPx = 2;            // merge near-adjacent rects (small gaps)
 }
 
 DECLARE_STATS_GROUP(TEXT("CefWebUiTelemetry"), STATGROUP_CefWebUiTelemetry, STATCAT_Advanced);
@@ -360,9 +361,14 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 
 			FIntRect mergedRects[MAX_CEF_DIRTY_RECTS];
 			uint32 mergedCount = 0;
-			auto intersectsOrTouches = [](const FIntRect& a, const FIntRect& b)
+			auto intersectsOrAdjacent = [](const FIntRect& a, const FIntRect& b)
 			{
-				return !(a.Max.X < b.Min.X || b.Max.X < a.Min.X || a.Max.Y < b.Min.Y || b.Max.Y < a.Min.Y);
+				// FIntRect uses min-inclusive/max-exclusive bounds.
+				const int32 ax0 = a.Min.X - kDirtyRectCoalesceGapPx;
+				const int32 ay0 = a.Min.Y - kDirtyRectCoalesceGapPx;
+				const int32 ax1 = a.Max.X + kDirtyRectCoalesceGapPx;
+				const int32 ay1 = a.Max.Y + kDirtyRectCoalesceGapPx;
+				return !(ax1 < b.Min.X || b.Max.X < ax0 || ay1 < b.Min.Y || b.Max.Y < ay0);
 			};
 			auto unionRect = [](const FIntRect& a, const FIntRect& b)
 			{
@@ -391,7 +397,7 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 				bool merged = false;
 				for (uint32 m = 0; m < mergedCount; ++m)
 				{
-					if (intersectsOrTouches(mergedRects[m], rect))
+					if (intersectsOrAdjacent(mergedRects[m], rect))
 					{
 						mergedRects[m] = unionRect(mergedRects[m], rect);
 						merged = true;
@@ -402,19 +408,25 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 					mergedRects[mergedCount++] = rect;
 			}
 
-			// One extra merge pass to coalesce chains after first unions.
-			for (uint32 i = 0; i < mergedCount; ++i)
+			// Stable coalesce pass for merge chains.
+			bool changed = true;
+			while (changed)
 			{
-				for (uint32 j = i + 1; j < mergedCount; )
+				changed = false;
+				for (uint32 i = 0; i < mergedCount; ++i)
 				{
-					if (intersectsOrTouches(mergedRects[i], mergedRects[j]))
+					for (uint32 j = i + 1; j < mergedCount; )
 					{
-						mergedRects[i] = unionRect(mergedRects[i], mergedRects[j]);
-						mergedRects[j] = mergedRects[mergedCount - 1];
-						--mergedCount;
-						continue;
+						if (intersectsOrAdjacent(mergedRects[i], mergedRects[j]))
+						{
+							mergedRects[i] = unionRect(mergedRects[i], mergedRects[j]);
+							mergedRects[j] = mergedRects[mergedCount - 1];
+							--mergedCount;
+							changed = true;
+							continue;
+						}
+						++j;
 					}
-					++j;
 				}
 			}
 
