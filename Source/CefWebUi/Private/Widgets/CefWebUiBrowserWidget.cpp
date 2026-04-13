@@ -20,6 +20,12 @@
 #include <dxgi1_4.h>
 #include "Windows/HideWindowsPlatformTypes.h"
 
+namespace
+{
+constexpr double kCadenceFeedbackPeriodSec = 0.10;      // 10 Hz feedback
+constexpr float  kDirtyAreaFullCopyThreshold = 0.45f;   // fallback to full copy above 45% area
+}
+
 DECLARE_STATS_GROUP(TEXT("CefWebUiTelemetry"), STATGROUP_CefWebUiTelemetry, STATCAT_Advanced);
 DECLARE_CYCLE_STAT(TEXT("CefWidget: PollFrame"), STAT_CefWidget_PollFrame, STATGROUP_CefWebUiTelemetry);
 DECLARE_CYCLE_STAT(TEXT("CefWidget: GPUBlit"), STAT_CefWidget_GPUBlit, STATGROUP_CefWebUiTelemetry);
@@ -282,9 +288,9 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 			if (dtSec > 0.0)
 			{
 				const uint32 rawUs = static_cast<uint32>(FMath::Clamp(dtSec * 1000000.0, 4000.0, 66666.0));
-				SmoothedCadenceUs = (SmoothedCadenceUs == 0) ? rawUs : ((SmoothedCadenceUs * 7u + rawUs * 3u) / 10u);
+				SmoothedCadenceUs = (SmoothedCadenceUs == 0) ? rawUs : ((SmoothedCadenceUs * 4u + rawUs * 6u) / 10u);
 
-				if (nowSec - LastCadenceSentTimeSec >= 0.25)
+				if (nowSec - LastCadenceSentTimeSec >= kCadenceFeedbackPeriodSec)
 				{
 					if (TSharedPtr<FCefControlWriter> Ctrl = ControlWriter.Pin())
 					{
@@ -352,7 +358,21 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 			}
 			SCOPE_CYCLE_COUNTER(STAT_CefWidget_GPUBlitDirty);
 
-			uint32 copiedRects = 0;
+			FIntRect mergedRects[MAX_CEF_DIRTY_RECTS];
+			uint32 mergedCount = 0;
+			auto intersectsOrTouches = [](const FIntRect& a, const FIntRect& b)
+			{
+				return !(a.Max.X < b.Min.X || b.Max.X < a.Min.X || a.Max.Y < b.Min.Y || b.Max.Y < a.Min.Y);
+			};
+			auto unionRect = [](const FIntRect& a, const FIntRect& b)
+			{
+				return FIntRect(
+					FMath::Min(a.Min.X, b.Min.X),
+					FMath::Min(a.Min.Y, b.Min.Y),
+					FMath::Max(a.Max.X, b.Max.X),
+					FMath::Max(a.Max.Y, b.Max.Y));
+			};
+
 			const uint8 rectCount = FMath::Min<uint8>(Frame.DirtyCount, MAX_CEF_DIRTY_RECTS);
 			for (uint8 i = 0; i < rectCount; ++i)
 			{
@@ -367,17 +387,60 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 				if (x1 <= x0 || y1 <= y0)
 					continue;
 
-				FRHICopyTextureInfo info;
-				info.SourcePosition = FIntVector(x0, y0, 0);
-				info.DestPosition = FIntVector(x0, y0, 0);
-				info.Size = FIntVector(x1 - x0, y1 - y0, 1);
-				RHICmdList.CopyTexture(SrcRHI, DstRes->TextureRHI, info);
-				++copiedRects;
+				FIntRect rect(x0, y0, x1, y1);
+				bool merged = false;
+				for (uint32 m = 0; m < mergedCount; ++m)
+				{
+					if (intersectsOrTouches(mergedRects[m], rect))
+					{
+						mergedRects[m] = unionRect(mergedRects[m], rect);
+						merged = true;
+						break;
+					}
+				}
+				if (!merged && mergedCount < MAX_CEF_DIRTY_RECTS)
+					mergedRects[mergedCount++] = rect;
 			}
 
-			// Safety net: if metadata was unusable this frame, force full copy.
-			if (copiedRects == 0)
+			// One extra merge pass to coalesce chains after first unions.
+			for (uint32 i = 0; i < mergedCount; ++i)
+			{
+				for (uint32 j = i + 1; j < mergedCount; )
+				{
+					if (intersectsOrTouches(mergedRects[i], mergedRects[j]))
+					{
+						mergedRects[i] = unionRect(mergedRects[i], mergedRects[j]);
+						mergedRects[j] = mergedRects[mergedCount - 1];
+						--mergedCount;
+						continue;
+					}
+					++j;
+				}
+			}
+
+			uint64 mergedArea = 0;
+			for (uint32 i = 0; i < mergedCount; ++i)
+			{
+				const int32 w = FMath::Max(0, mergedRects[i].Width());
+				const int32 h = FMath::Max(0, mergedRects[i].Height());
+				mergedArea += static_cast<uint64>(w) * static_cast<uint64>(h);
+			}
+			const uint64 fullArea = static_cast<uint64>(Frame.Width) * static_cast<uint64>(Frame.Height);
+			const bool useFullCopy = (mergedCount == 0) || (fullArea > 0 && (static_cast<double>(mergedArea) / static_cast<double>(fullArea)) > kDirtyAreaFullCopyThreshold);
+			if (useFullCopy)
+			{
 				RHICmdList.CopyTexture(SrcRHI, DstRes->TextureRHI, FRHICopyTextureInfo{});
+				return;
+			}
+
+			for (uint32 i = 0; i < mergedCount; ++i)
+			{
+				FRHICopyTextureInfo info;
+				info.SourcePosition = FIntVector(mergedRects[i].Min.X, mergedRects[i].Min.Y, 0);
+				info.DestPosition = FIntVector(mergedRects[i].Min.X, mergedRects[i].Min.Y, 0);
+				info.Size = FIntVector(mergedRects[i].Width(), mergedRects[i].Height(), 1);
+				RHICmdList.CopyTexture(SrcRHI, DstRes->TextureRHI, info);
+			}
 		}
 	);
 
