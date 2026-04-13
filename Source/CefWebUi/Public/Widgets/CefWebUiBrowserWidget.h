@@ -21,6 +21,14 @@ public:
 	UCefWebUiBrowserWidget(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 private:
+	void ResetRuntimeState();
+	bool TryAcquireFrame(FCefSharedFrame& OutFrame, bool& bOutIdleRecoveryFullCopy, double NowSec);
+	void UpdateCadenceFeedback(double NowSec, bool bIdleRecoveryFullCopy);
+	void UpdateFrameGapTelemetry(const FCefSharedFrame& Frame, bool bIdleRecoveryFullCopy);
+	bool ResolveUseDirtyRects(const FCefSharedFrame& Frame, double NowSec);
+	void UpdateCopyTelemetry(const FCefSharedFrame& Frame, bool bUseDirtyRects);
+	void MaybeLogAndResetTelemetry(double NowSec);
+	void MaybeUpdateCursor(const FCefSharedFrame& Frame, double NowSec);
 	void PollAndUpload();
 	void EnsureSharedRHI();
 	void EnsureRenderTarget(uint32 InWidth, uint32 InHeight);
@@ -35,9 +43,13 @@ private:
 	double LastUploadTimeSec = 0.0;
 	double LastIdleRecoveryCopyTimeSec = 0.0;
 	double LastSafetyFullCopyTimeSec = 0.0;
+	double LastInputEventTimeSec = 0.0;
+	double LastCursorUpdateTimeSec = 0.0;
 	double LastTelemetryLogTimeSec = 0.0;
 	uint32 SmoothedCadenceUs = 0;
 	uint64 LastSeenFrameId = 0;
+	uint32 PendingForceFullFrames = 0;
+	ECefCustomCursorType LastCursorType = ECefCustomCursorType::CT_NONE;
 	bool bLastUploadUsedDirty = false;
 	bool bHasLastUploadedFrame = false;
 	FCefSharedFrame LastUploadedFrame;
