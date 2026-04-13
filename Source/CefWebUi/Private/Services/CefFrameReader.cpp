@@ -3,6 +3,7 @@
 #include "Services/CefFrameReader.h"
 #include "CefWebUi.h"
 #include "Async/Async.h"
+#include "HAL/IConsoleManager.h"
 #include <atomic>
 
 #include "Windows/AllowWindowsPlatformTypes.h"
@@ -10,6 +11,50 @@
 #include <Windows.h>
 
 #include "Windows/HideWindowsPlatformTypes.h"
+
+namespace
+{
+static TAutoConsoleVariable<int32> CVarCefWebUiThreadTuning(
+	TEXT("CefWebUi.ThreadTuning"),
+	1,
+	TEXT("Enable thread priority/affinity tuning for CEF frame reader thread (1=on, 0=off)."),
+	ECVF_Default);
+
+ULONG_PTR SelectAffinityMask(ULONG_PTR processMask, uint32 logicalIndex)
+{
+	if (processMask == 0) return 0;
+	uint32 count = 0;
+	for (uint32 i = 0; i < sizeof(ULONG_PTR) * 8; ++i)
+	{
+		if (processMask & (static_cast<ULONG_PTR>(1) << i))
+			++count;
+	}
+	if (count == 0) return 0;
+	const uint32 target = logicalIndex % count;
+	uint32 seen = 0;
+	for (uint32 i = 0; i < sizeof(ULONG_PTR) * 8; ++i)
+	{
+		const ULONG_PTR bit = static_cast<ULONG_PTR>(1) << i;
+		if ((processMask & bit) == 0) continue;
+		if (seen == target) return bit;
+		++seen;
+	}
+	return 0;
+}
+
+void TryTuneCurrentThread()
+{
+	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
+
+	ULONG_PTR processMask = 0, systemMask = 0;
+	if (!GetProcessAffinityMask(GetCurrentProcess(), &processMask, &systemMask))
+		return;
+
+	const ULONG_PTR mask = SelectAffinityMask(processMask, 0);
+	if (mask != 0)
+		SetThreadAffinityMask(GetCurrentThread(), mask);
+}
+}
 
 // Must match SharedMemoryLayout.h on CEF side
 constexpr uint32 SHM_MAX_WIDTH = 3840;
@@ -111,6 +156,11 @@ void FCefFrameReader::Stop()
 
 uint32 FCefFrameReader::Run()
 {
+	if (CVarCefWebUiThreadTuning.GetValueOnAnyThread() != 0)
+	{
+		TryTuneCurrentThread();
+	}
+
 	while (bRunning)
 	{
 		DWORD result = WaitForSingleObject(HEvent, 500);
