@@ -114,13 +114,18 @@ static TAutoConsoleVariable<float> CVarCefWebUiCursorUpdateRateHz(
 
 static TAutoConsoleVariable<int32> CVarCefWebUiGpuFenceSync(
 	TEXT("CefWebUi.GpuFenceSync"),
-	1,
+	0,
 	TEXT("Wait on host-published shared GPU fence before copying shared texture (0/1)."));
 
 static TAutoConsoleVariable<int32> CVarCefWebUiGpuFenceWaitTimeoutMs(
 	TEXT("CefWebUi.GpuFenceWaitTimeoutMs"),
 	8,
 	TEXT("Initial timeout in ms for GPU fence wait before falling back to blocking wait."));
+
+static TAutoConsoleVariable<int32> CVarCefWebUiGpuFenceWaitMode(
+	TEXT("CefWebUi.GpuFenceWaitMode"),
+	1,
+	TEXT("0=auto, 1=timeout-no-block, 2=block-only, 3=no-wait"));
 
 UCefWebUiBrowserWidget::UCefWebUiBrowserWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -143,10 +148,12 @@ void UCefWebUiBrowserWidget::ResetRuntimeState()
 	LastSafetyFullCopyTimeSec = 0.0;
 	LastInputEventTimeSec = 0.0;
 	LastCursorUpdateTimeSec = 0.0;
+	GpuFenceAutoBlockUntilSec = 0.0;
 	LastTelemetryLogTimeSec = 0.0;
 	SmoothedCadenceUs = 0;
 	LastSeenFrameId = 0;
 	PendingForceFullFrames = 0;
+	GpuFenceTimeoutBurst = 0;
 	LastCursorType = ECefCustomCursorType::CT_NONE;
 	bLastUploadUsedDirty = false;
 	bHasLastUploadedFrame = false;
@@ -401,12 +408,36 @@ void UCefWebUiBrowserWidget::WaitForProducerGpuFence(uint64 FenceValue)
 	if (FAILED(hr))
 		return;
 
+	const double nowSec = FPlatformTime::Seconds();
+	const int32 waitMode = CVarCefWebUiGpuFenceWaitMode.GetValueOnAnyThread();
+	if (waitMode == 3)
+		return;
+
+	if (waitMode == 2)
+	{
+		WaitForSingleObject(static_cast<HANDLE>(GpuFenceWaitEvent), INFINITE);
+		return;
+	}
+
 	const DWORD timeoutMs = static_cast<DWORD>(FMath::Clamp(CVarCefWebUiGpuFenceWaitTimeoutMs.GetValueOnAnyThread(), 1, 1000));
 	const DWORD wr = WaitForSingleObject(static_cast<HANDLE>(GpuFenceWaitEvent), timeoutMs);
 	if (wr == WAIT_TIMEOUT)
 	{
-		UE_LOG(LogCefWebUiTelemetry, Warning, TEXT("CefWidget: GPU fence wait timeout, blocking until completion"));
-		WaitForSingleObject(static_cast<HANDLE>(GpuFenceWaitEvent), INFINITE);
+		UE_LOG(LogCefWebUiTelemetry, Verbose, TEXT("CefWidget: GPU fence wait timeout"));
+		if (waitMode == 0)
+		{
+			++GpuFenceTimeoutBurst;
+			if (GpuFenceTimeoutBurst >= 3)
+			{
+				GpuFenceAutoBlockUntilSec = nowSec + 1.0; // telemetry hint window only
+				GpuFenceTimeoutBurst = 0;
+			}
+		}
+		return;
+	}
+	else if (waitMode == 0)
+	{
+		GpuFenceTimeoutBurst = 0;
 	}
 }
 
@@ -608,6 +639,15 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 	bool bIdleRecoveryFullCopy = false;
 	if (!TryAcquireFrame(Frame, bIdleRecoveryFullCopy, nowSec))
 		return;
+	if (TSharedPtr<FCefFrameReader> Reader = FrameReader.Pin())
+	{
+		const uint32 dropped = Reader->ConsumeDroppedPendingFrames();
+		if (dropped > 0)
+		{
+			TelemetryFrameGapCount += dropped;
+			SET_DWORD_STAT(STAT_CefTel_FrameGaps, TelemetryFrameGapCount);
+		}
+	}
 
 	UpdateFrameGapTelemetry(Frame, bIdleRecoveryFullCopy);
 	UpdateCadenceFeedback(nowSec, bIdleRecoveryFullCopy);

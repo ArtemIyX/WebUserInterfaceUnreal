@@ -20,6 +20,12 @@ static TAutoConsoleVariable<int32> CVarCefWebUiThreadTuning(
 	TEXT("Enable thread priority/affinity tuning for CEF frame reader thread (1=on, 0=off)."),
 	ECVF_Default);
 
+static TAutoConsoleVariable<int32> CVarCefWebUiDeliverLatestOnly(
+	TEXT("CefWebUi.DeliverLatestOnly"),
+	1,
+	TEXT("Reader policy: keep latest pending frame only (1) or keep first pending until consumed (0)."),
+	ECVF_Default);
+
 ULONG_PTR SelectAffinityMask(ULONG_PTR processMask, uint32 logicalIndex)
 {
 	if (processMask == 0) return 0;
@@ -204,6 +210,14 @@ uint32 FCefFrameReader::Run()
 		LastFrameId = header->frame_id;
 
 		{
+			const bool bHadPending = bFramePending.load(std::memory_order_relaxed);
+			if (bHadPending)
+			{
+				if (CVarCefWebUiDeliverLatestOnly.GetValueOnAnyThread() == 0)
+					continue;
+				DroppedPendingFrames.fetch_add(1, std::memory_order_relaxed);
+			}
+
 			FScopeLock Lock(&PendingFrameLock);
 			PendingFrame.Version = header->version;
 			PendingFrame.SlotCount = slotCount;
@@ -271,6 +285,11 @@ bool FCefFrameReader::PollSharedTexture(FCefSharedFrame& OutFrame)
 
 	bFramePending = false;
 	return true;
+}
+
+uint32 FCefFrameReader::ConsumeDroppedPendingFrames()
+{
+	return DroppedPendingFrames.exchange(0, std::memory_order_relaxed);
 }
 
 EMouseCursor::Type FCefFrameReader::MapCefCursor(ECefCustomCursorType Type)

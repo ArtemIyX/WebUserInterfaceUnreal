@@ -47,10 +47,12 @@ private:
 	double LastSafetyFullCopyTimeSec = 0.0;
 	double LastInputEventTimeSec = 0.0;
 	double LastCursorUpdateTimeSec = 0.0;
+	double GpuFenceAutoBlockUntilSec = 0.0;
 	double LastTelemetryLogTimeSec = 0.0;
 	uint32 SmoothedCadenceUs = 0;
 	uint64 LastSeenFrameId = 0;
 	uint32 PendingForceFullFrames = 0;
+	uint32 GpuFenceTimeoutBurst = 0;
 	ECefCustomCursorType LastCursorType = ECefCustomCursorType::CT_NONE;
 	bool bLastUploadUsedDirty = false;
 	bool bHasLastUploadedFrame = false;

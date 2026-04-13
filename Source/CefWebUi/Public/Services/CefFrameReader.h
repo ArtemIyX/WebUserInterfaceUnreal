@@ -77,6 +77,7 @@ public:
 	 *        Caller must CloseHandle() it when done opening the D3D12 resource.
 	 */
 	bool PollSharedTexture(FCefSharedFrame& OutFrame);
+	uint32 ConsumeDroppedPendingFrames();
 
 	static EMouseCursor::Type MapCefCursor(ECefCustomCursorType Type);
 
@@ -99,6 +100,7 @@ private:
 	FRunnableThread* Thread = nullptr;
 	std::atomic<bool> bFramePending{ false };
 	std::atomic<bool> bRunning{ false };
+	std::atomic<uint32> DroppedPendingFrames{ 0 };
 	uint32 LastSequence = 0;
 	uint64 LastFrameId = 0;
 	uint64 LastDeliveredFrameId = 0;
