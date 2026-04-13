@@ -254,6 +254,14 @@ uint32 FCefFrameReader::Run()
 		}
 
 		bFramePending = true;
+		if (!bFrameReadyDispatchPending.exchange(true, std::memory_order_acq_rel))
+		{
+			AsyncTask(ENamedThreads::GameThread, [this]()
+			{
+				bFrameReadyDispatchPending.store(false, std::memory_order_release);
+				OnFrameReady.Broadcast();
+			});
+		}
 
 		// Fire load state delegate on game thread if changed
 		ECefLoadState CurrentLoad = static_cast<ECefLoadState>(header->load_state);

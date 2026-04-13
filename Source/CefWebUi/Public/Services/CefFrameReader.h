@@ -52,6 +52,7 @@ struct FCefSharedFrame
 	FCefDirtyRect DirtyRects[MAX_CEF_DIRTY_RECTS];
 };
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnCefLoadStateChanged, uint8);
+DECLARE_MULTICAST_DELEGATE(FOnCefFrameReady);
 
 class CEFWEBUI_API FCefFrameReader : public FRunnable
 {
@@ -86,6 +87,7 @@ public:
 
 public:
 	FOnCefLoadStateChanged OnLoadStateChanged;
+	FOnCefFrameReady OnFrameReady;
 
 private:
 	void CloseHandles();
@@ -104,6 +106,7 @@ private:
 	std::atomic<bool> bFramePending{ false };
 	std::atomic<bool> bRunning{ false };
 	std::atomic<uint32> DroppedPendingFrames{ 0 };
+	std::atomic<bool> bFrameReadyDispatchPending{ false };
 	uint32 LastSequence = 0;
 	uint64 LastFrameId = 0;
 	uint64 LastDeliveredFrameId = 0;

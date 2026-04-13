@@ -36,6 +36,9 @@ private:
 	void PollAndUpload();
 	void EnsureSharedRHI();
 	void EnsureRenderTarget(uint32 InWidth, uint32 InHeight);
+	UFUNCTION()
+	void OnFrameReady();
+	void MarkInputEvent();
 
 private:
 	static constexpr uint32 MaxSharedSlots = 3;
@@ -52,8 +55,12 @@ private:
 	double GpuFenceAutoBlockUntilSec = 0.0;
 	double LastHostTuningPushTimeSec = 0.0;
 	double LastTelemetryLogTimeSec = 0.0;
+	double LastInputToFrameLatencyMs = 0.0;
 	uint32 SmoothedCadenceUs = 0;
 	uint64 LastSeenFrameId = 0;
+	uint64 InputEventSerial = 0;
+	uint64 LastLatencyMeasuredInputSerial = 0;
+	uint64 LastLatencyFrameId = 0;
 	uint32 PendingForceFullFrames = 0;
 	uint32 GpuFenceTimeoutBurst = 0;
 	ECefCustomCursorType LastCursorType = ECefCustomCursorType::CT_NONE;
@@ -67,6 +74,10 @@ private:
 	uint32 TelemetryDirtyCopyCount = 0;
 	uint32 TelemetryDirtyRectCountSum = 0;
 	uint32 TelemetryDirtyRectAreaSum = 0;
+	uint32 TelemetryInputLatencySamples = 0;
+	uint32 TelemetryInputLatencyMsSum = 0;
+	uint32 TelemetryInputLatencyMsMax = 0;
+	bool bPollUploadInProgress = false;
 
 	void* LastSharedHandle[MaxSharedSlots] = { nullptr };
 	FTextureRHIRef SharedTextureRHI[MaxSharedSlots];

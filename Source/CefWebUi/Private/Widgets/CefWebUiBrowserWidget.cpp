@@ -41,6 +41,8 @@ DECLARE_DWORD_COUNTER_STAT(TEXT("Full Copy"), STAT_CefTel_FullCopy, STATGROUP_Ce
 DECLARE_DWORD_COUNTER_STAT(TEXT("Dirty Copy"), STAT_CefTel_DirtyCopy, STATGROUP_CefWebUiTelemetry);
 DECLARE_DWORD_COUNTER_STAT(TEXT("Dirty Rect Count Sum"), STAT_CefTel_DirtyRectCountSum, STATGROUP_CefWebUiTelemetry);
 DECLARE_DWORD_COUNTER_STAT(TEXT("Dirty Rect Area Sum"), STAT_CefTel_DirtyRectAreaSum, STATGROUP_CefWebUiTelemetry);
+DECLARE_DWORD_COUNTER_STAT(TEXT("Input->Frame Latency Ms"), STAT_CefTel_InputToFrameLatencyMs, STATGROUP_CefWebUiTelemetry);
+DECLARE_DWORD_COUNTER_STAT(TEXT("Input->Frame Max Ms"), STAT_CefTel_InputToFrameLatencyMaxMs, STATGROUP_CefWebUiTelemetry);
 
 static TAutoConsoleVariable<int32> CVarCefWebUiUseDirtyRects(
 	TEXT("CefWebUi.UseDirtyRects"),
@@ -132,6 +134,16 @@ static TAutoConsoleVariable<int32> CVarCefWebUiUsePopupDedicatedPlane(
 	1,
 	TEXT("Use dedicated popup shared plane when host provides it (0/1)."));
 
+static TAutoConsoleVariable<int32> CVarCefWebUiEventDrivenUpload(
+	TEXT("CefWebUi.EventDrivenUpload"),
+	1,
+	TEXT("Consume/upload immediately on frame-ready event in addition to widget tick (0/1)."));
+
+static TAutoConsoleVariable<int32> CVarCefWebUiPopupFastPath(
+	TEXT("CefWebUi.PopupFastPath"),
+	1,
+	TEXT("Popup-plane fast path: skip main copy for popup-only updates (0/1)."));
+
 static TAutoConsoleVariable<float> CVarCefWebUiHostTuningPushPeriodSec(
 	TEXT("CefWebUi.HostTuningPushPeriodSec"),
 	0.5f,
@@ -176,8 +188,12 @@ void UCefWebUiBrowserWidget::ResetRuntimeState()
 	GpuFenceAutoBlockUntilSec = 0.0;
 	LastHostTuningPushTimeSec = 0.0;
 	LastTelemetryLogTimeSec = 0.0;
+	LastInputToFrameLatencyMs = 0.0;
 	SmoothedCadenceUs = 0;
 	LastSeenFrameId = 0;
+	InputEventSerial = 0;
+	LastLatencyMeasuredInputSerial = 0;
+	LastLatencyFrameId = 0;
 	PendingForceFullFrames = 0;
 	GpuFenceTimeoutBurst = 0;
 	LastCursorType = ECefCustomCursorType::CT_NONE;
@@ -191,6 +207,10 @@ void UCefWebUiBrowserWidget::ResetRuntimeState()
 	TelemetryDirtyCopyCount = 0;
 	TelemetryDirtyRectCountSum = 0;
 	TelemetryDirtyRectAreaSum = 0;
+	TelemetryInputLatencySamples = 0;
+	TelemetryInputLatencyMsSum = 0;
+	TelemetryInputLatencyMsMax = 0;
+	bPollUploadInProgress = false;
 	SET_DWORD_STAT(STAT_CefTel_ConsumedFrames, 0);
 	SET_DWORD_STAT(STAT_CefTel_FrameGaps, 0);
 	SET_DWORD_STAT(STAT_CefTel_ForcedFull, 0);
@@ -198,6 +218,8 @@ void UCefWebUiBrowserWidget::ResetRuntimeState()
 	SET_DWORD_STAT(STAT_CefTel_DirtyCopy, 0);
 	SET_DWORD_STAT(STAT_CefTel_DirtyRectCountSum, 0);
 	SET_DWORD_STAT(STAT_CefTel_DirtyRectAreaSum, 0);
+	SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMs, 0);
+	SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMaxMs, 0);
 }
 
 void UCefWebUiBrowserWidget::EnsureRenderTarget(uint32 InWidth, uint32 InHeight)
@@ -252,10 +274,17 @@ void UCefWebUiBrowserWidget::NativeConstruct()
 		ControlWriterRef->Open();
 
 	FrameReader.Pin()->OnLoadStateChanged.AddUObject(this, &UCefWebUiBrowserWidget::OnLoadStateChanged);
+	FrameReader.Pin()->OnFrameReady.AddUObject(this, &UCefWebUiBrowserWidget::OnFrameReady);
 }
 
 void UCefWebUiBrowserWidget::NativeDestruct()
 {
+	if (TSharedPtr<FCefFrameReader> Reader = FrameReader.Pin())
+	{
+		Reader->OnLoadStateChanged.RemoveAll(this);
+		Reader->OnFrameReady.RemoveAll(this);
+	}
+
 	FTextureRHIRef OldRHI0 = SharedTextureRHI[0];
 	FTextureRHIRef OldRHI1 = SharedTextureRHI[1];
 	FTextureRHIRef OldRHI2 = SharedTextureRHI[2];
@@ -306,6 +335,23 @@ void UCefWebUiBrowserWidget::NativeTick(const FGeometry& MyGeometry, float InDel
 		return;
 
 	PollAndUpload();
+}
+
+void UCefWebUiBrowserWidget::OnFrameReady()
+{
+	if (CVarCefWebUiEventDrivenUpload.GetValueOnAnyThread() == 0)
+		return;
+	if (!FrameReader.IsValid())
+		return;
+	if (CVarCefWebUiUploadSkipWhenHidden.GetValueOnAnyThread() != 0 && !IsVisible())
+		return;
+	PollAndUpload();
+}
+
+void UCefWebUiBrowserWidget::MarkInputEvent()
+{
+	LastInputEventTimeSec = FPlatformTime::Seconds();
+	++InputEventSerial;
 }
 
 void UCefWebUiBrowserWidget::EnsureSharedRHI()
@@ -668,15 +714,19 @@ void UCefWebUiBrowserWidget::MaybeLogAndResetTelemetry(double NowSec)
 	const uint32 frames = TelemetryConsumedFrames;
 	const uint32 avgRects = (TelemetryDirtyCopyCount > 0) ? (TelemetryDirtyRectCountSum / TelemetryDirtyCopyCount) : 0;
 	const uint32 avgArea = (TelemetryDirtyCopyCount > 0) ? (TelemetryDirtyRectAreaSum / TelemetryDirtyCopyCount) : 0;
+	const uint32 avgInputLatencyMs = (TelemetryInputLatencySamples > 0) ? (TelemetryInputLatencyMsSum / TelemetryInputLatencySamples) : 0;
 	UE_LOG(LogCefWebUiTelemetry, Log,
-		TEXT("[CefWidgetTelemetry] frames=%u gaps=%u forced_full=%u full_copy=%u dirty_copy=%u dirty_rects_avg=%u dirty_area_avg=%u"),
+		TEXT("[CefWidgetTelemetry] frames=%u gaps=%u forced_full=%u full_copy=%u dirty_copy=%u dirty_rects_avg=%u dirty_area_avg=%u input_latency_avg_ms=%u input_latency_max_ms=%u last_latency_frame_id=%llu"),
 		frames,
 		TelemetryFrameGapCount,
 		TelemetryForcedFullCount,
 		TelemetryFullCopyCount,
 		TelemetryDirtyCopyCount,
 		avgRects,
-		avgArea);
+		avgArea,
+		avgInputLatencyMs,
+		TelemetryInputLatencyMsMax,
+		static_cast<unsigned long long>(LastLatencyFrameId));
 
 	LastTelemetryLogTimeSec = NowSec;
 	TelemetryConsumedFrames = 0;
@@ -686,6 +736,9 @@ void UCefWebUiBrowserWidget::MaybeLogAndResetTelemetry(double NowSec)
 	TelemetryDirtyCopyCount = 0;
 	TelemetryDirtyRectCountSum = 0;
 	TelemetryDirtyRectAreaSum = 0;
+	TelemetryInputLatencySamples = 0;
+	TelemetryInputLatencyMsSum = 0;
+	TelemetryInputLatencyMsMax = 0;
 	SET_DWORD_STAT(STAT_CefTel_ConsumedFrames, 0);
 	SET_DWORD_STAT(STAT_CefTel_FrameGaps, 0);
 	SET_DWORD_STAT(STAT_CefTel_ForcedFull, 0);
@@ -693,6 +746,8 @@ void UCefWebUiBrowserWidget::MaybeLogAndResetTelemetry(double NowSec)
 	SET_DWORD_STAT(STAT_CefTel_DirtyCopy, 0);
 	SET_DWORD_STAT(STAT_CefTel_DirtyRectCountSum, 0);
 	SET_DWORD_STAT(STAT_CefTel_DirtyRectAreaSum, 0);
+	SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMs, static_cast<uint32>(LastInputToFrameLatencyMs));
+	SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMaxMs, 0);
 }
 
 void UCefWebUiBrowserWidget::MaybeUpdateCursor(const FCefSharedFrame& Frame, double NowSec)
@@ -712,11 +767,18 @@ void UCefWebUiBrowserWidget::MaybeUpdateCursor(const FCefSharedFrame& Frame, dou
 
 void UCefWebUiBrowserWidget::PollAndUpload()
 {
+	if (bPollUploadInProgress)
+		return;
+	bPollUploadInProgress = true;
+
 	FCefSharedFrame Frame;
 	const double nowSec = FPlatformTime::Seconds();
 	bool bIdleRecoveryFullCopy = false;
 	if (!TryAcquireFrame(Frame, bIdleRecoveryFullCopy, nowSec))
+	{
+		bPollUploadInProgress = false;
 		return;
+	}
 	if (TSharedPtr<FCefFrameReader> Reader = FrameReader.Pin())
 	{
 		const uint32 dropped = Reader->ConsumeDroppedPendingFrames();
@@ -731,6 +793,19 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 	UpdateCadenceFeedback(nowSec, bIdleRecoveryFullCopy);
 	MaybeUpdateCursor(Frame, nowSec);
 	PushHostTuningIfNeeded(nowSec);
+	if (!bIdleRecoveryFullCopy && InputEventSerial != 0 && InputEventSerial != LastLatencyMeasuredInputSerial)
+	{
+		const uint32 latencyMs = static_cast<uint32>(FMath::Clamp((nowSec - LastInputEventTimeSec) * 1000.0, 0.0, 10000.0));
+		LastInputToFrameLatencyMs = static_cast<double>(latencyMs);
+		LastLatencyMeasuredInputSerial = InputEventSerial;
+		LastLatencyFrameId = Frame.FrameId;
+		++TelemetryInputLatencySamples;
+		const uint32 remaining = (TelemetryInputLatencyMsSum < MAX_uint32) ? (MAX_uint32 - TelemetryInputLatencyMsSum) : 0;
+		TelemetryInputLatencyMsSum += FMath::Min(latencyMs, remaining);
+		TelemetryInputLatencyMsMax = FMath::Max(TelemetryInputLatencyMsMax, latencyMs);
+		SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMs, latencyMs);
+		SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMaxMs, TelemetryInputLatencyMsMax);
+	}
 
 	SharedSlotCount = FMath::Clamp(Frame.SlotCount, 1u, MaxSharedSlots);
 	EnsureRenderTarget(Frame.Width, Frame.Height);
@@ -748,6 +823,10 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 	WaitForProducerGpuFence(Frame.GpuFenceValue);
 	const bool bUseDirtyRects = ResolveUseDirtyRects(Frame, nowSec);
 	UpdateCopyTelemetry(Frame, bUseDirtyRects);
+	const bool bPopupFastPathEnabled = (CVarCefWebUiPopupFastPath.GetValueOnAnyThread() != 0);
+	const bool bPopupRectValid = (Frame.PopupRect.W > 0 && Frame.PopupRect.H > 0);
+	const bool bMainUnsafeFlags = ((Frame.Flags & (CefFrameFlag_FullFrame | CefFrameFlag_Overflow | CefFrameFlag_Resized)) != 0) || Frame.bForceFullRefresh;
+	const bool bPopupFastPath = bUsePopupPlane && bPopupFastPathEnabled && bPopupRectValid && !bMainUnsafeFlags;
 
 	LastUploadedFrame = Frame;
 	bHasLastUploadedFrame = true;
@@ -759,13 +838,39 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 	const float dirtyAreaThreshold = FMath::Clamp(CVarCefWebUiDirtyAreaFullCopyThreshold.GetValueOnAnyThread(), 0.0f, 1.0f);
 
 	ENQUEUE_RENDER_COMMAND(CefBlitToRenderTarget)(
-		[SrcRHI, PopupSrcRHI, DstRes, Frame, bUseDirtyRects, bUsePopupPlane, dirtyInflatePx, coalesceGapPx, dirtyAreaThreshold](FRHICommandListImmediate& RHICmdList)
+		[SrcRHI, PopupSrcRHI, DstRes, Frame, bUseDirtyRects, bUsePopupPlane, bPopupFastPath, dirtyInflatePx, coalesceGapPx, dirtyAreaThreshold](FRHICommandListImmediate& RHICmdList)
 		{
 			SCOPE_CYCLE_COUNTER(STAT_CefWidget_GPUBlit);
 			if (!SrcRHI.IsValid() || !DstRes || !DstRes->TextureRHI)
 				return;
 
-			if (!bUseDirtyRects)
+			if (bPopupFastPath)
+			{
+				const int32 x0 = FMath::Clamp(Frame.PopupRect.X, 0, static_cast<int32>(Frame.Width));
+				const int32 y0 = FMath::Clamp(Frame.PopupRect.Y, 0, static_cast<int32>(Frame.Height));
+				const int32 x1 = FMath::Clamp(Frame.PopupRect.X + Frame.PopupRect.W, 0, static_cast<int32>(Frame.Width));
+				const int32 y1 = FMath::Clamp(Frame.PopupRect.Y + Frame.PopupRect.H, 0, static_cast<int32>(Frame.Height));
+				if (x1 > x0 && y1 > y0)
+				{
+					if (Frame.bPopupVisible && PopupSrcRHI.IsValid())
+					{
+						FRHICopyTextureInfo popupInfo;
+						popupInfo.SourcePosition = FIntVector(x0, y0, 0);
+						popupInfo.DestPosition = FIntVector(x0, y0, 0);
+						popupInfo.Size = FIntVector(x1 - x0, y1 - y0, 1);
+						RHICmdList.CopyTexture(PopupSrcRHI, DstRes->TextureRHI, popupInfo);
+					}
+					else
+					{
+						FRHICopyTextureInfo baseInfo;
+						baseInfo.SourcePosition = FIntVector(x0, y0, 0);
+						baseInfo.DestPosition = FIntVector(x0, y0, 0);
+						baseInfo.Size = FIntVector(x1 - x0, y1 - y0, 1);
+						RHICmdList.CopyTexture(SrcRHI, DstRes->TextureRHI, baseInfo);
+					}
+				}
+			}
+			else if (!bUseDirtyRects)
 			{
 				SCOPE_CYCLE_COUNTER(STAT_CefWidget_GPUBlitFull);
 				RHICmdList.CopyTexture(SrcRHI, DstRes->TextureRHI, FRHICopyTextureInfo{});
@@ -875,7 +980,7 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 			}
 
 			// Overlay popup plane after main copy.
-			if (bUsePopupPlane && PopupSrcRHI.IsValid() && Frame.bPopupVisible && Frame.PopupRect.W > 0 && Frame.PopupRect.H > 0)
+			if (!bPopupFastPath && bUsePopupPlane && PopupSrcRHI.IsValid() && Frame.bPopupVisible && Frame.PopupRect.W > 0 && Frame.PopupRect.H > 0)
 			{
 				const int32 x0 = FMath::Clamp(Frame.PopupRect.X, 0, static_cast<int32>(Frame.Width));
 				const int32 y0 = FMath::Clamp(Frame.PopupRect.Y, 0, static_cast<int32>(Frame.Height));
@@ -893,13 +998,14 @@ void UCefWebUiBrowserWidget::PollAndUpload()
 		}
 	);
 	MaybeLogAndResetTelemetry(FPlatformTime::Seconds());
+	bPollUploadInProgress = false;
 }
 
 // ---- Input ------------------------------------------------------------------
 
 FReply UCefWebUiBrowserWidget::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	LastInputEventTimeSec = FPlatformTime::Seconds();
+	MarkInputEvent();
 	TSharedPtr<FCefInputWriter> Writer = InputWriter.Pin();
 	if (Writer)
 	{
@@ -912,7 +1018,7 @@ FReply UCefWebUiBrowserWidget::NativeOnMouseMove(const FGeometry& InGeometry, co
 
 FReply UCefWebUiBrowserWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	LastInputEventTimeSec = FPlatformTime::Seconds();
+	MarkInputEvent();
 	TSharedPtr<FCefInputWriter> Writer = InputWriter.Pin();
 	if (Writer)
 	{
@@ -929,7 +1035,7 @@ FReply UCefWebUiBrowserWidget::NativeOnMouseButtonDown(const FGeometry& InGeomet
 
 FReply UCefWebUiBrowserWidget::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	LastInputEventTimeSec = FPlatformTime::Seconds();
+	MarkInputEvent();
 	TSharedPtr<FCefInputWriter> Writer = InputWriter.Pin();
 	if (Writer)
 	{
@@ -946,7 +1052,7 @@ FReply UCefWebUiBrowserWidget::NativeOnMouseButtonUp(const FGeometry& InGeometry
 
 FReply UCefWebUiBrowserWidget::NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	LastInputEventTimeSec = FPlatformTime::Seconds();
+	MarkInputEvent();
 	TSharedPtr<FCefInputWriter> Writer = InputWriter.Pin();
 	if (Writer)
 	{
@@ -959,7 +1065,7 @@ FReply UCefWebUiBrowserWidget::NativeOnMouseWheel(const FGeometry& InGeometry, c
 
 FReply UCefWebUiBrowserWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
-	LastInputEventTimeSec = FPlatformTime::Seconds();
+	MarkInputEvent();
 	TSharedPtr<FCefInputWriter> Writer = InputWriter.Pin();
 	if (Writer)
 		Writer->WriteKey(InKeyEvent.GetKeyCode(),
@@ -969,7 +1075,7 @@ FReply UCefWebUiBrowserWidget::NativeOnKeyDown(const FGeometry& InGeometry, cons
 
 FReply UCefWebUiBrowserWidget::NativeOnKeyUp(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
-	LastInputEventTimeSec = FPlatformTime::Seconds();
+	MarkInputEvent();
 	TSharedPtr<FCefInputWriter> Writer = InputWriter.Pin();
 	if (Writer)
 		Writer->WriteKey(InKeyEvent.GetKeyCode(),
@@ -979,7 +1085,7 @@ FReply UCefWebUiBrowserWidget::NativeOnKeyUp(const FGeometry& InGeometry, const 
 
 FReply UCefWebUiBrowserWidget::NativeOnKeyChar(const FGeometry& InGeometry, const FCharacterEvent& InCharacterEvent)
 {
-	LastInputEventTimeSec = FPlatformTime::Seconds();
+	MarkInputEvent();
 	TSharedPtr<FCefInputWriter> Writer = InputWriter.Pin();
 	if (Writer)
 		Writer->WriteChar(static_cast<uint16>(InCharacterEvent.GetCharacter()));
