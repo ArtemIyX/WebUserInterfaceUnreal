@@ -128,6 +128,7 @@ bool FCefFrameReader::Start()
 		CloseHandles();
 		return false;
 	}
+	LastKnownLoadStateRaw.store(startupHeader->load_state, std::memory_order_relaxed);
 
 	HEvent = OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE, false, L"CEFHost_FrameReady");
 	if (!HEvent)
@@ -252,6 +253,7 @@ uint32 FCefFrameReader::Run()
 			PendingFrame.CursorType = static_cast<ECefCustomCursorType>(header->cursor_type);
 			PendingFrame.LoadState = static_cast<ECefLoadState>(header->load_state);
 		}
+		LastKnownLoadStateRaw.store(header->load_state, std::memory_order_relaxed);
 
 		bFramePending = true;
 		if (!bFrameReadyDispatchPending.exchange(true, std::memory_order_acq_rel))
@@ -305,6 +307,11 @@ bool FCefFrameReader::PollSharedTexture(FCefSharedFrame& OutFrame)
 uint32 FCefFrameReader::ConsumeDroppedPendingFrames()
 {
 	return DroppedPendingFrames.exchange(0, std::memory_order_relaxed);
+}
+
+ECefLoadState FCefFrameReader::GetLastKnownLoadState() const
+{
+	return static_cast<ECefLoadState>(LastKnownLoadStateRaw.load(std::memory_order_relaxed));
 }
 
 EMouseCursor::Type FCefFrameReader::MapCefCursor(ECefCustomCursorType Type)

@@ -82,6 +82,7 @@ public:
 	 */
 	bool PollSharedTexture(FCefSharedFrame& OutFrame);
 	uint32 ConsumeDroppedPendingFrames();
+	ECefLoadState GetLastKnownLoadState() const;
 
 	static EMouseCursor::Type MapCefCursor(ECefCustomCursorType Type);
 
@@ -107,6 +108,7 @@ private:
 	std::atomic<bool> bRunning{ false };
 	std::atomic<uint32> DroppedPendingFrames{ 0 };
 	std::atomic<bool> bFrameReadyDispatchPending{ false };
+	std::atomic<uint8> LastKnownLoadStateRaw{ static_cast<uint8>(ECefLoadState::Idle) };
 	uint32 LastSequence = 0;
 	uint64 LastFrameId = 0;
 	uint64 LastDeliveredFrameId = 0;

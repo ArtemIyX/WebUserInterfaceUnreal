@@ -1,8 +1,9 @@
-﻿// UCefBrowserWidget.cpp
+// UCefBrowserWidget.cpp
 
 #include "Widgets/CefWebUiBrowserWidget.h"
 
 #include "CefWebUi.h"
+#include "Sessions/CefWebUiBrowserSession.h"
 #include "Services/CefFrameReader.h"
 #include "Components/Image.h"
 #include "Engine/TextureRenderTarget2D.h"
@@ -250,6 +251,10 @@ void UCefWebUiBrowserWidget::EnsureRenderTarget(uint32 InWidth, uint32 InHeight)
 void UCefWebUiBrowserWidget::OnLoadStateChanged(uint8 InState)
 {
 	UE_LOG(LogCefWebUi, Log, TEXT("Cef loading state changed: %d"), InState);
+	if (IsValid(BrowserSession))
+	{
+		BrowserSession->HandleWidgetLoadStateChanged(InState);
+	}
 }
 
 void UCefWebUiBrowserWidget::NativeConstruct()
@@ -275,10 +280,21 @@ void UCefWebUiBrowserWidget::NativeConstruct()
 
 	FrameReader.Pin()->OnLoadStateChanged.AddUObject(this, &UCefWebUiBrowserWidget::OnLoadStateChanged);
 	FrameReader.Pin()->OnFrameReady.AddUObject(this, &UCefWebUiBrowserWidget::OnFrameReady);
+
+	if (IsValid(BrowserSession))
+	{
+		const uint8 state = static_cast<uint8>(FrameReader.Pin()->GetLastKnownLoadState());
+		BrowserSession->HandleWidgetLoadStateChanged(state);
+	}
 }
 
 void UCefWebUiBrowserWidget::NativeDestruct()
 {
+	if (IsValid(BrowserSession))
+	{
+		BrowserSession->OnWidgetDestroyed(this);
+	}
+
 	if (TSharedPtr<FCefFrameReader> Reader = FrameReader.Pin())
 	{
 		Reader->OnLoadStateChanged.RemoveAll(this);
@@ -322,6 +338,7 @@ void UCefWebUiBrowserWidget::NativeDestruct()
 	FrameReader.Reset();
 	InputWriter.Reset();
 	ControlWriter.Reset();
+	BrowserSession = nullptr;
 	Super::NativeDestruct();
 }
 
@@ -346,6 +363,19 @@ void UCefWebUiBrowserWidget::OnFrameReady()
 	if (CVarCefWebUiUploadSkipWhenHidden.GetValueOnAnyThread() != 0 && !IsVisible())
 		return;
 	PollAndUpload();
+}
+
+void UCefWebUiBrowserWidget::SetBrowserSession(UCefWebUiBrowserSession* InSession)
+{
+	BrowserSession = InSession;
+	if (IsValid(BrowserSession))
+	{
+		if (TSharedPtr<FCefFrameReader> Reader = FrameReader.Pin())
+		{
+			const uint8 state = static_cast<uint8>(Reader->GetLastKnownLoadState());
+			BrowserSession->HandleWidgetLoadStateChanged(state);
+		}
+	}
 }
 
 void UCefWebUiBrowserWidget::MarkInputEvent()

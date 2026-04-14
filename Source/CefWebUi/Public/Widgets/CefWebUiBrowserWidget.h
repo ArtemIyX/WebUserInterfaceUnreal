@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -11,6 +11,7 @@
 
 enum class ECefLoadState : uint8;
 enum class ECefMouseButton : uint8;
+class UCefWebUiBrowserSession;
 
 UCLASS(Blueprintable, BlueprintType)
 class CEFWEBUI_API UCefWebUiBrowserWidget : public UUserWidget
@@ -127,6 +128,12 @@ public:
 	virtual void NativeDestruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
+	UFUNCTION(BlueprintCallable, Category="CefWebUi")
+	void SetBrowserSession(UCefWebUiBrowserSession* InSession);
+
+	UFUNCTION(BlueprintPure, Category="CefWebUi")
+	UCefWebUiBrowserSession* GetBrowserSession() const { return BrowserSession; }
+
 	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 	virtual FReply NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
@@ -182,4 +189,8 @@ public:
 	TSharedRef<class FCefInputWriter> GetInputWriter() const;
 	TSharedRef<class FCefFrameReader> GetFrameReader() const;
 	TSharedRef<class FCefControlWriter> GetControlWriter() const;
+
+private:
+	UPROPERTY(Transient, BlueprintReadOnly, Category="CefWebUi", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UCefWebUiBrowserSession> BrowserSession;
 };
