@@ -4,15 +4,21 @@
 #include "Input/Reply.h"
 #include "Layout/Geometry.h"
 #include "Rendering/DrawElements.h"
+#include "Styling/SlateBrush.h"
 #include "Widgets/SLeafWidget.h"
+#include "Services/CefFrameReader.h"
 #include "Services/CefInputWriter.h"
 
 class FCefInputWriter;
+class FCefFrameReader;
+class UTexture2D;
 class UCefWebUiBrowserSession;
 
 class CEFWEBUI_API SCefBrowserSurface : public SLeafWidget
 {
 public:
+	virtual ~SCefBrowserSurface() override;
+
 	SLATE_BEGIN_ARGS(SCefBrowserSurface)
 		: _BrowserWidth(1920)
 		, _BrowserHeight(1080)
@@ -48,12 +54,33 @@ public:
 	virtual FReply OnKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& CharacterEvent) override;
 
 private:
+	EActiveTimerReturnType HandleActiveTimer(double CurrentTime, float DeltaTime);
+	bool TryGetFrameReader(TSharedPtr<FCefFrameReader>& OutFrameReader) const;
 	bool TryGetInputWriter(TSharedPtr<FCefInputWriter>& OutInputWriter) const;
+	void PollLatestFrame() const;
+	void EnsureSharedRhi() const;
+	bool EnsurePopupPlaneRhi() const;
+	void EnsureSlateTextures(uint32 InWidth, uint32 InHeight) const;
+	void UpdateTextureRefs(uint32 InSlot, bool bUsePopupPlane) const;
+	void ReleaseResources();
 	void GetBrowserCoords(const FGeometry& InGeometry, const FVector2D& InScreenPosition, int32& OutX, int32& OutY) const;
 	static bool SlateButtonToCef(const FKey& InKey, ECefMouseButton& OutButton);
 
 private:
+	static constexpr uint32 MaxSharedSlots = 3;
+
 	TWeakObjectPtr<UCefWebUiBrowserSession> BrowserSession;
 	int32 BrowserWidth = 1920;
 	int32 BrowserHeight = 1080;
+
+	mutable TWeakPtr<FCefFrameReader> FrameReader;
+	mutable FCefSharedFrame LastFrame;
+	mutable bool bHasFrame = false;
+	mutable uint32 SharedSlotCount = 2;
+	mutable FTextureRHIRef SharedTextureRHI[MaxSharedSlots];
+	mutable FTextureRHIRef SharedPopupTextureRHI;
+	mutable UTexture2D* SlateMainTexture = nullptr;
+	mutable UTexture2D* SlatePopupTexture = nullptr;
+	mutable FSlateBrush MainBrush;
+	mutable FSlateBrush PopupBrush;
 };
