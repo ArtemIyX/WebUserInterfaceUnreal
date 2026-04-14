@@ -3,6 +3,7 @@
 #include "Data/CefLoadState.h"
 #include "Engine/GameInstance.h"
 #include "GameFramework/PlayerController.h"
+#include "Services/CefControlWriter.h"
 #include "Services/CefFrameReader.h"
 #include "Services/CefWebUiRuntime.h"
 #include "Slate/CefWebUiSlateHostWidget.h"
@@ -140,6 +141,154 @@ TWeakPtr<FCefControlWriter> UCefWebUiBrowserSession::GetControlWriterPtr() const
 
 #pragma endregion
 
+#pragma region Control
+
+void UCefWebUiBrowserSession::GoBack()
+{
+	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
+	{
+		controlWriter->GoBack();
+	}
+}
+
+void UCefWebUiBrowserSession::GoForward()
+{
+	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
+	{
+		controlWriter->GoForward();
+	}
+}
+
+void UCefWebUiBrowserSession::StopLoad()
+{
+	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
+	{
+		controlWriter->StopLoad();
+	}
+}
+
+void UCefWebUiBrowserSession::Reload()
+{
+	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
+	{
+		controlWriter->Reload();
+	}
+}
+
+void UCefWebUiBrowserSession::SetUrl(const FString& inUrl)
+{
+	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
+	{
+		controlWriter->SetURL(inUrl);
+	}
+}
+
+void UCefWebUiBrowserSession::SetPaused(bool bInPaused)
+{
+	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
+	{
+		controlWriter->SetPaused(bInPaused);
+	}
+}
+
+void UCefWebUiBrowserSession::SetHidden(bool bInHidden)
+{
+	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
+	{
+		controlWriter->SetHidden(bInHidden);
+	}
+}
+
+void UCefWebUiBrowserSession::SetFocus(bool bInFocus)
+{
+	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
+	{
+		controlWriter->SetFocus(bInFocus);
+	}
+}
+
+void UCefWebUiBrowserSession::SetZoomLevel(float inLevel)
+{
+	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
+	{
+		controlWriter->SetZoomLevel(inLevel);
+	}
+}
+
+void UCefWebUiBrowserSession::SetFrameRate(int32 inRate)
+{
+	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
+	{
+		controlWriter->SetFrameRate(static_cast<uint32>(FMath::Max(0, inRate)));
+	}
+}
+
+void UCefWebUiBrowserSession::ScrollTo(int32 inX, int32 inY)
+{
+	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
+	{
+		controlWriter->ScrollTo(inX, inY);
+	}
+}
+
+void UCefWebUiBrowserSession::Resize(int32 inWidth, int32 inHeight)
+{
+	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
+	{
+		controlWriter->Resize(static_cast<uint32>(FMath::Max(1, inWidth)), static_cast<uint32>(FMath::Max(1, inHeight)));
+	}
+}
+
+void UCefWebUiBrowserSession::SetMuted(bool bInMuted)
+{
+	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
+	{
+		controlWriter->SetMuted(bInMuted);
+	}
+}
+
+void UCefWebUiBrowserSession::OpenDevTools()
+{
+	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
+	{
+		controlWriter->OpenDevTools();
+	}
+}
+
+void UCefWebUiBrowserSession::CloseDevTools()
+{
+	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
+	{
+		controlWriter->CloseDevTools();
+	}
+}
+
+void UCefWebUiBrowserSession::SetInputEnabled(bool bInEnabled)
+{
+	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
+	{
+		controlWriter->SetInputEnabled(bInEnabled);
+	}
+}
+
+void UCefWebUiBrowserSession::ExecuteJs(const FString& inScript)
+{
+	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
+	{
+		controlWriter->ExecuteJS(inScript);
+	}
+}
+
+void UCefWebUiBrowserSession::ClearCookies()
+{
+	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
+	{
+		controlWriter->ClearCookies();
+	}
+}
+
+#pragma endregion
+
 #pragma region Loading
 
 void UCefWebUiBrowserSession::BindWhenFinishedLoading(const FCefWebUiWhenFinishedLoadingDelegate& callback)
@@ -210,6 +359,22 @@ void UCefWebUiBrowserSession::EnsureRuntimeStarted()
 		}
 		HandleWidgetLoadStateChanged(static_cast<uint8>(frameReader->GetLastKnownLoadState()));
 	}
+}
+
+TSharedPtr<FCefControlWriter> UCefWebUiBrowserSession::GetOrOpenControlWriter()
+{
+	EnsureRuntimeStarted();
+
+	TSharedPtr<FCefControlWriter> controlWriter = GetControlWriterPtr().Pin();
+	if (!controlWriter.IsValid())
+	{
+		return nullptr;
+	}
+	if (!controlWriter->IsOpen())
+	{
+		controlWriter->Open();
+	}
+	return controlWriter;
 }
 
 void UCefWebUiBrowserSession::ShutdownRuntime()

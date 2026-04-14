@@ -1146,32 +1146,31 @@ FReply UCefWebUiBrowserWidget::NativeOnKeyChar(const FGeometry& InGeometry, cons
 
 // ---- Browser control --------------------------------------------------------
 
-#define CEF_CTRL(expr) if (GetControlWriter()->IsOpen()) { GetControlWriter()->expr; }
-
-void UCefWebUiBrowserWidget::BP_GoBack() { CEF_CTRL(GoBack()) }
-void UCefWebUiBrowserWidget::BP_GoForward() { CEF_CTRL(GoForward()) }
-void UCefWebUiBrowserWidget::BP_StopLoad() { CEF_CTRL(StopLoad()) }
-void UCefWebUiBrowserWidget::BP_Reload() { CEF_CTRL(Reload()) }
-void UCefWebUiBrowserWidget::BP_SetURL(const FString& InURL) { CEF_CTRL(SetURL(InURL)) }
-void UCefWebUiBrowserWidget::BP_SetPaused(bool bInPaused) { CEF_CTRL(SetPaused(bInPaused)) }
-void UCefWebUiBrowserWidget::BP_SetHidden(bool bInHidden) { CEF_CTRL(SetHidden(bInHidden)) }
-void UCefWebUiBrowserWidget::BP_SetFocus(bool bInFocus) { CEF_CTRL(SetFocus(bInFocus)) }
-void UCefWebUiBrowserWidget::BP_SetZoomLevel(float InLevel) { CEF_CTRL(SetZoomLevel(InLevel)) }
-void UCefWebUiBrowserWidget::BP_SetFrameRate(int32 InRate) { CEF_CTRL(SetFrameRate(static_cast<uint32>(InRate))) }
-void UCefWebUiBrowserWidget::BP_ScrollTo(int32 InX, int32 InY) { CEF_CTRL(ScrollTo(InX, InY)) }
-void UCefWebUiBrowserWidget::BP_SetMuted(bool bInMuted) { CEF_CTRL(SetMuted(bInMuted)) }
-void UCefWebUiBrowserWidget::BP_OpenDevTools() { CEF_CTRL(OpenDevTools()) }
-void UCefWebUiBrowserWidget::BP_CloseDevTools() { CEF_CTRL(CloseDevTools()) }
-void UCefWebUiBrowserWidget::BP_SetInputEnabled(bool bInEnabled) { CEF_CTRL(SetInputEnabled(bInEnabled)) }
-void UCefWebUiBrowserWidget::BP_ExecuteJS(const FString& InScript) { CEF_CTRL(ExecuteJS(InScript)) }
-void UCefWebUiBrowserWidget::BP_ClearCookies() { CEF_CTRL(ClearCookies()) }
+void UCefWebUiBrowserWidget::BP_GoBack() { if (IsValid(BrowserSession)) { BrowserSession->GoBack(); } }
+void UCefWebUiBrowserWidget::BP_GoForward() { if (IsValid(BrowserSession)) { BrowserSession->GoForward(); } }
+void UCefWebUiBrowserWidget::BP_StopLoad() { if (IsValid(BrowserSession)) { BrowserSession->StopLoad(); } }
+void UCefWebUiBrowserWidget::BP_Reload() { if (IsValid(BrowserSession)) { BrowserSession->Reload(); } }
+void UCefWebUiBrowserWidget::BP_SetURL(const FString& InURL) { if (IsValid(BrowserSession)) { BrowserSession->SetUrl(InURL); } }
+void UCefWebUiBrowserWidget::BP_SetPaused(bool bInPaused) { if (IsValid(BrowserSession)) { BrowserSession->SetPaused(bInPaused); } }
+void UCefWebUiBrowserWidget::BP_SetHidden(bool bInHidden) { if (IsValid(BrowserSession)) { BrowserSession->SetHidden(bInHidden); } }
+void UCefWebUiBrowserWidget::BP_SetFocus(bool bInFocus) { if (IsValid(BrowserSession)) { BrowserSession->SetFocus(bInFocus); } }
+void UCefWebUiBrowserWidget::BP_SetZoomLevel(float InLevel) { if (IsValid(BrowserSession)) { BrowserSession->SetZoomLevel(InLevel); } }
+void UCefWebUiBrowserWidget::BP_SetFrameRate(int32 InRate) { if (IsValid(BrowserSession)) { BrowserSession->SetFrameRate(InRate); } }
+void UCefWebUiBrowserWidget::BP_ScrollTo(int32 InX, int32 InY) { if (IsValid(BrowserSession)) { BrowserSession->ScrollTo(InX, InY); } }
+void UCefWebUiBrowserWidget::BP_SetMuted(bool bInMuted) { if (IsValid(BrowserSession)) { BrowserSession->SetMuted(bInMuted); } }
+void UCefWebUiBrowserWidget::BP_OpenDevTools() { if (IsValid(BrowserSession)) { BrowserSession->OpenDevTools(); } }
+void UCefWebUiBrowserWidget::BP_CloseDevTools() { if (IsValid(BrowserSession)) { BrowserSession->CloseDevTools(); } }
+void UCefWebUiBrowserWidget::BP_SetInputEnabled(bool bInEnabled) { if (IsValid(BrowserSession)) { BrowserSession->SetInputEnabled(bInEnabled); } }
+void UCefWebUiBrowserWidget::BP_ExecuteJS(const FString& InScript) { if (IsValid(BrowserSession)) { BrowserSession->ExecuteJs(InScript); } }
+void UCefWebUiBrowserWidget::BP_ClearCookies() { if (IsValid(BrowserSession)) { BrowserSession->ClearCookies(); } }
 
 void UCefWebUiBrowserWidget::BP_Resize(int32 InWidth, int32 InHeight)
 {
-	CEF_CTRL(Resize(static_cast<uint32>(InWidth), static_cast<uint32>(InHeight)))
+	if (IsValid(BrowserSession))
+	{
+		BrowserSession->Resize(InWidth, InHeight);
+	}
 }
-
-#undef CEF_CTRL
 
 // ---- Helpers ----------------------------------------------------------------
 

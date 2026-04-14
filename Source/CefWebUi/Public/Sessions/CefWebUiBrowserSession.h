@@ -59,6 +59,62 @@ public:
 	TWeakPtr<FCefControlWriter> GetControlWriterPtr() const;
 #pragma endregion
 
+#pragma region Control
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
+	void GoBack();
+
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
+	void GoForward();
+
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
+	void StopLoad();
+
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
+	void Reload();
+
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
+	void SetUrl(const FString& InUrl);
+
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
+	void SetPaused(bool bInPaused);
+
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
+	void SetHidden(bool bInHidden);
+
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
+	void SetFocus(bool bInFocus);
+
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
+	void SetZoomLevel(float InLevel);
+
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
+	void SetFrameRate(int32 InRate);
+
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
+	void ScrollTo(int32 InX, int32 InY);
+
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
+	void Resize(int32 InWidth, int32 InHeight);
+
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
+	void SetMuted(bool bInMuted);
+
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
+	void OpenDevTools();
+
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
+	void CloseDevTools();
+
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
+	void SetInputEnabled(bool bInEnabled);
+
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
+	void ExecuteJs(const FString& InScript);
+
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
+	void ClearCookies();
+#pragma endregion
+
 #pragma region Loading
 	UFUNCTION(BlueprintCallable, Category="CefWebUi", meta=(AutoCreateRefTerm="Callback"))
 	void BindWhenFinishedLoading(const FCefWebUiWhenFinishedLoadingDelegate& Callback);
@@ -77,6 +133,7 @@ private:
 #pragma region Runtime Internal
 	void EnsureRuntimeStarted();
 	void ShutdownRuntime();
+	TSharedPtr<FCefControlWriter> GetOrOpenControlWriter();
 #pragma endregion
 
 private:
