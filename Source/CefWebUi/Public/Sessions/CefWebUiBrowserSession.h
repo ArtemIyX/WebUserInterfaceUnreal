@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Data/CefConsoleLogLevel.h"
 #include "Services/CefWebUiRuntime.h"
 #include "Templates/UniquePtr.h"
 #include "Widgets/SWidget.h"
@@ -13,13 +14,19 @@ class UCefWebUiGameInstanceSubsystem;
 class FCefInputWriter;
 class FCefFrameReader;
 class FCefControlWriter;
+class FCefConsoleLogReader;
 class SCefBrowserSurface;
 class UGameViewportClient;
 #pragma endregion
 
 #pragma region Delegates
 DECLARE_DYNAMIC_DELEGATE_OneParam(FCefWebUiWhenFinishedLoadingDelegate, UCefWebUiBrowserSession*, Session);
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FCefWebUiFinishedLoadingEvent, UCefWebUiBrowserSession*, Session);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FCefWebUiConsoleMessageEvent,
+                                              ECefConsoleLogLevel, Level, const FString&, Message, const FString&,
+                                              Source, int32, Line);
 #pragma endregion
 
 UCLASS(BlueprintType)
@@ -120,16 +127,29 @@ public:
 #pragma endregion
 
 #pragma region Loading
+
+public:
 	UFUNCTION(BlueprintCallable, Category="CefWebUi", meta=(AutoCreateRefTerm="Callback"))
 	void BindWhenFinishedLoading(const FCefWebUiWhenFinishedLoadingDelegate& Callback);
 
 	UFUNCTION(BlueprintPure, Category="CefWebUi")
 	bool IsInitialLoadingFinished() const { return bInitialLoadingFinished; }
 
+
+	void HandleWidgetLoadStateChanged(uint8 InState);
+	void HandleConsoleLogMessage(ECefConsoleLogLevel InLevel, const FString& InMessage, const FString& InSource,
+	                             int32 InLine);
+#pragma endregion
+
+
+#pragma region Events
+
 	UPROPERTY(BlueprintAssignable, Category="CefWebUi")
 	FCefWebUiFinishedLoadingEvent OnFinishedLoading;
 
-	void HandleWidgetLoadStateChanged(uint8 InState);
+	UPROPERTY(BlueprintAssignable, Category="CefWebUi")
+	FCefWebUiConsoleMessageEvent OnConsoleMessage;
+
 #pragma endregion
 
 private:
@@ -152,6 +172,8 @@ private:
 	TArray<FCefWebUiWhenFinishedLoadingDelegate> PendingFinishedLoadingCallbacks;
 	TUniquePtr<FCefWebUiRuntime> Runtime;
 	TWeakPtr<FCefFrameReader> RuntimeFrameReader;
+	TWeakPtr<FCefConsoleLogReader> RuntimeConsoleLogReader;
 	FDelegateHandle LoadStateDelegateHandle;
+	FDelegateHandle ConsoleLogDelegateHandle;
 #pragma endregion
 };

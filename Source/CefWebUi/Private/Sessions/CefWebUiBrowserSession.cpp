@@ -1,10 +1,12 @@
 #include "Sessions/CefWebUiBrowserSession.h"
 
+#include "CefWebUi.h"
 #include "Data/CefLoadState.h"
 #include "Engine/GameInstance.h"
 #include "Engine/GameViewportClient.h"
 #include "GameFramework/PlayerController.h"
 #include "Services/CefControlWriter.h"
+#include "Services/CefConsoleLogReader.h"
 #include "Services/CefFrameReader.h"
 #include "Services/CefWebUiRuntime.h"
 #include "Slate/CefBrowserSurface.h"
@@ -320,6 +322,59 @@ void UCefWebUiBrowserSession::HandleWidgetLoadStateChanged(uint8 inState)
 	PendingFinishedLoadingCallbacks.Reset();
 }
 
+void UCefWebUiBrowserSession::HandleConsoleLogMessage(
+	ECefConsoleLogLevel inLevel,
+	const FString& inMessage,
+	const FString& inSource,
+	int32 inLine)
+{
+	const TCHAR* levelText = TEXT("Log");
+	switch (inLevel)
+	{
+	case ECefConsoleLogLevel::Warning:
+		levelText = TEXT("Warning");
+		break;
+	case ECefConsoleLogLevel::Error:
+		levelText = TEXT("Error");
+		break;
+	default:
+		break;
+	}
+
+	switch (inLevel)
+	{
+	case ECefConsoleLogLevel::Warning:
+		UE_LOG(LogCefWebUiJsConsole, Warning,
+			TEXT("[%s][%s] %s (%s:%d)"),
+			*SessionId.ToString(),
+			levelText,
+			*inMessage,
+			*inSource,
+			inLine);
+		break;
+	case ECefConsoleLogLevel::Error:
+		UE_LOG(LogCefWebUiJsConsole, Error,
+			TEXT("[%s][%s] %s (%s:%d)"),
+			*SessionId.ToString(),
+			levelText,
+			*inMessage,
+			*inSource,
+			inLine);
+		break;
+	default:
+		UE_LOG(LogCefWebUiJsConsole, Log,
+			TEXT("[%s][%s] %s (%s:%d)"),
+			*SessionId.ToString(),
+			levelText,
+			*inMessage,
+			*inSource,
+			inLine);
+		break;
+	}
+
+	OnConsoleMessage.Broadcast(inLevel, inMessage, inSource, inLine);
+}
+
 #pragma endregion
 
 #pragma region Runtime Internal
@@ -336,6 +391,10 @@ void UCefWebUiBrowserSession::EnsureRuntimeStarted()
 	{
 		RuntimeFrameReader = Runtime->GetFrameReaderPtr();
 	}
+	if (!RuntimeConsoleLogReader.IsValid())
+	{
+		RuntimeConsoleLogReader = Runtime->GetConsoleLogReaderPtr();
+	}
 
 	if (TSharedPtr<FCefFrameReader> frameReader = RuntimeFrameReader.Pin())
 	{
@@ -345,6 +404,14 @@ void UCefWebUiBrowserSession::EnsureRuntimeStarted()
 				this, &UCefWebUiBrowserSession::HandleWidgetLoadStateChanged);
 		}
 		HandleWidgetLoadStateChanged(static_cast<uint8>(frameReader->GetLastKnownLoadState()));
+	}
+	if (TSharedPtr<FCefConsoleLogReader> consoleReader = RuntimeConsoleLogReader.Pin())
+	{
+		if (!ConsoleLogDelegateHandle.IsValid())
+		{
+			ConsoleLogDelegateHandle = consoleReader->OnConsoleLogMessage.AddUObject(
+				this, &UCefWebUiBrowserSession::HandleConsoleLogMessage);
+		}
 	}
 }
 
@@ -386,6 +453,15 @@ void UCefWebUiBrowserSession::ShutdownRuntime()
 	}
 	LoadStateDelegateHandle.Reset();
 	RuntimeFrameReader.Reset();
+	if (TSharedPtr<FCefConsoleLogReader> consoleReader = RuntimeConsoleLogReader.Pin())
+	{
+		if (ConsoleLogDelegateHandle.IsValid())
+		{
+			consoleReader->OnConsoleLogMessage.Remove(ConsoleLogDelegateHandle);
+		}
+	}
+	ConsoleLogDelegateHandle.Reset();
+	RuntimeConsoleLogReader.Reset();
 
 	if (!Runtime)
 	{

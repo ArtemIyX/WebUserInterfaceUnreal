@@ -8,6 +8,7 @@ IMPLEMENT_MODULE(FCefWebUiModule, CefWebUi)
 
 DEFINE_LOG_CATEGORY(LogCefWebUi);
 DEFINE_LOG_CATEGORY(LogCefWebUiTelemetry);
+DEFINE_LOG_CATEGORY(LogCefWebUiJsConsole);
 
 FCefWebUiModule& FCefWebUiModule::Get()
 {

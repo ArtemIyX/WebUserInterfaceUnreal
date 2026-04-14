@@ -3,6 +3,7 @@
 #include "CefWebUi.h"
 #include "Libs/CefWebUiBPLibrary.h"
 #include "Services/CefControlWriter.h"
+#include "Services/CefConsoleLogReader.h"
 #include "Services/CefFrameReader.h"
 #include "Services/CefInputWriter.h"
 #include "Misc/Paths.h"
@@ -24,8 +25,10 @@ void FCefWebUiRuntime::EnsureStarted()
 	FrameReader = MakeShared<FCefFrameReader>();
 	InputWriter = MakeShared<FCefInputWriter>();
 	ControlWriter = MakeShared<FCefControlWriter>();
+	ConsoleLogReader = MakeShared<FCefConsoleLogReader>();
 	bStarted = true;
 	bFrameReaderStarted = false;
+	bConsoleLogReaderStarted = false;
 
 	LaunchHostProcess();
 	TickStartRetry(0.0f);
@@ -59,10 +62,16 @@ void FCefWebUiRuntime::Shutdown()
 	{
 		ControlWriter.Reset();
 	}
+	if (ConsoleLogReader.IsValid())
+	{
+		ConsoleLogReader->Stop();
+		ConsoleLogReader.Reset();
+	}
 
 	KillHostProcess();
 	bStarted = false;
 	bFrameReaderStarted = false;
+	bConsoleLogReaderStarted = false;
 }
 
 bool FCefWebUiRuntime::TickStartRetry(float)
@@ -73,6 +82,7 @@ bool FCefWebUiRuntime::TickStartRetry(float)
 	bool bInputOk = false;
 	bool bControlOk = false;
 	bool bFrameOk = bFrameReaderStarted;
+	bool bConsoleOk = bConsoleLogReaderStarted;
 
 	if (InputWriter.IsValid())
 	{
@@ -93,8 +103,13 @@ bool FCefWebUiRuntime::TickStartRetry(float)
 		bFrameReaderStarted = FrameReader->Start();
 		bFrameOk = bFrameReaderStarted;
 	}
+	if (!bConsoleLogReaderStarted && ConsoleLogReader.IsValid())
+	{
+		bConsoleLogReaderStarted = ConsoleLogReader->Start();
+		bConsoleOk = bConsoleLogReaderStarted;
+	}
 
-	const bool bReady = bInputOk && bControlOk && bFrameOk;
+	const bool bReady = bInputOk && bControlOk && bFrameOk && bConsoleOk;
 	if (bReady)
 	{
 		UE_LOG(LogCefWebUi, Log, TEXT("CefWebUi: Runtime connected (host + IPC ready)."));
@@ -203,4 +218,16 @@ TWeakPtr<FCefControlWriter> FCefWebUiRuntime::GetControlWriterPtr() const
 {
 	ensure(ControlWriter.IsValid());
 	return ControlWriter.ToWeakPtr();
+}
+
+TSharedRef<FCefConsoleLogReader> FCefWebUiRuntime::GetConsoleLogReaderRef() const
+{
+	ensure(ConsoleLogReader.IsValid());
+	return ConsoleLogReader.ToSharedRef();
+}
+
+TWeakPtr<FCefConsoleLogReader> FCefWebUiRuntime::GetConsoleLogReaderPtr() const
+{
+	ensure(ConsoleLogReader.IsValid());
+	return ConsoleLogReader.ToWeakPtr();
 }

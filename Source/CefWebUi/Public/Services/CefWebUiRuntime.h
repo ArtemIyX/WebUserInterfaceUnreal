@@ -6,6 +6,7 @@
 class FCefInputWriter;
 class FCefFrameReader;
 class FCefControlWriter;
+class FCefConsoleLogReader;
 
 class FCefWebUiRuntime
 {
@@ -25,6 +26,9 @@ public:
 	TSharedRef<FCefControlWriter> GetControlWriterRef() const;
 	TWeakPtr<FCefControlWriter> GetControlWriterPtr() const;
 
+	TSharedRef<FCefConsoleLogReader> GetConsoleLogReaderRef() const;
+	TWeakPtr<FCefConsoleLogReader> GetConsoleLogReaderPtr() const;
+
 private:
 	bool TickStartRetry(float DeltaSeconds);
 	void LaunchHostProcess();
@@ -33,9 +37,11 @@ private:
 private:
 	bool bStarted = false;
 	bool bFrameReaderStarted = false;
+	bool bConsoleLogReaderStarted = false;
 	TSharedPtr<FCefFrameReader> FrameReader;
 	TSharedPtr<FCefInputWriter> InputWriter;
 	TSharedPtr<FCefControlWriter> ControlWriter;
+	TSharedPtr<FCefConsoleLogReader> ConsoleLogReader;
 	FTSTicker::FDelegateHandle StartRetryTickerHandle;
 	FProcHandle HostProcess;
 	void* JobHandle = nullptr;
