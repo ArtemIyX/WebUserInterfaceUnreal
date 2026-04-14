@@ -123,6 +123,12 @@ public:
 	void ExecuteJs(const FString& InScript);
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
+	void OpenLocalFile(const FString& InLocalFilePath);
+
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
+	void LoadHtmlString(const FString& InHtml);
+
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	void ClearCookies();
 #pragma endregion
 

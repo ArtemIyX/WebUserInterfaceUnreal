@@ -287,6 +287,26 @@ void FCefControlWriter::ClearCookies()
 	WriteEvent(evt);
 }
 
+void FCefControlWriter::OpenLocalFile(const FString& LocalFilePath)
+{
+	FCefControlEvent evt{};
+	evt.Type = ECefControlEventType::OpenLocalFile;
+	FMemory::Memzero(evt.String.Text, sizeof(evt.String.Text));
+	FCString::Strncpy(reinterpret_cast<TCHAR*>(evt.String.Text), *LocalFilePath,
+	                  FMath::Min(LocalFilePath.Len() + 1, (int32)CONTROL_STRING_MAX));
+	WriteEvent(evt);
+}
+
+void FCefControlWriter::LoadHtmlString(const FString& Html)
+{
+	FCefControlEvent evt{};
+	evt.Type = ECefControlEventType::LoadHtmlString;
+	FMemory::Memzero(evt.String.Text, sizeof(evt.String.Text));
+	FCString::Strncpy(reinterpret_cast<TCHAR*>(evt.String.Text), *Html,
+	                  FMath::Min(Html.Len() + 1, (int32)CONTROL_STRING_MAX));
+	WriteEvent(evt);
+}
+
 void FCefControlWriter::SetConsumerCadenceUs(uint32 CadenceUs)
 {
 	FCefControlEvent evt{};

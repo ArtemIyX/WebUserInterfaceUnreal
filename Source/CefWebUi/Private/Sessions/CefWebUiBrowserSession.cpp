@@ -268,6 +268,22 @@ void UCefWebUiBrowserSession::ExecuteJs(const FString& inScript)
 	}
 }
 
+void UCefWebUiBrowserSession::OpenLocalFile(const FString& inLocalFilePath)
+{
+	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
+	{
+		controlWriter->OpenLocalFile(inLocalFilePath);
+	}
+}
+
+void UCefWebUiBrowserSession::LoadHtmlString(const FString& inHtml)
+{
+	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
+	{
+		controlWriter->LoadHtmlString(inHtml);
+	}
+}
+
 void UCefWebUiBrowserSession::ClearCookies()
 {
 	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())

@@ -30,4 +30,6 @@ enum class ECefControlEventType : uint8
 	SetMaxInFlightBeginFrames = 19,
 	SetFlushIntervalFrames = 20,
 	SetKeyframeIntervalUs = 21,
+	OpenLocalFile = 22,
+	LoadHtmlString = 23,
 };

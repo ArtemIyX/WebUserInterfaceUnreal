@@ -38,6 +38,8 @@ public:
 	void SetInputEnabled(bool bEnabled);
 
 	void ExecuteJS(const FString& Script);
+	void OpenLocalFile(const FString& LocalFilePath);
+	void LoadHtmlString(const FString& Html);
 
 	void ClearCookies();
 	void SetConsumerCadenceUs(uint32 CadenceUs);
