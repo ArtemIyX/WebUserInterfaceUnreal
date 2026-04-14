@@ -52,6 +52,16 @@ UCefWebUiBrowserSession* UCefWebUiBPLibrary::GetOrCreateBrowserSession(
 	return nullptr;
 }
 
+void UCefWebUiBPLibrary::DestroyBrowserSession(
+	const UObject* WorldContextObject,
+	FName SessionId)
+{
+	if (UCefWebUiGameInstanceSubsystem* Subsystem = GetCefWebUiSubsystem(WorldContextObject))
+	{
+		Subsystem->DestroySession(SessionId);
+	}
+}
+
 UCefWebUiBrowserWidget* UCefWebUiBPLibrary::CreateOrGetBrowserWidget(
 	const UObject* WorldContextObject,
 	FName SessionId,

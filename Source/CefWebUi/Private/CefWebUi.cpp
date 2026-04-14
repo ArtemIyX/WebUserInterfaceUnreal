@@ -1,8 +1,5 @@
-﻿// CefWebUiModule.cpp
+// CefWebUiModule.cpp
 #include "CefWebUi.h"
-
-#include "Services/CefWebUiRuntime.h"
-
 
 IMPLEMENT_MODULE(FCefWebUiModule, CefWebUi)
 
@@ -21,59 +18,10 @@ bool FCefWebUiModule::IsAvailable()
 
 void FCefWebUiModule::StartupModule()
 {
-	// Lazy by design: do not launch host/processes during module startup.
+	// Session owns runtime lifecycle.
 }
 
 void FCefWebUiModule::ShutdownModule()
 {
-	if (Runtime.IsValid())
-	{
-		Runtime->Shutdown();
-		Runtime.Reset();
-	}
-}
-
-void FCefWebUiModule::EnsureRuntimeStarted() const
-{
-	if (!Runtime.IsValid())
-	{
-		Runtime = MakeUnique<FCefWebUiRuntime>();
-	}
-	Runtime->EnsureStarted();
-}
-
-TSharedRef<FCefFrameReader> FCefWebUiModule::GetFrameReaderRef() const
-{
-	EnsureRuntimeStarted();
-	return Runtime->GetFrameReaderRef();
-}
-
-TWeakPtr<FCefFrameReader> FCefWebUiModule::GetFrameReaderPtr() const
-{
-	EnsureRuntimeStarted();
-	return Runtime->GetFrameReaderPtr();
-}
-
-TSharedRef<FCefInputWriter> FCefWebUiModule::GetInputWriterRef() const
-{
-	EnsureRuntimeStarted();
-	return Runtime->GetInputWriterRef();
-}
-
-TWeakPtr<FCefInputWriter> FCefWebUiModule::GeInputWriterPtr() const
-{
-	EnsureRuntimeStarted();
-	return Runtime->GetInputWriterPtr();
-}
-
-TSharedRef<FCefControlWriter> FCefWebUiModule::GetControlWriterRef() const
-{
-	EnsureRuntimeStarted();
-	return Runtime->GetControlWriterRef();
-}
-
-TWeakPtr<FCefControlWriter> FCefWebUiModule::GetControlWriterPtr() const
-{
-	EnsureRuntimeStarted();
-	return Runtime->GetControlWriterPtr();
+	// Session teardown handles runtime shutdown.
 }

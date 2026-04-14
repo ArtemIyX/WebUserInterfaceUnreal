@@ -32,6 +32,11 @@ public:
 		FName SessionId);
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi", meta=(WorldContext="WorldContextObject"))
+	static void DestroyBrowserSession(
+		const UObject* WorldContextObject,
+		FName SessionId);
+
+	UFUNCTION(BlueprintCallable, Category="CefWebUi", meta=(WorldContext="WorldContextObject"))
 	static UCefWebUiBrowserWidget* CreateOrGetBrowserWidget(
 		const UObject* WorldContextObject,
 		FName SessionId,

@@ -22,6 +22,7 @@
 #include <dxgi1_4.h>
 
 #include "tiffiop.h"
+#include "Services/CefControlWriter.h"
 #include "Windows/HideWindowsPlatformTypes.h"
 
 namespace
@@ -262,13 +263,20 @@ void UCefWebUiBrowserWidget::NativeConstruct()
 	Super::NativeConstruct();
 	ResetRuntimeState();
 
-	if (!ensureMsgf(FCefWebUiModule::IsAvailable(), TEXT("FCefWebUiModule is not available")))
+	if (!IsValid(BrowserSession))
+	{
+		UE_LOG(LogCefWebUi, Error, TEXT("CefWidget: BrowserSession is null in NativeConstruct"));
 		return;
+	}
 
-	FCefWebUiModule& ModuleRef = FCefWebUiModule::Get();
-	FrameReader = ModuleRef.GetFrameReaderPtr();
-	InputWriter = ModuleRef.GeInputWriterPtr();
-	ControlWriter = ModuleRef.GetControlWriterPtr();
+	FrameReader = BrowserSession->GetFrameReaderPtr();
+	InputWriter = BrowserSession->GetInputWriterPtr();
+	ControlWriter = BrowserSession->GetControlWriterPtr();
+	if (!FrameReader.IsValid() || !InputWriter.IsValid() || !ControlWriter.IsValid())
+	{
+		UE_LOG(LogCefWebUi, Error, TEXT("CefWidget: Session runtime channels are not available"));
+		return;
+	}
 
 	TSharedRef<FCefInputWriter> InputWriterRef = InputWriter.Pin().ToSharedRef();
 	if (!InputWriterRef->IsOpen())
@@ -370,6 +378,19 @@ void UCefWebUiBrowserWidget::SetBrowserSession(UCefWebUiBrowserSession* InSessio
 	BrowserSession = InSession;
 	if (IsValid(BrowserSession))
 	{
+		if (!FrameReader.IsValid())
+		{
+			FrameReader = BrowserSession->GetFrameReaderPtr();
+		}
+		if (!InputWriter.IsValid())
+		{
+			InputWriter = BrowserSession->GetInputWriterPtr();
+		}
+		if (!ControlWriter.IsValid())
+		{
+			ControlWriter = BrowserSession->GetControlWriterPtr();
+		}
+
 		if (TSharedPtr<FCefFrameReader> Reader = FrameReader.Pin())
 		{
 			const uint8 state = static_cast<uint8>(Reader->GetLastKnownLoadState());

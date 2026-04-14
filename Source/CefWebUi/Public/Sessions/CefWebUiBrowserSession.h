@@ -7,6 +7,10 @@
 class APlayerController;
 class UCefWebUiBrowserWidget;
 class UCefWebUiGameInstanceSubsystem;
+class FCefInputWriter;
+class FCefFrameReader;
+class FCefControlWriter;
+class FCefWebUiRuntime;
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FCefWebUiWhenFinishedLoadingDelegate, UCefWebUiBrowserSession*, Session);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FCefWebUiFinishedLoadingEvent, UCefWebUiBrowserSession*, Session);
@@ -17,6 +21,8 @@ class CEFWEBUI_API UCefWebUiBrowserSession : public UObject
 	GENERATED_BODY()
 
 public:
+	virtual void BeginDestroy() override;
+
 	void Initialize(UCefWebUiGameInstanceSubsystem* InOwnerSubsystem, FName InSessionId);
 
 	UFUNCTION(BlueprintPure, Category="CefWebUi")
@@ -34,6 +40,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
 	void DestroyWidget();
 
+	UFUNCTION(BlueprintCallable, Category="CefWebUi")
+	void Shutdown();
+
+	TWeakPtr<FCefFrameReader> GetFrameReaderPtr() const;
+	TWeakPtr<FCefInputWriter> GetInputWriterPtr() const;
+	TWeakPtr<FCefControlWriter> GetControlWriterPtr() const;
+
 	UFUNCTION(BlueprintCallable, Category="CefWebUi", meta=(AutoCreateRefTerm="Callback"))
 	void BindWhenFinishedLoading(const FCefWebUiWhenFinishedLoadingDelegate& Callback);
 
@@ -47,6 +60,10 @@ public:
 	void HandleWidgetLoadStateChanged(uint8 InState);
 
 private:
+	void EnsureRuntimeStarted();
+	void ShutdownRuntime();
+
+private:
 	TWeakObjectPtr<UCefWebUiGameInstanceSubsystem> OwnerSubsystem;
 	FName SessionId = NAME_None;
 	bool bInitialLoadingFinished = false;
@@ -55,4 +72,5 @@ private:
 	TObjectPtr<UCefWebUiBrowserWidget> Widget = nullptr;
 
 	TArray<FCefWebUiWhenFinishedLoadingDelegate> PendingFinishedLoadingCallbacks;
+	FCefWebUiRuntime* Runtime = nullptr;
 };

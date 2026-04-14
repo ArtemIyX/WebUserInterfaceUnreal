@@ -26,6 +26,11 @@ public:
 		return GetSession(NAME_None);
 	}
 
+	void DestroySession()
+	{
+		DestroySession(NAME_None);
+	}
+
 	UCefWebUiBrowserWidget* GetSessionWidget() const
 	{
 		return GetSessionWidget(NAME_None);
@@ -44,6 +49,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
 	UCefWebUiBrowserSession* GetSession(FName SessionId) const;
+
+	UFUNCTION(BlueprintCallable, Category="CefWebUi")
+	void DestroySession(FName SessionId);
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
 	UCefWebUiBrowserWidget* GetSessionWidget(FName SessionId) const;

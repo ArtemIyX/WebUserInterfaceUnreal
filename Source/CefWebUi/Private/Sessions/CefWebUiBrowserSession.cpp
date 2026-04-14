@@ -1,15 +1,23 @@
 #include "Sessions/CefWebUiBrowserSession.h"
 
 #include "Data/CefLoadState.h"
+#include "Services/CefWebUiRuntime.h"
 #include "Subsystems/CefWebUiGameInstanceSubsystem.h"
 #include "Widgets/CefWebUiBrowserWidget.h"
 #include "Engine/GameInstance.h"
 #include "GameFramework/PlayerController.h"
 
+void UCefWebUiBrowserSession::BeginDestroy()
+{
+	Shutdown();
+	Super::BeginDestroy();
+}
+
 void UCefWebUiBrowserSession::Initialize(UCefWebUiGameInstanceSubsystem* InOwnerSubsystem, FName InSessionId)
 {
 	OwnerSubsystem = InOwnerSubsystem;
 	SessionId = InSessionId;
+	EnsureRuntimeStarted();
 }
 
 UCefWebUiBrowserWidget* UCefWebUiBrowserSession::GetWidget() const
@@ -34,6 +42,7 @@ UCefWebUiBrowserWidget* UCefWebUiBrowserSession::CreateOrGetWidget(
 	UCefWebUiGameInstanceSubsystem* Subsystem = OwnerSubsystem.Get();
 	if (!Subsystem)
 		return nullptr;
+	EnsureRuntimeStarted();
 
 	if (!WidgetClass)
 	{
@@ -71,6 +80,27 @@ void UCefWebUiBrowserSession::DestroyWidget()
 	Widget->SetBrowserSession(nullptr);
 	Widget->RemoveFromParent();
 	Widget = nullptr;
+}
+
+void UCefWebUiBrowserSession::Shutdown()
+{
+	DestroyWidget();
+	ShutdownRuntime();
+}
+
+TWeakPtr<FCefFrameReader> UCefWebUiBrowserSession::GetFrameReaderPtr() const
+{
+	return Runtime ? Runtime->GetFrameReaderPtr() : TWeakPtr<FCefFrameReader>();
+}
+
+TWeakPtr<FCefInputWriter> UCefWebUiBrowserSession::GetInputWriterPtr() const
+{
+	return Runtime ? Runtime->GetInputWriterPtr() : TWeakPtr<FCefInputWriter>();
+}
+
+TWeakPtr<FCefControlWriter> UCefWebUiBrowserSession::GetControlWriterPtr() const
+{
+	return Runtime ? Runtime->GetControlWriterPtr() : TWeakPtr<FCefControlWriter>();
 }
 
 void UCefWebUiBrowserSession::BindWhenFinishedLoading(const FCefWebUiWhenFinishedLoadingDelegate& Callback)
@@ -115,4 +145,22 @@ void UCefWebUiBrowserSession::HandleWidgetLoadStateChanged(uint8 InState)
 		}
 	}
 	PendingFinishedLoadingCallbacks.Reset();
+}
+
+void UCefWebUiBrowserSession::EnsureRuntimeStarted()
+{
+	if (!Runtime)
+	{
+		Runtime = new FCefWebUiRuntime();
+	}
+	Runtime->EnsureStarted();
+}
+
+void UCefWebUiBrowserSession::ShutdownRuntime()
+{
+	if (!Runtime)
+		return;
+	Runtime->Shutdown();
+	delete Runtime;
+	Runtime = nullptr;
 }

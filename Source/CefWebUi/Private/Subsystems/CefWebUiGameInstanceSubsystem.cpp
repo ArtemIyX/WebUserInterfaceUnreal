@@ -9,7 +9,7 @@ void UCefWebUiGameInstanceSubsystem::Deinitialize()
 	{
 		if (IsValid(It.Value))
 		{
-			It.Value->DestroyWidget();
+			It.Value->Shutdown();
 		}
 	}
 	Sessions.Empty();
@@ -38,6 +38,19 @@ UCefWebUiBrowserSession* UCefWebUiGameInstanceSubsystem::GetSession(FName Sessio
 		return Found->Get();
 	}
 	return nullptr;
+}
+
+void UCefWebUiGameInstanceSubsystem::DestroySession(FName SessionId)
+{
+	const FName Key = NormalizeSessionId(SessionId);
+	if (TObjectPtr<UCefWebUiBrowserSession>* Found = Sessions.Find(Key))
+	{
+		if (IsValid(*Found))
+		{
+			(*Found)->Shutdown();
+		}
+		Sessions.Remove(Key);
+	}
 }
 
 UCefWebUiBrowserWidget* UCefWebUiGameInstanceSubsystem::GetSessionWidget(FName SessionId) const
