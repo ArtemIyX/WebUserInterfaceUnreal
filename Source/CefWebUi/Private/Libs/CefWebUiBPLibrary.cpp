@@ -5,6 +5,7 @@
 
 #include "Sessions/CefWebUiBrowserSession.h"
 #include "Interfaces/IPluginManager.h"
+#include "Slate/CefWebUiSlateHostWidget.h"
 #include "Subsystems/CefWebUiGameInstanceSubsystem.h"
 #include "Widgets/CefWebUiBrowserWidget.h"
 #include "Engine/GameInstance.h"
@@ -85,4 +86,49 @@ UCefWebUiBrowserWidget* UCefWebUiBPLibrary::GetBrowserWidget(
 		return Subsystem->GetSessionWidget(SessionId);
 	}
 	return nullptr;
+}
+
+UCefWebUiSlateHostWidget* UCefWebUiBPLibrary::CreateBrowserSlateHostWidget(
+	const UObject* WorldContextObject,
+	FName SessionId,
+	TSubclassOf<UCefWebUiSlateHostWidget> WidgetClass,
+	APlayerController* PlayerController,
+	int32 ZOrder,
+	int32 BrowserWidth,
+	int32 BrowserHeight)
+{
+	UCefWebUiBrowserSession* session = GetOrCreateBrowserSession(WorldContextObject, SessionId);
+	if (!session)
+	{
+		return nullptr;
+	}
+
+	if (!WidgetClass)
+	{
+		WidgetClass = UCefWebUiSlateHostWidget::StaticClass();
+	}
+
+	UWorld* world = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+	UGameInstance* gameInstance = world ? world->GetGameInstance() : nullptr;
+	if (!gameInstance)
+	{
+		return nullptr;
+	}
+
+	APlayerController* targetPlayerController = PlayerController ? PlayerController : gameInstance->GetFirstLocalPlayerController();
+	if (!targetPlayerController)
+	{
+		return nullptr;
+	}
+
+	UCefWebUiSlateHostWidget* slateHostWidget = CreateWidget<UCefWebUiSlateHostWidget>(targetPlayerController, WidgetClass);
+	if (!slateHostWidget)
+	{
+		return nullptr;
+	}
+
+	slateHostWidget->SetBrowserSession(session);
+	slateHostWidget->SetBrowserSize(BrowserWidth, BrowserHeight);
+	slateHostWidget->AddToViewport(ZOrder);
+	return slateHostWidget;
 }

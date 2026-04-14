@@ -11,6 +11,7 @@ class APlayerController;
 class UCefWebUiBrowserSession;
 class UCefWebUiBrowserWidget;
 class UCefWebUiGameInstanceSubsystem;
+class UCefWebUiSlateHostWidget;
 #pragma endregion
 
 UCLASS()
@@ -57,5 +58,17 @@ public:
 	static UCefWebUiBrowserWidget* GetBrowserWidget(
 		const UObject* WorldContextObject,
 		FName SessionId);
+#pragma endregion
+
+#pragma region Slate Widget
+	UFUNCTION(BlueprintCallable, Category="CefWebUi", meta=(WorldContext="WorldContextObject"))
+	static UCefWebUiSlateHostWidget* CreateBrowserSlateHostWidget(
+		const UObject* WorldContextObject,
+		FName SessionId,
+		TSubclassOf<UCefWebUiSlateHostWidget> WidgetClass,
+		APlayerController* PlayerController,
+		int32 ZOrder,
+		int32 BrowserWidth,
+		int32 BrowserHeight);
 #pragma endregion
 };
