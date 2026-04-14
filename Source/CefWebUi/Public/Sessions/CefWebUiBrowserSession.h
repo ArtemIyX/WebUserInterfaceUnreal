@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Services/CefWebUiRuntime.h"
 #include "Templates/UniquePtr.h"
 #include "UObject/Object.h"
 #include "CefWebUiBrowserSession.generated.h"
@@ -11,7 +12,7 @@ class UCefWebUiGameInstanceSubsystem;
 class FCefInputWriter;
 class FCefFrameReader;
 class FCefControlWriter;
-class FCefWebUiRuntime;
+
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FCefWebUiWhenFinishedLoadingDelegate, UCefWebUiBrowserSession*, Session);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FCefWebUiFinishedLoadingEvent, UCefWebUiBrowserSession*, Session);
@@ -22,6 +23,7 @@ class CEFWEBUI_API UCefWebUiBrowserSession : public UObject
 	GENERATED_BODY()
 
 public:
+
 	virtual void BeginDestroy() override;
 
 	void Initialize(UCefWebUiGameInstanceSubsystem* InOwnerSubsystem, FName InSessionId);
