@@ -151,7 +151,7 @@ void UCefWebUiBrowserSession::EnsureRuntimeStarted()
 {
 	if (!Runtime)
 	{
-		Runtime = new FCefWebUiRuntime();
+		Runtime = MakeUnique<FCefWebUiRuntime>();
 	}
 	Runtime->EnsureStarted();
 }
@@ -161,6 +161,5 @@ void UCefWebUiBrowserSession::ShutdownRuntime()
 	if (!Runtime)
 		return;
 	Runtime->Shutdown();
-	delete Runtime;
-	Runtime = nullptr;
+	Runtime.Reset();
 }

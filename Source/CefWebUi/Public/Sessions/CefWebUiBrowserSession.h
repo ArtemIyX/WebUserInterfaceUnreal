@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Templates/UniquePtr.h"
 #include "UObject/Object.h"
 #include "CefWebUiBrowserSession.generated.h"
 
@@ -72,5 +73,5 @@ private:
 	TObjectPtr<UCefWebUiBrowserWidget> Widget = nullptr;
 
 	TArray<FCefWebUiWhenFinishedLoadingDelegate> PendingFinishedLoadingCallbacks;
-	FCefWebUiRuntime* Runtime = nullptr;
+	TUniquePtr<FCefWebUiRuntime> Runtime;
 };
