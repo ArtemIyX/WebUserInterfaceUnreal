@@ -1,14 +1,19 @@
 #include "Sessions/CefWebUiBrowserSession.h"
 
 #include "Data/CefLoadState.h"
+#include "Engine/GameInstance.h"
+#include "GameFramework/PlayerController.h"
 #include "Services/CefFrameReader.h"
 #include "Services/CefWebUiRuntime.h"
 #include "Subsystems/CefWebUiGameInstanceSubsystem.h"
 #include "Widgets/CefWebUiBrowserWidget.h"
-#include "Engine/GameInstance.h"
-#include "GameFramework/PlayerController.h"
 
+#pragma region Lifecycle
 
+UCefWebUiBrowserSession::UCefWebUiBrowserSession(const FObjectInitializer& objectInitializer)
+	: Super(objectInitializer)
+{
+}
 
 void UCefWebUiBrowserSession::BeginDestroy()
 {
@@ -16,12 +21,16 @@ void UCefWebUiBrowserSession::BeginDestroy()
 	Super::BeginDestroy();
 }
 
-void UCefWebUiBrowserSession::Initialize(UCefWebUiGameInstanceSubsystem* InOwnerSubsystem, FName InSessionId)
+void UCefWebUiBrowserSession::Initialize(UCefWebUiGameInstanceSubsystem* inOwnerSubsystem, FName inSessionId)
 {
-	OwnerSubsystem = InOwnerSubsystem;
-	SessionId = InSessionId;
+	OwnerSubsystem = inOwnerSubsystem;
+	SessionId = inSessionId;
 	EnsureRuntimeStarted();
 }
+
+#pragma endregion
+
+#pragma region Widget
 
 UCefWebUiBrowserWidget* UCefWebUiBrowserSession::GetWidget() const
 {
@@ -29,47 +38,57 @@ UCefWebUiBrowserWidget* UCefWebUiBrowserSession::GetWidget() const
 }
 
 UCefWebUiBrowserWidget* UCefWebUiBrowserSession::CreateOrGetWidget(
-	TSubclassOf<UCefWebUiBrowserWidget> WidgetClass,
-	APlayerController* PlayerController,
-	int32 ZOrder)
+	TSubclassOf<UCefWebUiBrowserWidget> widgetClass,
+	APlayerController* playerController,
+	int32 zOrder)
 {
 	if (IsValid(Widget))
 	{
 		if (!Widget->IsInViewport())
 		{
-			Widget->AddToViewport(ZOrder);
+			Widget->AddToViewport(zOrder);
 		}
 		return Widget.Get();
 	}
 
-	UCefWebUiGameInstanceSubsystem* Subsystem = OwnerSubsystem.Get();
-	if (!Subsystem)
+	UCefWebUiGameInstanceSubsystem* subsystem = OwnerSubsystem.Get();
+	if (!subsystem)
+	{
 		return nullptr;
+	}
 	EnsureRuntimeStarted();
 
-	if (!WidgetClass)
+	if (!widgetClass)
 	{
-		WidgetClass = Subsystem->GetDefaultWidgetClass();
+		widgetClass = subsystem->GetDefaultWidgetClass();
 	}
-	if (!WidgetClass)
+	if (!widgetClass)
+	{
 		return nullptr;
+	}
 
-	UGameInstance* GI = Subsystem->GetGameInstance();
-	if (!GI)
+	UGameInstance* gameInstance = subsystem->GetGameInstance();
+	if (!gameInstance)
+	{
 		return nullptr;
+	}
 
-	APlayerController* PC = PlayerController ? PlayerController : GI->GetFirstLocalPlayerController();
-	if (!PC)
+	APlayerController* targetPlayerController = playerController ? playerController : gameInstance->GetFirstLocalPlayerController();
+	if (!targetPlayerController)
+	{
 		return nullptr;
+	}
 
-	UCefWebUiBrowserWidget* Created = CreateWidget<UCefWebUiBrowserWidget>(PC, WidgetClass);
-	if (!Created)
+	UCefWebUiBrowserWidget* createdWidget = CreateWidget<UCefWebUiBrowserWidget>(targetPlayerController, widgetClass);
+	if (!createdWidget)
+	{
 		return nullptr;
+	}
 
-	Created->SetBrowserSession(this);
-	Created->AddToViewport(ZOrder);
-	Widget = Created;
-	return Created;
+	createdWidget->SetBrowserSession(this);
+	createdWidget->AddToViewport(zOrder);
+	Widget = createdWidget;
+	return createdWidget;
 }
 
 void UCefWebUiBrowserSession::DestroyWidget()
@@ -91,6 +110,18 @@ void UCefWebUiBrowserSession::Shutdown()
 	ShutdownRuntime();
 }
 
+void UCefWebUiBrowserSession::OnWidgetDestroyed(UCefWebUiBrowserWidget* inWidget)
+{
+	if (Widget == inWidget)
+	{
+		Widget = nullptr;
+	}
+}
+
+#pragma endregion
+
+#pragma region Runtime Access
+
 TWeakPtr<FCefFrameReader> UCefWebUiBrowserSession::GetFrameReaderPtr() const
 {
 	return RuntimeFrameReader;
@@ -106,49 +137,55 @@ TWeakPtr<FCefControlWriter> UCefWebUiBrowserSession::GetControlWriterPtr() const
 	return Runtime ? Runtime->GetControlWriterPtr() : TWeakPtr<FCefControlWriter>();
 }
 
-void UCefWebUiBrowserSession::BindWhenFinishedLoading(const FCefWebUiWhenFinishedLoadingDelegate& Callback)
-{
-	if (!Callback.IsBound())
-		return;
+#pragma endregion
 
-	if (bInitialLoadingFinished)
+#pragma region Loading
+
+void UCefWebUiBrowserSession::BindWhenFinishedLoading(const FCefWebUiWhenFinishedLoadingDelegate& callback)
+{
+	if (!callback.IsBound())
 	{
-		FCefWebUiWhenFinishedLoadingDelegate Copy = Callback;
-		Copy.Execute(this);
 		return;
 	}
 
-	PendingFinishedLoadingCallbacks.Add(Callback);
-}
-
-void UCefWebUiBrowserSession::OnWidgetDestroyed(UCefWebUiBrowserWidget* InWidget)
-{
-	if (Widget == InWidget)
+	if (bInitialLoadingFinished)
 	{
-		Widget = nullptr;
+		FCefWebUiWhenFinishedLoadingDelegate callbackCopy = callback;
+		callbackCopy.Execute(this);
+		return;
 	}
+
+	PendingFinishedLoadingCallbacks.Add(callback);
 }
 
-void UCefWebUiBrowserSession::HandleWidgetLoadStateChanged(uint8 InState)
+void UCefWebUiBrowserSession::HandleWidgetLoadStateChanged(uint8 inState)
 {
 	if (bInitialLoadingFinished)
+	{
 		return;
-	if (InState != static_cast<uint8>(ECefLoadState::Ready))
+	}
+	if (inState != static_cast<uint8>(ECefLoadState::Ready))
+	{
 		return;
+	}
 
 	bInitialLoadingFinished = true;
 	OnFinishedLoading.Broadcast(this);
 
-	for (const FCefWebUiWhenFinishedLoadingDelegate& Callback : PendingFinishedLoadingCallbacks)
+	for (const FCefWebUiWhenFinishedLoadingDelegate& callback : PendingFinishedLoadingCallbacks)
 	{
-		if (Callback.IsBound())
+		if (callback.IsBound())
 		{
-			FCefWebUiWhenFinishedLoadingDelegate Copy = Callback;
-			Copy.Execute(this);
+			FCefWebUiWhenFinishedLoadingDelegate callbackCopy = callback;
+			callbackCopy.Execute(this);
 		}
 	}
 	PendingFinishedLoadingCallbacks.Reset();
 }
+
+#pragma endregion
+
+#pragma region Runtime Internal
 
 void UCefWebUiBrowserSession::EnsureRuntimeStarted()
 {
@@ -162,30 +199,36 @@ void UCefWebUiBrowserSession::EnsureRuntimeStarted()
 	{
 		RuntimeFrameReader = Runtime->GetFrameReaderPtr();
 	}
-	if (TSharedPtr<FCefFrameReader> Reader = RuntimeFrameReader.Pin())
+
+	if (TSharedPtr<FCefFrameReader> frameReader = RuntimeFrameReader.Pin())
 	{
 		if (!LoadStateDelegateHandle.IsValid())
 		{
-			LoadStateDelegateHandle = Reader->OnLoadStateChanged.AddUObject(this, &UCefWebUiBrowserSession::HandleWidgetLoadStateChanged);
+			LoadStateDelegateHandle = frameReader->OnLoadStateChanged.AddUObject(
+				this, &UCefWebUiBrowserSession::HandleWidgetLoadStateChanged);
 		}
-		HandleWidgetLoadStateChanged(static_cast<uint8>(Reader->GetLastKnownLoadState()));
+		HandleWidgetLoadStateChanged(static_cast<uint8>(frameReader->GetLastKnownLoadState()));
 	}
 }
 
 void UCefWebUiBrowserSession::ShutdownRuntime()
 {
-	if (TSharedPtr<FCefFrameReader> Reader = RuntimeFrameReader.Pin())
+	if (TSharedPtr<FCefFrameReader> frameReader = RuntimeFrameReader.Pin())
 	{
 		if (LoadStateDelegateHandle.IsValid())
 		{
-			Reader->OnLoadStateChanged.Remove(LoadStateDelegateHandle);
+			frameReader->OnLoadStateChanged.Remove(LoadStateDelegateHandle);
 		}
 	}
 	LoadStateDelegateHandle.Reset();
 	RuntimeFrameReader.Reset();
 
 	if (!Runtime)
+	{
 		return;
+	}
 	Runtime->Shutdown();
 	Runtime.Reset();
 }
+
+#pragma endregion
