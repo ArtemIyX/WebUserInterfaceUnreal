@@ -76,4 +76,6 @@ private:
 
 	TArray<FCefWebUiWhenFinishedLoadingDelegate> PendingFinishedLoadingCallbacks;
 	TUniquePtr<FCefWebUiRuntime> Runtime;
+	TWeakPtr<FCefFrameReader> RuntimeFrameReader;
+	FDelegateHandle LoadStateDelegateHandle;
 };

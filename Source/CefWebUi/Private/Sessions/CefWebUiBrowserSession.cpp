@@ -1,6 +1,7 @@
 #include "Sessions/CefWebUiBrowserSession.h"
 
 #include "Data/CefLoadState.h"
+#include "Services/CefFrameReader.h"
 #include "Services/CefWebUiRuntime.h"
 #include "Subsystems/CefWebUiGameInstanceSubsystem.h"
 #include "Widgets/CefWebUiBrowserWidget.h"
@@ -92,7 +93,7 @@ void UCefWebUiBrowserSession::Shutdown()
 
 TWeakPtr<FCefFrameReader> UCefWebUiBrowserSession::GetFrameReaderPtr() const
 {
-	return Runtime ? Runtime->GetFrameReaderPtr() : TWeakPtr<FCefFrameReader>();
+	return RuntimeFrameReader;
 }
 
 TWeakPtr<FCefInputWriter> UCefWebUiBrowserSession::GetInputWriterPtr() const
@@ -156,10 +157,33 @@ void UCefWebUiBrowserSession::EnsureRuntimeStarted()
 		Runtime = MakeUnique<FCefWebUiRuntime>();
 	}
 	Runtime->EnsureStarted();
+
+	if (!RuntimeFrameReader.IsValid())
+	{
+		RuntimeFrameReader = Runtime->GetFrameReaderPtr();
+	}
+	if (TSharedPtr<FCefFrameReader> Reader = RuntimeFrameReader.Pin())
+	{
+		if (!LoadStateDelegateHandle.IsValid())
+		{
+			LoadStateDelegateHandle = Reader->OnLoadStateChanged.AddUObject(this, &UCefWebUiBrowserSession::HandleWidgetLoadStateChanged);
+		}
+		HandleWidgetLoadStateChanged(static_cast<uint8>(Reader->GetLastKnownLoadState()));
+	}
 }
 
 void UCefWebUiBrowserSession::ShutdownRuntime()
 {
+	if (TSharedPtr<FCefFrameReader> Reader = RuntimeFrameReader.Pin())
+	{
+		if (LoadStateDelegateHandle.IsValid())
+		{
+			Reader->OnLoadStateChanged.Remove(LoadStateDelegateHandle);
+		}
+	}
+	LoadStateDelegateHandle.Reset();
+	RuntimeFrameReader.Reset();
+
 	if (!Runtime)
 		return;
 	Runtime->Shutdown();
