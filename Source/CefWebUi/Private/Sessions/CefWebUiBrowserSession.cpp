@@ -5,6 +5,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Services/CefFrameReader.h"
 #include "Services/CefWebUiRuntime.h"
+#include "Slate/CefWebUiSlateHostWidget.h"
 #include "Subsystems/CefWebUiGameInstanceSubsystem.h"
 #include "Widgets/CefWebUiBrowserWidget.h"
 
@@ -32,13 +33,13 @@ void UCefWebUiBrowserSession::Initialize(UCefWebUiGameInstanceSubsystem* inOwner
 
 #pragma region Widget
 
-UCefWebUiBrowserWidget* UCefWebUiBrowserSession::GetWidget() const
+UCefWebUiSlateHostWidget* UCefWebUiBrowserSession::GetWidget() const
 {
 	return Widget.Get();
 }
 
-UCefWebUiBrowserWidget* UCefWebUiBrowserSession::CreateOrGetWidget(
-	TSubclassOf<UCefWebUiBrowserWidget> widgetClass,
+UCefWebUiSlateHostWidget* UCefWebUiBrowserSession::CreateOrGetWidget(
+	TSubclassOf<UCefWebUiSlateHostWidget> widgetClass,
 	APlayerController* playerController,
 	int32 zOrder)
 {
@@ -79,7 +80,7 @@ UCefWebUiBrowserWidget* UCefWebUiBrowserSession::CreateOrGetWidget(
 		return nullptr;
 	}
 
-	UCefWebUiBrowserWidget* createdWidget = CreateWidget<UCefWebUiBrowserWidget>(targetPlayerController, widgetClass);
+	UCefWebUiSlateHostWidget* createdWidget = CreateWidget<UCefWebUiSlateHostWidget>(targetPlayerController, widgetClass);
 	if (!createdWidget)
 	{
 		return nullptr;
@@ -110,7 +111,7 @@ void UCefWebUiBrowserSession::Shutdown()
 	ShutdownRuntime();
 }
 
-void UCefWebUiBrowserSession::OnWidgetDestroyed(UCefWebUiBrowserWidget* inWidget)
+void UCefWebUiBrowserSession::OnWidgetDestroyed(UCefWebUiSlateHostWidget* inWidget)
 {
 	if (Widget == inWidget)
 	{

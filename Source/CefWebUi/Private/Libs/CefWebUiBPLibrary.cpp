@@ -63,10 +63,10 @@ void UCefWebUiBPLibrary::DestroyBrowserSession(
 	}
 }
 
-UCefWebUiBrowserWidget* UCefWebUiBPLibrary::CreateOrGetBrowserWidget(
+UCefWebUiSlateHostWidget* UCefWebUiBPLibrary::CreateOrGetBrowserWidget(
 	const UObject* WorldContextObject,
 	FName SessionId,
-	TSubclassOf<UCefWebUiBrowserWidget> WidgetClass,
+	TSubclassOf<UCefWebUiSlateHostWidget> WidgetClass,
 	APlayerController* PlayerController,
 	int32 ZOrder)
 {
@@ -77,7 +77,7 @@ UCefWebUiBrowserWidget* UCefWebUiBPLibrary::CreateOrGetBrowserWidget(
 	return nullptr;
 }
 
-UCefWebUiBrowserWidget* UCefWebUiBPLibrary::GetBrowserWidget(
+UCefWebUiSlateHostWidget* UCefWebUiBPLibrary::GetBrowserWidget(
 	const UObject* WorldContextObject,
 	FName SessionId)
 {

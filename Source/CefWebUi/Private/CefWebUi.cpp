@@ -1,5 +1,8 @@
 // CefWebUiModule.cpp
 #include "CefWebUi.h"
+#include "Interfaces/IPluginManager.h"
+#include "Misc/Paths.h"
+#include "ShaderCore.h"
 
 IMPLEMENT_MODULE(FCefWebUiModule, CefWebUi)
 
@@ -18,7 +21,14 @@ bool FCefWebUiModule::IsAvailable()
 
 void FCefWebUiModule::StartupModule()
 {
-	// Session owns runtime lifecycle.
+	const TSharedPtr<IPlugin> plugin = IPluginManager::Get().FindPlugin(TEXT("CefWebUi"));
+	if (!plugin.IsValid())
+	{
+		return;
+	}
+
+	const FString shaderDir = FPaths::Combine(plugin->GetBaseDir(), TEXT("Shaders"));
+	AddShaderSourceDirectoryMapping(TEXT("/Plugin/CefWebUi"), shaderDir);
 }
 
 void FCefWebUiModule::ShutdownModule()

@@ -47,15 +47,15 @@ public:
 
 #pragma region Widget
 	UFUNCTION(BlueprintCallable, Category="CefWebUi", meta=(WorldContext="WorldContextObject"))
-	static UCefWebUiBrowserWidget* CreateOrGetBrowserWidget(
+	static UCefWebUiSlateHostWidget* CreateOrGetBrowserWidget(
 		const UObject* WorldContextObject,
 		FName SessionId,
-		TSubclassOf<UCefWebUiBrowserWidget> WidgetClass,
+		TSubclassOf<UCefWebUiSlateHostWidget> WidgetClass,
 		APlayerController* PlayerController,
 		int32 ZOrder);
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi", meta=(WorldContext="WorldContextObject"))
-	static UCefWebUiBrowserWidget* GetBrowserWidget(
+	static UCefWebUiSlateHostWidget* GetBrowserWidget(
 		const UObject* WorldContextObject,
 		FName SessionId);
 #pragma endregion

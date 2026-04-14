@@ -300,7 +300,8 @@ void UCefWebUiBrowserWidget::NativeDestruct()
 {
 	if (IsValid(BrowserSession))
 	{
-		BrowserSession->OnWidgetDestroyed(this);
+		//TODO: Fix
+		//BrowserSession->OnWidgetDestroyed(this);
 	}
 
 	if (TSharedPtr<FCefFrameReader> Reader = FrameReader.Pin())

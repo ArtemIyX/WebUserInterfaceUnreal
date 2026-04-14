@@ -4,15 +4,15 @@
 #include "Input/Reply.h"
 #include "Layout/Geometry.h"
 #include "Rendering/DrawElements.h"
-#include "Styling/SlateBrush.h"
+#include "Rendering/RenderingCommon.h"
 #include "Widgets/SLeafWidget.h"
 #include "Services/CefFrameReader.h"
 #include "Services/CefInputWriter.h"
 
 class FCefInputWriter;
 class FCefFrameReader;
-class UTexture2D;
 class UCefWebUiBrowserSession;
+class FCefBrowserSurfaceDrawer;
 
 class CEFWEBUI_API SCefBrowserSurface : public SLeafWidget
 {
@@ -60,8 +60,6 @@ private:
 	void PollLatestFrame() const;
 	void EnsureSharedRhi() const;
 	bool EnsurePopupPlaneRhi() const;
-	void EnsureSlateTextures(uint32 InWidth, uint32 InHeight) const;
-	void UpdateTextureRefs(uint32 InSlot, bool bUsePopupPlane) const;
 	void ReleaseResources();
 	void GetBrowserCoords(const FGeometry& InGeometry, const FVector2D& InScreenPosition, int32& OutX, int32& OutY) const;
 	static bool SlateButtonToCef(const FKey& InKey, ECefMouseButton& OutButton);
@@ -79,8 +77,5 @@ private:
 	mutable uint32 SharedSlotCount = 2;
 	mutable FTextureRHIRef SharedTextureRHI[MaxSharedSlots];
 	mutable FTextureRHIRef SharedPopupTextureRHI;
-	mutable UTexture2D* SlateMainTexture = nullptr;
-	mutable UTexture2D* SlatePopupTexture = nullptr;
-	mutable FSlateBrush MainBrush;
-	mutable FSlateBrush PopupBrush;
+	mutable TSharedPtr<FCefBrowserSurfaceDrawer, ESPMode::ThreadSafe> CustomDrawer;
 };

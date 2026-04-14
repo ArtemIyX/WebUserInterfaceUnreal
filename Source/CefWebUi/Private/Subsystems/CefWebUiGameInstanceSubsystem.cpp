@@ -1,6 +1,7 @@
 #include "Subsystems/CefWebUiGameInstanceSubsystem.h"
 
 #include "Sessions/CefWebUiBrowserSession.h"
+#include "Slate/CefWebUiSlateHostWidget.h"
 #include "Widgets/CefWebUiBrowserWidget.h"
 
 void UCefWebUiGameInstanceSubsystem::Deinitialize()
@@ -53,7 +54,7 @@ void UCefWebUiGameInstanceSubsystem::DestroySession(FName SessionId)
 	}
 }
 
-UCefWebUiBrowserWidget* UCefWebUiGameInstanceSubsystem::GetSessionWidget(FName SessionId) const
+UCefWebUiSlateHostWidget* UCefWebUiGameInstanceSubsystem::GetSessionWidget(FName SessionId) const
 {
 	if (UCefWebUiBrowserSession* Session = GetSession(SessionId))
 	{
@@ -62,9 +63,9 @@ UCefWebUiBrowserWidget* UCefWebUiGameInstanceSubsystem::GetSessionWidget(FName S
 	return nullptr;
 }
 
-UCefWebUiBrowserWidget* UCefWebUiGameInstanceSubsystem::CreateOrGetSessionWidget(
+UCefWebUiSlateHostWidget* UCefWebUiGameInstanceSubsystem::CreateOrGetSessionWidget(
 	FName SessionId,
-	TSubclassOf<UCefWebUiBrowserWidget> WidgetClass,
+	TSubclassOf<UCefWebUiSlateHostWidget> WidgetClass,
 	APlayerController* PlayerController,
 	int32 ZOrder)
 {

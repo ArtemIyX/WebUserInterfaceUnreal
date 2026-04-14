@@ -7,6 +7,7 @@
 #include "CefWebUiBrowserSession.generated.h"
 
 #pragma region Forward Declarations
+class UCefWebUiSlateHostWidget;
 class APlayerController;
 class UCefWebUiBrowserWidget;
 class UCefWebUiGameInstanceSubsystem;
@@ -37,11 +38,11 @@ public:
 	FName GetSessionId() const { return SessionId; }
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
-	UCefWebUiBrowserWidget* GetWidget() const;
+	UCefWebUiSlateHostWidget* GetWidget() const;
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
-	UCefWebUiBrowserWidget* CreateOrGetWidget(
-		TSubclassOf<UCefWebUiBrowserWidget> WidgetClass,
+	UCefWebUiSlateHostWidget* CreateOrGetWidget(
+		TSubclassOf<UCefWebUiSlateHostWidget> WidgetClass,
 		APlayerController* PlayerController,
 		int32 ZOrder);
 
@@ -68,7 +69,7 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="CefWebUi")
 	FCefWebUiFinishedLoadingEvent OnFinishedLoading;
 
-	void OnWidgetDestroyed(UCefWebUiBrowserWidget* InWidget);
+	void OnWidgetDestroyed(UCefWebUiSlateHostWidget* InWidget);
 	void HandleWidgetLoadStateChanged(uint8 InState);
 #pragma endregion
 
@@ -85,7 +86,7 @@ private:
 	bool bInitialLoadingFinished = false;
 
 	UPROPERTY(Transient)
-	TObjectPtr<UCefWebUiBrowserWidget> Widget = nullptr;
+	TObjectPtr<UCefWebUiSlateHostWidget> Widget = nullptr;
 
 	TArray<FCefWebUiWhenFinishedLoadingDelegate> PendingFinishedLoadingCallbacks;
 	TUniquePtr<FCefWebUiRuntime> Runtime;

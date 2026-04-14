@@ -5,6 +5,7 @@
 #include "CefWebUiGameInstanceSubsystem.generated.h"
 
 #pragma region Forward Declarations
+class UCefWebUiSlateHostWidget;
 class APlayerController;
 class UCefWebUiBrowserSession;
 class UCefWebUiBrowserWidget;
@@ -36,13 +37,13 @@ public:
 		DestroySession(NAME_None);
 	}
 
-	UCefWebUiBrowserWidget* GetSessionWidget() const
+	UCefWebUiSlateHostWidget* GetSessionWidget() const
 	{
 		return GetSessionWidget(NAME_None);
 	}
 
-	UCefWebUiBrowserWidget* CreateOrGetSessionWidget(
-		TSubclassOf<UCefWebUiBrowserWidget> WidgetClass = nullptr,
+	UCefWebUiSlateHostWidget* CreateOrGetSessionWidget(
+		TSubclassOf<UCefWebUiSlateHostWidget> WidgetClass = nullptr,
 		APlayerController* PlayerController = nullptr,
 		int32 ZOrder = 0)
 	{
@@ -61,12 +62,12 @@ public:
 	void DestroySession(FName SessionId);
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
-	UCefWebUiBrowserWidget* GetSessionWidget(FName SessionId) const;
+	UCefWebUiSlateHostWidget* GetSessionWidget(FName SessionId) const;
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
-	UCefWebUiBrowserWidget* CreateOrGetSessionWidget(
+	UCefWebUiSlateHostWidget* CreateOrGetSessionWidget(
 		FName SessionId,
-		TSubclassOf<UCefWebUiBrowserWidget> WidgetClass,
+		TSubclassOf<UCefWebUiSlateHostWidget> WidgetClass,
 		APlayerController* PlayerController,
 		int32 ZOrder);
 #pragma endregion
