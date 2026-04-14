@@ -3,17 +3,18 @@
 #include "CoreMinimal.h"
 #include "Services/CefWebUiRuntime.h"
 #include "Templates/UniquePtr.h"
+#include "Widgets/SWidget.h"
 #include "UObject/Object.h"
 #include "CefWebUiBrowserSession.generated.h"
 
 #pragma region Forward Declarations
-class UCefWebUiSlateHostWidget;
 class APlayerController;
-class UCefWebUiBrowserWidget;
 class UCefWebUiGameInstanceSubsystem;
 class FCefInputWriter;
 class FCefFrameReader;
 class FCefControlWriter;
+class SCefBrowserSurface;
+class UGameViewportClient;
 #pragma endregion
 
 #pragma region Delegates
@@ -38,19 +39,22 @@ public:
 	FName GetSessionId() const { return SessionId; }
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
-	UCefWebUiSlateHostWidget* GetWidget() const;
-
-	UFUNCTION(BlueprintCallable, Category="CefWebUi")
-	UCefWebUiSlateHostWidget* CreateOrGetWidget(
-		TSubclassOf<UCefWebUiSlateHostWidget> WidgetClass,
+	void ShowInViewport(
 		APlayerController* PlayerController,
-		int32 ZOrder);
+		int32 ZOrder,
+		int32 BrowserWidth = 1920,
+		int32 BrowserHeight = 1080);
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
-	void DestroyWidget();
+	void HideFromViewport();
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
 	void Shutdown();
+
+	UFUNCTION(BlueprintPure, Category="CefWebUi")
+	bool IsShownInViewport() const;
+
+	TSharedPtr<SCefBrowserSurface> GetSlateWidget() const { return BrowserSurfaceWidget; }
 #pragma endregion
 
 #pragma region Runtime Access
@@ -125,7 +129,6 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="CefWebUi")
 	FCefWebUiFinishedLoadingEvent OnFinishedLoading;
 
-	void OnWidgetDestroyed(UCefWebUiSlateHostWidget* InWidget);
 	void HandleWidgetLoadStateChanged(uint8 InState);
 #pragma endregion
 
@@ -134,6 +137,7 @@ private:
 	void EnsureRuntimeStarted();
 	void ShutdownRuntime();
 	TSharedPtr<FCefControlWriter> GetOrOpenControlWriter();
+	UGameViewportClient* GetGameViewportClient() const;
 #pragma endregion
 
 private:
@@ -142,8 +146,8 @@ private:
 	FName SessionId = NAME_None;
 	bool bInitialLoadingFinished = false;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UCefWebUiSlateHostWidget> Widget = nullptr;
+	TSharedPtr<SCefBrowserSurface> BrowserSurfaceWidget;
+	TSharedPtr<SWidget> ViewportWidgetHost;
 
 	TArray<FCefWebUiWhenFinishedLoadingDelegate> PendingFinishedLoadingCallbacks;
 	TUniquePtr<FCefWebUiRuntime> Runtime;

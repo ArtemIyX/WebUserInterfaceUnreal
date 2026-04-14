@@ -5,10 +5,8 @@
 #include "CefWebUiGameInstanceSubsystem.generated.h"
 
 #pragma region Forward Declarations
-class UCefWebUiSlateHostWidget;
 class APlayerController;
 class UCefWebUiBrowserSession;
-class UCefWebUiBrowserWidget;
 #pragma endregion
 
 UCLASS(BlueprintType)
@@ -17,6 +15,8 @@ class CEFWEBUI_API UCefWebUiGameInstanceSubsystem : public UGameInstanceSubsyste
 	GENERATED_BODY()
 
 public:
+	UCefWebUiGameInstanceSubsystem();
+public:
 #pragma region Lifecycle
 	virtual void Deinitialize() override;
 #pragma endregion
@@ -24,7 +24,7 @@ public:
 #pragma region Convenience
 	UCefWebUiBrowserSession* GetOrCreateSession()
 	{
-		return GetOrCreateSession(NAME_None);
+		return GetOrCreateSession(NAME_None, nullptr);
 	}
 
 	UCefWebUiBrowserSession* GetSession() const
@@ -37,23 +37,26 @@ public:
 		DestroySession(NAME_None);
 	}
 
-	UCefWebUiSlateHostWidget* GetSessionWidget() const
+	void ShowSessionInViewport(
+		APlayerController* PlayerController = nullptr,
+		int32 ZOrder = 0,
+		int32 BrowserWidth = 1920,
+		int32 BrowserHeight = 1080)
 	{
-		return GetSessionWidget(NAME_None);
+		ShowSessionInViewport(NAME_None, PlayerController, ZOrder, BrowserWidth, BrowserHeight);
 	}
 
-	UCefWebUiSlateHostWidget* CreateOrGetSessionWidget(
-		TSubclassOf<UCefWebUiSlateHostWidget> WidgetClass = nullptr,
-		APlayerController* PlayerController = nullptr,
-		int32 ZOrder = 0)
+	void HideSessionFromViewport()
 	{
-		return CreateOrGetSessionWidget(NAME_None, WidgetClass, PlayerController, ZOrder);
+		HideSessionFromViewport(NAME_None);
 	}
 #pragma endregion
 
 #pragma region Session API
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
-	UCefWebUiBrowserSession* GetOrCreateSession(FName SessionId);
+	UCefWebUiBrowserSession* GetOrCreateSession(
+		FName SessionId,
+		TSubclassOf<UCefWebUiBrowserSession> SessionClass = nullptr);
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
 	UCefWebUiBrowserSession* GetSession(FName SessionId) const;
@@ -62,22 +65,23 @@ public:
 	void DestroySession(FName SessionId);
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
-	UCefWebUiSlateHostWidget* GetSessionWidget(FName SessionId) const;
+	void ShowSessionInViewport(
+		FName SessionId,
+		APlayerController* PlayerController,
+		int32 ZOrder,
+		int32 BrowserWidth,
+		int32 BrowserHeight);
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
-	UCefWebUiSlateHostWidget* CreateOrGetSessionWidget(
-		FName SessionId,
-		TSubclassOf<UCefWebUiSlateHostWidget> WidgetClass,
-		APlayerController* PlayerController,
-		int32 ZOrder);
+	void HideSessionFromViewport(FName SessionId);
 #pragma endregion
 
 #pragma region Settings
 	UFUNCTION(BlueprintPure, Category="CefWebUi")
-	TSubclassOf<UCefWebUiBrowserWidget> GetDefaultWidgetClass() const { return DefaultWidgetClass; }
+	TSubclassOf<UCefWebUiBrowserSession> GetDefaultSessionClass() const { return DefaultSessionClass; }
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
-	void SetDefaultWidgetClass(TSubclassOf<UCefWebUiBrowserWidget> InWidgetClass);
+	void SetDefaultSessionClass(TSubclassOf<UCefWebUiBrowserSession> InSessionClass);
 #pragma endregion
 
 private:
@@ -86,7 +90,7 @@ private:
 private:
 #pragma region State
 	UPROPERTY(EditAnywhere, Category="CefWebUi")
-	TSubclassOf<UCefWebUiBrowserWidget> DefaultWidgetClass;
+	TSubclassOf<UCefWebUiBrowserSession> DefaultSessionClass;
 
 	UPROPERTY(Transient)
 	TMap<FName, TObjectPtr<UCefWebUiBrowserSession>> Sessions;

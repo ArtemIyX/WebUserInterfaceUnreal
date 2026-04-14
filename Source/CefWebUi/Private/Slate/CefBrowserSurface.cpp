@@ -1,6 +1,8 @@
 #include "Slate/CefBrowserSurface.h"
 
+#include "CefWebUi.h"
 #include "GlobalShader.h"
+#include "HAL/IConsoleManager.h"
 #include "ID3D12DynamicRHI.h"
 #include "InputCoreTypes.h"
 #include "PixelShaderUtils.h"
@@ -8,11 +10,63 @@
 #include "RenderingThread.h"
 #include "RHI.h"
 #include "Sessions/CefWebUiBrowserSession.h"
+#include "Services/CefControlWriter.h"
 #include "Services/CefInputWriter.h"
 
 #include "Windows/AllowWindowsPlatformTypes.h"
 #include <d3d12.h>
 #include "Windows/HideWindowsPlatformTypes.h"
+
+DECLARE_STATS_GROUP(TEXT("CefWebUiTelemetry"), STATGROUP_CefWebUiTelemetry, STATCAT_Advanced);
+DECLARE_CYCLE_STAT(TEXT("CefSlate: PollFrame"), STAT_CefSlate_PollFrame, STATGROUP_CefWebUiTelemetry);
+DECLARE_CYCLE_STAT(TEXT("CefSlate: Draw"), STAT_CefSlate_Draw, STATGROUP_CefWebUiTelemetry);
+DECLARE_DWORD_COUNTER_STAT(TEXT("Consumed Frames"), STAT_CefTel_ConsumedFrames, STATGROUP_CefWebUiTelemetry);
+DECLARE_DWORD_COUNTER_STAT(TEXT("Frame Gaps"), STAT_CefTel_FrameGaps, STATGROUP_CefWebUiTelemetry);
+DECLARE_DWORD_COUNTER_STAT(TEXT("Input->Frame Latency Ms"), STAT_CefTel_InputToFrameLatencyMs, STATGROUP_CefWebUiTelemetry);
+DECLARE_DWORD_COUNTER_STAT(TEXT("Input->Frame Max Ms"), STAT_CefTel_InputToFrameLatencyMaxMs, STATGROUP_CefWebUiTelemetry);
+
+namespace
+{
+static TAutoConsoleVariable<int32> CVarCefWebUiCadenceFeedback(
+	TEXT("CefWebUi.CadenceFeedback"),
+	1,
+	TEXT("Enable consumer cadence feedback to host pacing (0/1)."));
+
+static TAutoConsoleVariable<float> CVarCefWebUiCadenceFeedbackPeriodSec(
+	TEXT("CefWebUi.CadenceFeedbackPeriodSec"),
+	0.10f,
+	TEXT("Cadence feedback send period in seconds."));
+
+static TAutoConsoleVariable<float> CVarCefWebUiTelemetryLogPeriodSec(
+	TEXT("CefWebUi.TelemetryLogPeriodSec"),
+	2.0f,
+	TEXT("Telemetry log period in seconds."));
+
+static TAutoConsoleVariable<float> CVarCefWebUiHostTuningPushPeriodSec(
+	TEXT("CefWebUi.HostTuningPushPeriodSec"),
+	0.5f,
+	TEXT("How often to push host tuning CVars via control channel."));
+
+static TAutoConsoleVariable<int32> CVarCefWebUiHostMaxInFlightBeginFrames(
+	TEXT("CefWebUi.HostMaxInFlightBeginFrames"),
+	0,
+	TEXT("Host tuning: max in-flight begin frames (0 disables cap)."));
+
+static TAutoConsoleVariable<int32> CVarCefWebUiHostFlushIntervalFrames(
+	TEXT("CefWebUi.HostFlushIntervalFrames"),
+	4,
+	TEXT("Host tuning: flush every N frames (0=only special cases)."));
+
+static TAutoConsoleVariable<int32> CVarCefWebUiHostKeyframeIntervalUs(
+	TEXT("CefWebUi.HostKeyframeIntervalUs"),
+	300000,
+	TEXT("Host tuning: time-based keyframe full refresh interval in microseconds."));
+
+static TAutoConsoleVariable<float> CVarCefWebUiCursorUpdateRateHz(
+	TEXT("CefWebUi.CursorUpdateRateHz"),
+	120.0f,
+	TEXT("Max cursor updates per second (0 disables limit)."));
+}
 
 class FCefSlateBlitPS : public FGlobalShader
 {
@@ -167,6 +221,27 @@ void SCefBrowserSurface::Construct(const FArguments& inArgs)
 	BrowserSession = inArgs._BrowserSession;
 	BrowserWidth = FMath::Max(1, inArgs._BrowserWidth);
 	BrowserHeight = FMath::Max(1, inArgs._BrowserHeight);
+	LastConsumerFrameTimeSec = 0.0;
+	LastCadenceSentTimeSec = 0.0;
+	LastHostTuningPushTimeSec = 0.0;
+	LastTelemetryLogTimeSec = 0.0;
+	LastInputEventTimeSec = 0.0;
+	LastInputToFrameLatencyMs = 0.0;
+	SmoothedCadenceUs = 0;
+	LastSeenFrameId = 0;
+	InputEventSerial = 0;
+	LastLatencyMeasuredInputSerial = 0;
+	LastLatencyFrameId = 0;
+	LastCursorType = ECefCustomCursorType::CT_NONE;
+	TelemetryConsumedFrames = 0;
+	TelemetryFrameGapCount = 0;
+	TelemetryInputLatencySamples = 0;
+	TelemetryInputLatencyMsSum = 0;
+	TelemetryInputLatencyMsMax = 0;
+	SET_DWORD_STAT(STAT_CefTel_ConsumedFrames, 0);
+	SET_DWORD_STAT(STAT_CefTel_FrameGaps, 0);
+	SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMs, 0);
+	SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMaxMs, 0);
 	RegisterActiveTimer(0.0f, FWidgetActiveTimerDelegate::CreateSP(this, &SCefBrowserSurface::HandleActiveTimer));
 }
 
@@ -174,6 +249,7 @@ void SCefBrowserSurface::SetBrowserSession(TWeakObjectPtr<UCefWebUiBrowserSessio
 {
 	BrowserSession = inBrowserSession;
 	FrameReader.Reset();
+	ControlWriter.Reset();
 }
 
 void SCefBrowserSurface::SetBrowserSize(int32 inBrowserWidth, int32 inBrowserHeight)
@@ -191,11 +267,19 @@ int32 SCefBrowserSurface::OnPaint(
 	const FWidgetStyle& inWidgetStyle,
 	bool bParentEnabled) const
 {
+	SCOPE_CYCLE_COUNTER(STAT_CefSlate_Draw);
 	PollLatestFrame();
 	if (!bHasFrame)
 	{
 		return layerId;
 	}
+
+	const double nowSec = FPlatformTime::Seconds();
+	UpdateFrameTelemetry(LastFrame);
+	MaybeUpdateCadenceFeedback(nowSec);
+	MaybePushHostTuning(nowSec);
+	MaybeUpdateCursor(LastFrame, nowSec);
+	MaybeLogAndResetTelemetry(nowSec);
 
 	const uint32 slotCount = FMath::Clamp(SharedSlotCount, 1u, MaxSharedSlots);
 	const uint32 slot = LastFrame.WriteSlot % slotCount;
@@ -238,6 +322,7 @@ FVector2D SCefBrowserSurface::ComputeDesiredSize(float layoutScaleMultiplier) co
 
 FReply SCefBrowserSurface::OnMouseMove(const FGeometry& myGeometry, const FPointerEvent& mouseEvent)
 {
+	MarkInputEvent();
 	TSharedPtr<FCefInputWriter> inputWriter;
 	if (!TryGetInputWriter(inputWriter))
 	{
@@ -253,6 +338,7 @@ FReply SCefBrowserSurface::OnMouseMove(const FGeometry& myGeometry, const FPoint
 
 FReply SCefBrowserSurface::OnMouseButtonDown(const FGeometry& myGeometry, const FPointerEvent& mouseEvent)
 {
+	MarkInputEvent();
 	TSharedPtr<FCefInputWriter> inputWriter;
 	if (!TryGetInputWriter(inputWriter))
 	{
@@ -274,6 +360,7 @@ FReply SCefBrowserSurface::OnMouseButtonDown(const FGeometry& myGeometry, const 
 
 FReply SCefBrowserSurface::OnMouseButtonUp(const FGeometry& myGeometry, const FPointerEvent& mouseEvent)
 {
+	MarkInputEvent();
 	TSharedPtr<FCefInputWriter> inputWriter;
 	if (!TryGetInputWriter(inputWriter))
 	{
@@ -295,6 +382,7 @@ FReply SCefBrowserSurface::OnMouseButtonUp(const FGeometry& myGeometry, const FP
 
 FReply SCefBrowserSurface::OnMouseWheel(const FGeometry& myGeometry, const FPointerEvent& mouseEvent)
 {
+	MarkInputEvent();
 	TSharedPtr<FCefInputWriter> inputWriter;
 	if (!TryGetInputWriter(inputWriter))
 	{
@@ -310,6 +398,7 @@ FReply SCefBrowserSurface::OnMouseWheel(const FGeometry& myGeometry, const FPoin
 
 FReply SCefBrowserSurface::OnKeyDown(const FGeometry& myGeometry, const FKeyEvent& keyEvent)
 {
+	MarkInputEvent();
 	TSharedPtr<FCefInputWriter> inputWriter;
 	if (!TryGetInputWriter(inputWriter))
 	{
@@ -323,6 +412,7 @@ FReply SCefBrowserSurface::OnKeyDown(const FGeometry& myGeometry, const FKeyEven
 
 FReply SCefBrowserSurface::OnKeyUp(const FGeometry& myGeometry, const FKeyEvent& keyEvent)
 {
+	MarkInputEvent();
 	TSharedPtr<FCefInputWriter> inputWriter;
 	if (!TryGetInputWriter(inputWriter))
 	{
@@ -336,6 +426,7 @@ FReply SCefBrowserSurface::OnKeyUp(const FGeometry& myGeometry, const FKeyEvent&
 
 FReply SCefBrowserSurface::OnKeyChar(const FGeometry& myGeometry, const FCharacterEvent& characterEvent)
 {
+	MarkInputEvent();
 	TSharedPtr<FCefInputWriter> inputWriter;
 	if (!TryGetInputWriter(inputWriter))
 	{
@@ -383,8 +474,177 @@ bool SCefBrowserSurface::TryGetInputWriter(TSharedPtr<FCefInputWriter>& outInput
 	return outInputWriter.IsValid();
 }
 
+bool SCefBrowserSurface::TryGetControlWriter(TSharedPtr<FCefControlWriter>& outControlWriter) const
+{
+	if (TSharedPtr<FCefControlWriter> writer = ControlWriter.Pin())
+	{
+		outControlWriter = writer;
+		return true;
+	}
+
+	const TWeakObjectPtr<UCefWebUiBrowserSession> session = BrowserSession;
+	if (!session.IsValid())
+	{
+		return false;
+	}
+
+	ControlWriter = session->GetControlWriterPtr();
+	outControlWriter = ControlWriter.Pin();
+	return outControlWriter.IsValid();
+}
+
+void SCefBrowserSurface::MaybePushHostTuning(double nowSec) const
+{
+	TSharedPtr<FCefControlWriter> controlWriter;
+	if (!TryGetControlWriter(controlWriter))
+	{
+		return;
+	}
+	if (!controlWriter->IsOpen())
+	{
+		controlWriter->Open();
+	}
+	if (!controlWriter->IsOpen())
+	{
+		return;
+	}
+
+	const double periodSec = FMath::Max(0.05, static_cast<double>(CVarCefWebUiHostTuningPushPeriodSec.GetValueOnAnyThread()));
+	if (LastHostTuningPushTimeSec > 0.0 && (nowSec - LastHostTuningPushTimeSec) < periodSec)
+	{
+		return;
+	}
+
+	controlWriter->SetMaxInFlightBeginFrames(static_cast<uint32>(FMath::Max(0, CVarCefWebUiHostMaxInFlightBeginFrames.GetValueOnAnyThread())));
+	controlWriter->SetFlushIntervalFrames(static_cast<uint32>(FMath::Max(0, CVarCefWebUiHostFlushIntervalFrames.GetValueOnAnyThread())));
+	controlWriter->SetKeyframeIntervalUs(static_cast<uint32>(FMath::Max(0, CVarCefWebUiHostKeyframeIntervalUs.GetValueOnAnyThread())));
+	LastHostTuningPushTimeSec = nowSec;
+}
+
+void SCefBrowserSurface::MaybeUpdateCadenceFeedback(double nowSec) const
+{
+	if (CVarCefWebUiCadenceFeedback.GetValueOnAnyThread() == 0)
+	{
+		return;
+	}
+
+	TSharedPtr<FCefControlWriter> controlWriter;
+	if (!TryGetControlWriter(controlWriter))
+	{
+		return;
+	}
+	if (!controlWriter->IsOpen())
+	{
+		controlWriter->Open();
+	}
+	if (!controlWriter->IsOpen())
+	{
+		return;
+	}
+
+	if (LastConsumerFrameTimeSec > 0.0)
+	{
+		const double dtSec = nowSec - LastConsumerFrameTimeSec;
+		if (dtSec > 0.0001)
+		{
+			const uint32 dtUs = static_cast<uint32>(FMath::Clamp(dtSec * 1000000.0, 1000.0, 1000000.0));
+			SmoothedCadenceUs = (SmoothedCadenceUs == 0) ? dtUs : static_cast<uint32>((SmoothedCadenceUs * 7ull + dtUs) / 8ull);
+		}
+	}
+	LastConsumerFrameTimeSec = nowSec;
+
+	const double sendPeriodSec = FMath::Max(0.01, static_cast<double>(CVarCefWebUiCadenceFeedbackPeriodSec.GetValueOnAnyThread()));
+	if (LastCadenceSentTimeSec > 0.0 && (nowSec - LastCadenceSentTimeSec) < sendPeriodSec)
+	{
+		return;
+	}
+
+	const uint32 cadenceToSend = (SmoothedCadenceUs > 0) ? SmoothedCadenceUs : 16666u;
+	controlWriter->SetConsumerCadenceUs(cadenceToSend);
+	LastCadenceSentTimeSec = nowSec;
+}
+
+void SCefBrowserSurface::UpdateFrameTelemetry(const FCefSharedFrame& frame) const
+{
+	++TelemetryConsumedFrames;
+	SET_DWORD_STAT(STAT_CefTel_ConsumedFrames, TelemetryConsumedFrames);
+
+	if (LastSeenFrameId != 0 && frame.FrameId > (LastSeenFrameId + 1))
+	{
+		const uint64 gap = frame.FrameId - (LastSeenFrameId + 1);
+		const uint32 remaining = (TelemetryFrameGapCount < MAX_uint32) ? (MAX_uint32 - TelemetryFrameGapCount) : 0;
+		TelemetryFrameGapCount += static_cast<uint32>(FMath::Min<uint64>(gap, remaining));
+		SET_DWORD_STAT(STAT_CefTel_FrameGaps, TelemetryFrameGapCount);
+	}
+	LastSeenFrameId = frame.FrameId;
+}
+
+void SCefBrowserSurface::MaybeUpdateCursor(const FCefSharedFrame& frame, double nowSec) const
+{
+	if (frame.CursorType == LastCursorType)
+	{
+		return;
+	}
+
+	const double hz = FMath::Max(0.0, static_cast<double>(CVarCefWebUiCursorUpdateRateHz.GetValueOnAnyThread()));
+	const double minDt = (hz > 0.0) ? (1.0 / hz) : 0.0;
+	if (minDt > 0.0 && (nowSec - LastCursorUpdateTimeSec) < minDt)
+	{
+		return;
+	}
+
+	LastCursorType = frame.CursorType;
+	LastCursorUpdateTimeSec = nowSec;
+	const_cast<SCefBrowserSurface*>(this)->SetCursor(FCefFrameReader::MapCefCursor(frame.CursorType));
+}
+
+void SCefBrowserSurface::MaybeLogAndResetTelemetry(double nowSec) const
+{
+	const double logPeriodSec = FMath::Max(0.0, static_cast<double>(CVarCefWebUiTelemetryLogPeriodSec.GetValueOnAnyThread()));
+	if (logPeriodSec <= 0.0)
+	{
+		return;
+	}
+	if (LastTelemetryLogTimeSec <= 0.0)
+	{
+		LastTelemetryLogTimeSec = nowSec;
+		return;
+	}
+	if (nowSec - LastTelemetryLogTimeSec < logPeriodSec)
+	{
+		return;
+	}
+
+	const uint32 avgInputLatencyMs = (TelemetryInputLatencySamples > 0) ? (TelemetryInputLatencyMsSum / TelemetryInputLatencySamples) : 0;
+	UE_LOG(LogCefWebUiTelemetry, Log,
+		TEXT("[CefSlateTelemetry] frames=%u gaps=%u input_latency_avg_ms=%u input_latency_max_ms=%u last_latency_frame_id=%llu"),
+		TelemetryConsumedFrames,
+		TelemetryFrameGapCount,
+		avgInputLatencyMs,
+		TelemetryInputLatencyMsMax,
+		static_cast<unsigned long long>(LastLatencyFrameId));
+
+	LastTelemetryLogTimeSec = nowSec;
+	TelemetryConsumedFrames = 0;
+	TelemetryFrameGapCount = 0;
+	TelemetryInputLatencySamples = 0;
+	TelemetryInputLatencyMsSum = 0;
+	TelemetryInputLatencyMsMax = 0;
+	SET_DWORD_STAT(STAT_CefTel_ConsumedFrames, 0);
+	SET_DWORD_STAT(STAT_CefTel_FrameGaps, 0);
+	SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMs, static_cast<uint32>(LastInputToFrameLatencyMs));
+	SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMaxMs, 0);
+}
+
+void SCefBrowserSurface::MarkInputEvent()
+{
+	LastInputEventTimeSec = FPlatformTime::Seconds();
+	++InputEventSerial;
+}
+
 void SCefBrowserSurface::PollLatestFrame() const
 {
+	SCOPE_CYCLE_COUNTER(STAT_CefSlate_PollFrame);
 	TSharedPtr<FCefFrameReader> frameReader;
 	if (!TryGetFrameReader(frameReader))
 	{
@@ -396,6 +656,20 @@ void SCefBrowserSurface::PollLatestFrame() const
 	{
 		LastFrame = frame;
 		bHasFrame = true;
+		if (InputEventSerial != 0 && InputEventSerial != LastLatencyMeasuredInputSerial)
+		{
+			const double nowSec = FPlatformTime::Seconds();
+			const uint32 latencyMs = static_cast<uint32>(FMath::Clamp((nowSec - LastInputEventTimeSec) * 1000.0, 0.0, 10000.0));
+			LastInputToFrameLatencyMs = static_cast<double>(latencyMs);
+			LastLatencyMeasuredInputSerial = InputEventSerial;
+			LastLatencyFrameId = LastFrame.FrameId;
+			++TelemetryInputLatencySamples;
+			const uint32 remaining = (TelemetryInputLatencyMsSum < MAX_uint32) ? (MAX_uint32 - TelemetryInputLatencyMsSum) : 0;
+			TelemetryInputLatencyMsSum += FMath::Min(latencyMs, remaining);
+			TelemetryInputLatencyMsMax = FMath::Max(TelemetryInputLatencyMsMax, latencyMs);
+			SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMs, latencyMs);
+			SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMaxMs, TelemetryInputLatencyMsMax);
+		}
 	}
 
 	if (!bHasFrame)
@@ -563,6 +837,7 @@ void SCefBrowserSurface::ReleaseResources()
 	SharedPopupTextureRHI = nullptr;
 	bHasFrame = false;
 	FrameReader.Reset();
+	ControlWriter.Reset();
 }
 
 void SCefBrowserSurface::GetBrowserCoords(const FGeometry& inGeometry, const FVector2D& inScreenPosition, int32& outX, int32& outY) const

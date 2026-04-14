@@ -2,13 +2,14 @@
 
 #include "Data/CefLoadState.h"
 #include "Engine/GameInstance.h"
+#include "Engine/GameViewportClient.h"
 #include "GameFramework/PlayerController.h"
 #include "Services/CefControlWriter.h"
 #include "Services/CefFrameReader.h"
 #include "Services/CefWebUiRuntime.h"
-#include "Slate/CefWebUiSlateHostWidget.h"
+#include "Slate/CefBrowserSurface.h"
 #include "Subsystems/CefWebUiGameInstanceSubsystem.h"
-#include "Widgets/CefWebUiBrowserWidget.h"
+#include "Widgets/SWeakWidget.h"
 
 #pragma region Lifecycle
 
@@ -34,90 +35,76 @@ void UCefWebUiBrowserSession::Initialize(UCefWebUiGameInstanceSubsystem* inOwner
 
 #pragma region Widget
 
-UCefWebUiSlateHostWidget* UCefWebUiBrowserSession::GetWidget() const
-{
-	return Widget.Get();
-}
-
-UCefWebUiSlateHostWidget* UCefWebUiBrowserSession::CreateOrGetWidget(
-	TSubclassOf<UCefWebUiSlateHostWidget> widgetClass,
+void UCefWebUiBrowserSession::ShowInViewport(
 	APlayerController* playerController,
-	int32 zOrder)
+	int32 zOrder,
+	int32 browserWidth,
+	int32 browserHeight)
 {
-	if (IsValid(Widget))
+	UGameViewportClient* gameViewportClient = GetGameViewportClient();
+	if (!gameViewportClient)
 	{
-		if (!Widget->IsInViewport())
-		{
-			Widget->AddToViewport(zOrder);
-		}
-		return Widget.Get();
-	}
-
-	UCefWebUiGameInstanceSubsystem* subsystem = OwnerSubsystem.Get();
-	if (!subsystem)
-	{
-		return nullptr;
+		return;
 	}
 	EnsureRuntimeStarted();
 
-	if (!widgetClass)
+	if (!BrowserSurfaceWidget.IsValid())
 	{
-		widgetClass = subsystem->GetDefaultWidgetClass();
+		SAssignNew(BrowserSurfaceWidget, SCefBrowserSurface)
+			.BrowserSession(this)
+			.BrowserWidth(FMath::Max(1, browserWidth))
+			.BrowserHeight(FMath::Max(1, browserHeight));
 	}
-	if (!widgetClass)
+	else
 	{
-		return nullptr;
-	}
-
-	UGameInstance* gameInstance = subsystem->GetGameInstance();
-	if (!gameInstance)
-	{
-		return nullptr;
+		BrowserSurfaceWidget->SetBrowserSession(this);
+		BrowserSurfaceWidget->SetBrowserSize(FMath::Max(1, browserWidth), FMath::Max(1, browserHeight));
 	}
 
-	APlayerController* targetPlayerController = playerController ? playerController : gameInstance->GetFirstLocalPlayerController();
-	if (!targetPlayerController)
+	if (ViewportWidgetHost.IsValid())
 	{
-		return nullptr;
+		gameViewportClient->RemoveViewportWidgetContent(ViewportWidgetHost.ToSharedRef());
+		ViewportWidgetHost.Reset();
 	}
 
-	UCefWebUiSlateHostWidget* createdWidget = CreateWidget<UCefWebUiSlateHostWidget>(targetPlayerController, widgetClass);
-	if (!createdWidget)
+	if (!playerController)
 	{
-		return nullptr;
+		if (UCefWebUiGameInstanceSubsystem* subsystem = OwnerSubsystem.Get())
+		{
+			if (UGameInstance* gameInstance = subsystem->GetGameInstance())
+			{
+				playerController = gameInstance->GetFirstLocalPlayerController();
+			}
+		}
 	}
 
-	createdWidget->SetBrowserSession(this);
-	createdWidget->AddToViewport(zOrder);
-	Widget = createdWidget;
-	return createdWidget;
+	SAssignNew(ViewportWidgetHost, SWeakWidget)
+		.PossiblyNullContent(BrowserSurfaceWidget.ToSharedRef());
+	gameViewportClient->AddViewportWidgetContent(ViewportWidgetHost.ToSharedRef(), zOrder);
 }
 
-void UCefWebUiBrowserSession::DestroyWidget()
+void UCefWebUiBrowserSession::HideFromViewport()
 {
-	if (!IsValid(Widget))
+	UGameViewportClient* gameViewportClient = GetGameViewportClient();
+	if (!gameViewportClient || !ViewportWidgetHost.IsValid())
 	{
-		Widget = nullptr;
 		return;
 	}
 
-	Widget->SetBrowserSession(nullptr);
-	Widget->RemoveFromParent();
-	Widget = nullptr;
+	gameViewportClient->RemoveViewportWidgetContent(ViewportWidgetHost.ToSharedRef());
+	ViewportWidgetHost.Reset();
 }
 
 void UCefWebUiBrowserSession::Shutdown()
 {
-	DestroyWidget();
+	HideFromViewport();
+	BrowserSurfaceWidget.Reset();
 	ShutdownRuntime();
 }
 
-void UCefWebUiBrowserSession::OnWidgetDestroyed(UCefWebUiSlateHostWidget* inWidget)
+bool UCefWebUiBrowserSession::IsShownInViewport() const
 {
-	if (Widget == inWidget)
-	{
-		Widget = nullptr;
-	}
+	return ViewportWidgetHost.IsValid();
 }
 
 #pragma endregion
@@ -375,6 +362,17 @@ TSharedPtr<FCefControlWriter> UCefWebUiBrowserSession::GetOrOpenControlWriter()
 		controlWriter->Open();
 	}
 	return controlWriter;
+}
+
+UGameViewportClient* UCefWebUiBrowserSession::GetGameViewportClient() const
+{
+	UCefWebUiGameInstanceSubsystem* subsystem = OwnerSubsystem.Get();
+	if (!subsystem)
+	{
+		return nullptr;
+	}
+	UGameInstance* gameInstance = subsystem->GetGameInstance();
+	return gameInstance ? gameInstance->GetGameViewportClient() : nullptr;
 }
 
 void UCefWebUiBrowserSession::ShutdownRuntime()

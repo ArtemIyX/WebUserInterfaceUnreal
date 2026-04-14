@@ -1,8 +1,11 @@
 #include "Subsystems/CefWebUiGameInstanceSubsystem.h"
 
 #include "Sessions/CefWebUiBrowserSession.h"
-#include "Slate/CefWebUiSlateHostWidget.h"
-#include "Widgets/CefWebUiBrowserWidget.h"
+
+UCefWebUiGameInstanceSubsystem::UCefWebUiGameInstanceSubsystem()
+{
+	DefaultSessionClass = UCefWebUiBrowserSession::StaticClass();
+}
 
 void UCefWebUiGameInstanceSubsystem::Deinitialize()
 {
@@ -17,7 +20,8 @@ void UCefWebUiGameInstanceSubsystem::Deinitialize()
 	Super::Deinitialize();
 }
 
-UCefWebUiBrowserSession* UCefWebUiGameInstanceSubsystem::GetOrCreateSession(FName SessionId)
+UCefWebUiBrowserSession* UCefWebUiGameInstanceSubsystem::GetOrCreateSession(
+	FName SessionId, TSubclassOf<UCefWebUiBrowserSession> SessionClass)
 {
 	const FName Key = NormalizeSessionId(SessionId);
 	if (TObjectPtr<UCefWebUiBrowserSession>* Found = Sessions.Find(Key))
@@ -25,7 +29,16 @@ UCefWebUiBrowserSession* UCefWebUiGameInstanceSubsystem::GetOrCreateSession(FNam
 		return Found->Get();
 	}
 
-	UCefWebUiBrowserSession* Session = NewObject<UCefWebUiBrowserSession>(this);
+	if (!SessionClass)
+	{
+		SessionClass = DefaultSessionClass;
+	}
+	if (!SessionClass)
+	{
+		SessionClass = UCefWebUiBrowserSession::StaticClass();
+	}
+
+	UCefWebUiBrowserSession* Session = NewObject<UCefWebUiBrowserSession>(this, SessionClass);
 	Session->Initialize(this, Key);
 	Sessions.Add(Key, Session);
 	return Session;
@@ -54,28 +67,30 @@ void UCefWebUiGameInstanceSubsystem::DestroySession(FName SessionId)
 	}
 }
 
-UCefWebUiSlateHostWidget* UCefWebUiGameInstanceSubsystem::GetSessionWidget(FName SessionId) const
+void UCefWebUiGameInstanceSubsystem::ShowSessionInViewport(
+	FName SessionId,
+	APlayerController* PlayerController,
+	int32 ZOrder,
+	int32 BrowserWidth,
+	int32 BrowserHeight)
+{
+	if (UCefWebUiBrowserSession* Session = GetOrCreateSession(SessionId, nullptr))
+	{
+		Session->ShowInViewport(PlayerController, ZOrder, BrowserWidth, BrowserHeight);
+	}
+}
+
+void UCefWebUiGameInstanceSubsystem::HideSessionFromViewport(FName SessionId)
 {
 	if (UCefWebUiBrowserSession* Session = GetSession(SessionId))
 	{
-		return Session->GetWidget();
+		Session->HideFromViewport();
 	}
-	return nullptr;
 }
 
-UCefWebUiSlateHostWidget* UCefWebUiGameInstanceSubsystem::CreateOrGetSessionWidget(
-	FName SessionId,
-	TSubclassOf<UCefWebUiSlateHostWidget> WidgetClass,
-	APlayerController* PlayerController,
-	int32 ZOrder)
+void UCefWebUiGameInstanceSubsystem::SetDefaultSessionClass(TSubclassOf<UCefWebUiBrowserSession> InSessionClass)
 {
-	UCefWebUiBrowserSession* Session = GetOrCreateSession(SessionId);
-	return Session ? Session->CreateOrGetWidget(WidgetClass, PlayerController, ZOrder) : nullptr;
-}
-
-void UCefWebUiGameInstanceSubsystem::SetDefaultWidgetClass(TSubclassOf<UCefWebUiBrowserWidget> InWidgetClass)
-{
-	DefaultWidgetClass = InWidgetClass;
+	DefaultSessionClass = InSessionClass;
 }
 
 FName UCefWebUiGameInstanceSubsystem::NormalizeSessionId(FName SessionId) const

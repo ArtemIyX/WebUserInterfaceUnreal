@@ -9,9 +9,7 @@
 #pragma region Forward Declarations
 class APlayerController;
 class UCefWebUiBrowserSession;
-class UCefWebUiBrowserWidget;
 class UCefWebUiGameInstanceSubsystem;
-class UCefWebUiSlateHostWidget;
 #pragma endregion
 
 UCLASS()
@@ -37,7 +35,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category="CefWebUi", meta=(WorldContext="WorldContextObject"))
 	static UCefWebUiBrowserSession* GetOrCreateBrowserSession(
 		const UObject* WorldContextObject,
-		FName SessionId);
+		FName SessionId,
+		TSubclassOf<UCefWebUiBrowserSession> SessionClass = nullptr);
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi", meta=(WorldContext="WorldContextObject"))
 	static void DestroyBrowserSession(
@@ -45,30 +44,20 @@ public:
 		FName SessionId);
 #pragma endregion
 
-#pragma region Widget
+#pragma region Viewport
 	UFUNCTION(BlueprintCallable, Category="CefWebUi", meta=(WorldContext="WorldContextObject"))
-	static UCefWebUiSlateHostWidget* CreateOrGetBrowserWidget(
+	static UCefWebUiBrowserSession* ShowBrowserSessionInViewport(
 		const UObject* WorldContextObject,
 		FName SessionId,
-		TSubclassOf<UCefWebUiSlateHostWidget> WidgetClass,
-		APlayerController* PlayerController,
-		int32 ZOrder);
+		TSubclassOf<UCefWebUiBrowserSession> SessionClass = nullptr,
+		APlayerController* PlayerController = nullptr,
+		int32 ZOrder = 0,
+		int32 BrowserWidth = 1920,
+		int32 BrowserHeight = 1080);
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi", meta=(WorldContext="WorldContextObject"))
-	static UCefWebUiSlateHostWidget* GetBrowserWidget(
+	static void HideBrowserSessionFromViewport(
 		const UObject* WorldContextObject,
 		FName SessionId);
-#pragma endregion
-
-#pragma region Slate Widget
-	UFUNCTION(BlueprintCallable, Category="CefWebUi", meta=(WorldContext="WorldContextObject"))
-	static UCefWebUiSlateHostWidget* CreateBrowserSlateHostWidget(
-		const UObject* WorldContextObject,
-		FName SessionId,
-		TSubclassOf<UCefWebUiSlateHostWidget> WidgetClass,
-		APlayerController* PlayerController,
-		int32 ZOrder,
-		int32 BrowserWidth,
-		int32 BrowserHeight);
 #pragma endregion
 };

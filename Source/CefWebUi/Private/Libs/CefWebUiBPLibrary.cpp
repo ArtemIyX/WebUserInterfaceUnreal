@@ -5,9 +5,7 @@
 
 #include "Sessions/CefWebUiBrowserSession.h"
 #include "Interfaces/IPluginManager.h"
-#include "Slate/CefWebUiSlateHostWidget.h"
 #include "Subsystems/CefWebUiGameInstanceSubsystem.h"
-#include "Widgets/CefWebUiBrowserWidget.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 
@@ -44,11 +42,12 @@ UCefWebUiGameInstanceSubsystem* UCefWebUiBPLibrary::GetCefWebUiSubsystem(const U
 
 UCefWebUiBrowserSession* UCefWebUiBPLibrary::GetOrCreateBrowserSession(
 	const UObject* WorldContextObject,
-	FName SessionId)
+	FName SessionId,
+	TSubclassOf<UCefWebUiBrowserSession> SessionClass)
 {
 	if (UCefWebUiGameInstanceSubsystem* Subsystem = GetCefWebUiSubsystem(WorldContextObject))
 	{
-		return Subsystem->GetOrCreateSession(SessionId);
+		return Subsystem->GetOrCreateSession(SessionId, SessionClass);
 	}
 	return nullptr;
 }
@@ -63,72 +62,42 @@ void UCefWebUiBPLibrary::DestroyBrowserSession(
 	}
 }
 
-UCefWebUiSlateHostWidget* UCefWebUiBPLibrary::CreateOrGetBrowserWidget(
+UCefWebUiBrowserSession* UCefWebUiBPLibrary::ShowBrowserSessionInViewport(
 	const UObject* WorldContextObject,
 	FName SessionId,
-	TSubclassOf<UCefWebUiSlateHostWidget> WidgetClass,
-	APlayerController* PlayerController,
-	int32 ZOrder)
-{
-	if (UCefWebUiGameInstanceSubsystem* Subsystem = GetCefWebUiSubsystem(WorldContextObject))
-	{
-		return Subsystem->CreateOrGetSessionWidget(SessionId, WidgetClass, PlayerController, ZOrder);
-	}
-	return nullptr;
-}
-
-UCefWebUiSlateHostWidget* UCefWebUiBPLibrary::GetBrowserWidget(
-	const UObject* WorldContextObject,
-	FName SessionId)
-{
-	if (UCefWebUiGameInstanceSubsystem* Subsystem = GetCefWebUiSubsystem(WorldContextObject))
-	{
-		return Subsystem->GetSessionWidget(SessionId);
-	}
-	return nullptr;
-}
-
-UCefWebUiSlateHostWidget* UCefWebUiBPLibrary::CreateBrowserSlateHostWidget(
-	const UObject* WorldContextObject,
-	FName SessionId,
-	TSubclassOf<UCefWebUiSlateHostWidget> WidgetClass,
+	TSubclassOf<UCefWebUiBrowserSession> SessionClass,
 	APlayerController* PlayerController,
 	int32 ZOrder,
 	int32 BrowserWidth,
 	int32 BrowserHeight)
 {
-	UCefWebUiBrowserSession* session = GetOrCreateBrowserSession(WorldContextObject, SessionId);
+	UCefWebUiBrowserSession* session = GetOrCreateBrowserSession(WorldContextObject, SessionId, SessionClass);
 	if (!session)
 	{
 		return nullptr;
 	}
 
-	if (!WidgetClass)
+	if (!PlayerController)
 	{
-		WidgetClass = UCefWebUiSlateHostWidget::StaticClass();
+		if (UWorld* world = WorldContextObject ? WorldContextObject->GetWorld() : nullptr)
+		{
+			if (UGameInstance* gameInstance = world->GetGameInstance())
+			{
+				PlayerController = gameInstance->GetFirstLocalPlayerController();
+			}
+		}
 	}
 
-	UWorld* world = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
-	UGameInstance* gameInstance = world ? world->GetGameInstance() : nullptr;
-	if (!gameInstance)
-	{
-		return nullptr;
-	}
+	session->ShowInViewport(PlayerController, ZOrder, BrowserWidth, BrowserHeight);
+	return session;
+}
 
-	APlayerController* targetPlayerController = PlayerController ? PlayerController : gameInstance->GetFirstLocalPlayerController();
-	if (!targetPlayerController)
+void UCefWebUiBPLibrary::HideBrowserSessionFromViewport(
+	const UObject* WorldContextObject,
+	FName SessionId)
+{
+	if (UCefWebUiGameInstanceSubsystem* subsystem = GetCefWebUiSubsystem(WorldContextObject))
 	{
-		return nullptr;
+		subsystem->HideSessionFromViewport(SessionId);
 	}
-
-	UCefWebUiSlateHostWidget* slateHostWidget = CreateWidget<UCefWebUiSlateHostWidget>(targetPlayerController, WidgetClass);
-	if (!slateHostWidget)
-	{
-		return nullptr;
-	}
-
-	slateHostWidget->SetBrowserSession(session);
-	slateHostWidget->SetBrowserSize(BrowserWidth, BrowserHeight);
-	slateHostWidget->AddToViewport(ZOrder);
-	return slateHostWidget;
 }

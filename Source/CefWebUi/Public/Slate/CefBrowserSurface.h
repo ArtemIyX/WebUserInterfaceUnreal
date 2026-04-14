@@ -11,6 +11,7 @@
 
 class FCefInputWriter;
 class FCefFrameReader;
+class FCefControlWriter;
 class UCefWebUiBrowserSession;
 class FCefBrowserSurfaceDrawer;
 
@@ -57,7 +58,14 @@ private:
 	EActiveTimerReturnType HandleActiveTimer(double CurrentTime, float DeltaTime);
 	bool TryGetFrameReader(TSharedPtr<FCefFrameReader>& OutFrameReader) const;
 	bool TryGetInputWriter(TSharedPtr<FCefInputWriter>& OutInputWriter) const;
+	bool TryGetControlWriter(TSharedPtr<FCefControlWriter>& OutControlWriter) const;
 	void PollLatestFrame() const;
+	void MaybePushHostTuning(double NowSec) const;
+	void MaybeUpdateCadenceFeedback(double NowSec) const;
+	void UpdateFrameTelemetry(const FCefSharedFrame& Frame) const;
+	void MaybeUpdateCursor(const FCefSharedFrame& Frame, double NowSec) const;
+	void MaybeLogAndResetTelemetry(double NowSec) const;
+	void MarkInputEvent();
 	void EnsureSharedRhi() const;
 	bool EnsurePopupPlaneRhi() const;
 	void ReleaseResources();
@@ -72,10 +80,29 @@ private:
 	int32 BrowserHeight = 1080;
 
 	mutable TWeakPtr<FCefFrameReader> FrameReader;
+	mutable TWeakPtr<FCefControlWriter> ControlWriter;
 	mutable FCefSharedFrame LastFrame;
 	mutable bool bHasFrame = false;
 	mutable uint32 SharedSlotCount = 2;
 	mutable FTextureRHIRef SharedTextureRHI[MaxSharedSlots];
 	mutable FTextureRHIRef SharedPopupTextureRHI;
 	mutable TSharedPtr<FCefBrowserSurfaceDrawer, ESPMode::ThreadSafe> CustomDrawer;
+	mutable double LastConsumerFrameTimeSec = 0.0;
+	mutable double LastCadenceSentTimeSec = 0.0;
+	mutable double LastHostTuningPushTimeSec = 0.0;
+	mutable double LastTelemetryLogTimeSec = 0.0;
+	mutable double LastInputEventTimeSec = 0.0;
+	mutable double LastInputToFrameLatencyMs = 0.0;
+	mutable double LastCursorUpdateTimeSec = 0.0;
+	mutable uint32 SmoothedCadenceUs = 0;
+	mutable uint64 LastSeenFrameId = 0;
+	mutable uint64 InputEventSerial = 0;
+	mutable uint64 LastLatencyMeasuredInputSerial = 0;
+	mutable uint64 LastLatencyFrameId = 0;
+	mutable ECefCustomCursorType LastCursorType = ECefCustomCursorType::CT_NONE;
+	mutable uint32 TelemetryConsumedFrames = 0;
+	mutable uint32 TelemetryFrameGapCount = 0;
+	mutable uint32 TelemetryInputLatencySamples = 0;
+	mutable uint32 TelemetryInputLatencyMsSum = 0;
+	mutable uint32 TelemetryInputLatencyMsMax = 0;
 };
