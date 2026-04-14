@@ -48,14 +48,14 @@ FCefConsoleLogReader::~FCefConsoleLogReader()
 
 bool FCefConsoleLogReader::Start()
 {
-	HMap = OpenFileMappingW(FILE_MAP_READ, false, CEF_SHM_CONSOLE_NAME);
+	HMap = OpenFileMappingW(FILE_MAP_READ | FILE_MAP_WRITE, false, CEF_SHM_CONSOLE_NAME);
 	if (!HMap)
 	{
 		UE_LOG(LogCefWebUi, Verbose, TEXT("FCefConsoleLogReader: Shared memory not available yet."));
 		return false;
 	}
 
-	PData = MapViewOfFile(HMap, FILE_MAP_READ, 0, 0, sizeof(FCefConsoleRingBuffer));
+	PData = MapViewOfFile(HMap, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, sizeof(FCefConsoleRingBuffer));
 	if (!PData)
 	{
 		UE_LOG(LogCefWebUi, Error, TEXT("FCefConsoleLogReader: MapViewOfFile failed."));
