@@ -57,6 +57,7 @@ public:
 	virtual FReply OnKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& CharacterEvent) override;
 
 private:
+	EActiveTimerReturnType HandleActiveTimer(double CurrentTime, float DeltaTime);
 	void HandleFrameReady();
 	void UnbindFrameReaderDelegate();
 	bool TryGetFrameReader(TSharedPtr<FCefFrameReader>& OutFrameReader) const;

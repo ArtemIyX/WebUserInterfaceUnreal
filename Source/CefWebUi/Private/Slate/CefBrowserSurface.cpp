@@ -32,10 +32,11 @@ constexpr double kTelemetryLogPeriodSec = 2.0;
 constexpr double kHostTuningPushPeriodSec = 0.5;
 constexpr uint32 kHostMaxInFlightBeginFrames = 1;
 constexpr uint32 kHostFlushIntervalFrames = 2;
-constexpr uint32 kHostKeyframeIntervalUs = 150000;
+constexpr uint32 kHostKeyframeIntervalUs = 0;
 constexpr uint32 kHostFrameRate = 60;
 constexpr double kCursorUpdateRateHz = 120.0;
-constexpr bool   kUseGpuFenceCheck = true;
+constexpr float  kActiveRepaintPeriodSec = 1.0f / 60.0f;
+constexpr bool   kUseGpuFenceCheck = false;
 }
 
 class FCefSlateBlitPS : public FGlobalShader
@@ -214,6 +215,7 @@ void SCefBrowserSurface::Construct(const FArguments& inArgs)
 	SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMs, 0);
 	SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMaxMs, 0);
 	SET_DWORD_STAT(STAT_CefTel_FenceNotReady, 0);
+	RegisterActiveTimer(kActiveRepaintPeriodSec, FWidgetActiveTimerDelegate::CreateSP(this, &SCefBrowserSurface::HandleActiveTimer));
 }
 
 void SCefBrowserSurface::SetBrowserSession(TWeakObjectPtr<UCefWebUiBrowserSession> inBrowserSession)
@@ -412,6 +414,12 @@ FReply SCefBrowserSurface::OnKeyChar(const FGeometry& myGeometry, const FCharact
 void SCefBrowserSurface::HandleFrameReady()
 {
 	Invalidate(EInvalidateWidgetReason::Paint);
+}
+
+EActiveTimerReturnType SCefBrowserSurface::HandleActiveTimer(double currentTime, float deltaTime)
+{
+	Invalidate(EInvalidateWidgetReason::Paint);
+	return EActiveTimerReturnType::Continue;
 }
 
 void SCefBrowserSurface::UnbindFrameReaderDelegate()

@@ -56,3 +56,23 @@ YYYY-MM-DD HH:MM
 - Rendering path restored with frame-driven invalidation and deterministic tuning values.
 - Load-state callback flow is observable in logs and no longer tied only to paint-driven updates.
 - Session callback sequencing is stricter and avoids early `Idle` completion.
+
+---
+
+## 2026-04-15 16:40
+
+### Changed
+- Tuned `SCefBrowserSurface` for smoother baseline without reintroducing black-screen regressions:
+  - Added fixed active repaint timer at `60Hz` via `RegisterActiveTimer(1/60s, ...)`.
+  - Added `HandleActiveTimer(...)` to invalidate paint on a stable cadence.
+  - Disabled GPU fence readiness gating in surface path (`kUseGpuFenceCheck = false`).
+  - Disabled host keyframe forcing push from plugin (`kHostKeyframeIntervalUs = 0`).
+
+### Why
+- Current jitter root was primarily cadence instability and occasional fence-gate stalls.
+- Stable repaint cadence reduced visible snap/jitter while keeping rendering alive.
+
+### Impact
+- Telemetry improved to near-zero `gaps` and `fence_not_ready` in many windows.
+- Rendering remained stable.
+- Residual issue still exists: intermittent brief stutters/latency spikes, not fully resolved yet.
