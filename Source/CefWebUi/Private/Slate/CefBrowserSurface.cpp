@@ -2,7 +2,6 @@
 
 #include "CefWebUi.h"
 #include "GlobalShader.h"
-#include "HAL/IConsoleManager.h"
 #include "ID3D12DynamicRHI.h"
 #include "InputCoreTypes.h"
 #include "PixelShaderUtils.h"
@@ -24,48 +23,19 @@ DECLARE_DWORD_COUNTER_STAT(TEXT("Consumed Frames"), STAT_CefTel_ConsumedFrames, 
 DECLARE_DWORD_COUNTER_STAT(TEXT("Frame Gaps"), STAT_CefTel_FrameGaps, STATGROUP_CefWebUiTelemetry);
 DECLARE_DWORD_COUNTER_STAT(TEXT("Input->Frame Latency Ms"), STAT_CefTel_InputToFrameLatencyMs, STATGROUP_CefWebUiTelemetry);
 DECLARE_DWORD_COUNTER_STAT(TEXT("Input->Frame Max Ms"), STAT_CefTel_InputToFrameLatencyMaxMs, STATGROUP_CefWebUiTelemetry);
+DECLARE_DWORD_COUNTER_STAT(TEXT("Fence Not Ready"), STAT_CefTel_FenceNotReady, STATGROUP_CefWebUiTelemetry);
 
 namespace
 {
-static TAutoConsoleVariable<int32> CVarCefWebUiCadenceFeedback(
-	TEXT("CefWebUi.CadenceFeedback"),
-	1,
-	TEXT("Enable consumer cadence feedback to host pacing (0/1)."));
-
-static TAutoConsoleVariable<float> CVarCefWebUiCadenceFeedbackPeriodSec(
-	TEXT("CefWebUi.CadenceFeedbackPeriodSec"),
-	0.10f,
-	TEXT("Cadence feedback send period in seconds."));
-
-static TAutoConsoleVariable<float> CVarCefWebUiTelemetryLogPeriodSec(
-	TEXT("CefWebUi.TelemetryLogPeriodSec"),
-	2.0f,
-	TEXT("Telemetry log period in seconds."));
-
-static TAutoConsoleVariable<float> CVarCefWebUiHostTuningPushPeriodSec(
-	TEXT("CefWebUi.HostTuningPushPeriodSec"),
-	0.5f,
-	TEXT("How often to push host tuning CVars via control channel."));
-
-static TAutoConsoleVariable<int32> CVarCefWebUiHostMaxInFlightBeginFrames(
-	TEXT("CefWebUi.HostMaxInFlightBeginFrames"),
-	0,
-	TEXT("Host tuning: max in-flight begin frames (0 disables cap)."));
-
-static TAutoConsoleVariable<int32> CVarCefWebUiHostFlushIntervalFrames(
-	TEXT("CefWebUi.HostFlushIntervalFrames"),
-	4,
-	TEXT("Host tuning: flush every N frames (0=only special cases)."));
-
-static TAutoConsoleVariable<int32> CVarCefWebUiHostKeyframeIntervalUs(
-	TEXT("CefWebUi.HostKeyframeIntervalUs"),
-	300000,
-	TEXT("Host tuning: time-based keyframe full refresh interval in microseconds."));
-
-static TAutoConsoleVariable<float> CVarCefWebUiCursorUpdateRateHz(
-	TEXT("CefWebUi.CursorUpdateRateHz"),
-	120.0f,
-	TEXT("Max cursor updates per second (0 disables limit)."));
+constexpr bool   kEnableCadenceFeedback = false;
+constexpr double kTelemetryLogPeriodSec = 2.0;
+constexpr double kHostTuningPushPeriodSec = 0.5;
+constexpr uint32 kHostMaxInFlightBeginFrames = 1;
+constexpr uint32 kHostFlushIntervalFrames = 2;
+constexpr uint32 kHostKeyframeIntervalUs = 150000;
+constexpr uint32 kHostFrameRate = 60;
+constexpr double kCursorUpdateRateHz = 120.0;
+constexpr bool   kUseGpuFenceCheck = true;
 }
 
 class FCefSlateBlitPS : public FGlobalShader
@@ -238,16 +208,18 @@ void SCefBrowserSurface::Construct(const FArguments& inArgs)
 	TelemetryInputLatencySamples = 0;
 	TelemetryInputLatencyMsSum = 0;
 	TelemetryInputLatencyMsMax = 0;
+	TelemetryFenceNotReadyCount = 0;
 	SET_DWORD_STAT(STAT_CefTel_ConsumedFrames, 0);
 	SET_DWORD_STAT(STAT_CefTel_FrameGaps, 0);
 	SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMs, 0);
 	SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMaxMs, 0);
-	RegisterActiveTimer(0.0f, FWidgetActiveTimerDelegate::CreateSP(this, &SCefBrowserSurface::HandleActiveTimer));
+	SET_DWORD_STAT(STAT_CefTel_FenceNotReady, 0);
 }
 
 void SCefBrowserSurface::SetBrowserSession(TWeakObjectPtr<UCefWebUiBrowserSession> inBrowserSession)
 {
 	BrowserSession = inBrowserSession;
+	UnbindFrameReaderDelegate();
 	FrameReader.Reset();
 	ControlWriter.Reset();
 }
@@ -437,10 +409,23 @@ FReply SCefBrowserSurface::OnKeyChar(const FGeometry& myGeometry, const FCharact
 	return FReply::Handled();
 }
 
-EActiveTimerReturnType SCefBrowserSurface::HandleActiveTimer(double currentTime, float deltaTime)
+void SCefBrowserSurface::HandleFrameReady()
 {
 	Invalidate(EInvalidateWidgetReason::Paint);
-	return EActiveTimerReturnType::Continue;
+}
+
+void SCefBrowserSurface::UnbindFrameReaderDelegate()
+{
+	if (!FrameReadyDelegateHandle.IsValid())
+	{
+		return;
+	}
+
+	if (TSharedPtr<FCefFrameReader> reader = FrameReader.Pin())
+	{
+		reader->OnFrameReady.Remove(FrameReadyDelegateHandle);
+	}
+	FrameReadyDelegateHandle.Reset();
 }
 
 bool SCefBrowserSurface::TryGetFrameReader(TSharedPtr<FCefFrameReader>& outFrameReader) const
@@ -459,6 +444,10 @@ bool SCefBrowserSurface::TryGetFrameReader(TSharedPtr<FCefFrameReader>& outFrame
 
 	FrameReader = session->GetFrameReaderPtr();
 	outFrameReader = FrameReader.Pin();
+	if (outFrameReader.IsValid() && !FrameReadyDelegateHandle.IsValid())
+	{
+		FrameReadyDelegateHandle = outFrameReader->OnFrameReady.AddSP(const_cast<SCefBrowserSurface*>(this), &SCefBrowserSurface::HandleFrameReady);
+	}
 	return outFrameReader.IsValid();
 }
 
@@ -509,21 +498,21 @@ void SCefBrowserSurface::MaybePushHostTuning(double nowSec) const
 		return;
 	}
 
-	const double periodSec = FMath::Max(0.05, static_cast<double>(CVarCefWebUiHostTuningPushPeriodSec.GetValueOnAnyThread()));
-	if (LastHostTuningPushTimeSec > 0.0 && (nowSec - LastHostTuningPushTimeSec) < periodSec)
+	if (LastHostTuningPushTimeSec > 0.0 && (nowSec - LastHostTuningPushTimeSec) < kHostTuningPushPeriodSec)
 	{
 		return;
 	}
 
-	controlWriter->SetMaxInFlightBeginFrames(static_cast<uint32>(FMath::Max(0, CVarCefWebUiHostMaxInFlightBeginFrames.GetValueOnAnyThread())));
-	controlWriter->SetFlushIntervalFrames(static_cast<uint32>(FMath::Max(0, CVarCefWebUiHostFlushIntervalFrames.GetValueOnAnyThread())));
-	controlWriter->SetKeyframeIntervalUs(static_cast<uint32>(FMath::Max(0, CVarCefWebUiHostKeyframeIntervalUs.GetValueOnAnyThread())));
+	controlWriter->SetFrameRate(kHostFrameRate);
+	controlWriter->SetMaxInFlightBeginFrames(kHostMaxInFlightBeginFrames);
+	controlWriter->SetFlushIntervalFrames(kHostFlushIntervalFrames);
+	controlWriter->SetKeyframeIntervalUs(kHostKeyframeIntervalUs);
 	LastHostTuningPushTimeSec = nowSec;
 }
 
 void SCefBrowserSurface::MaybeUpdateCadenceFeedback(double nowSec) const
 {
-	if (CVarCefWebUiCadenceFeedback.GetValueOnAnyThread() == 0)
+	if (!kEnableCadenceFeedback)
 	{
 		return;
 	}
@@ -553,8 +542,7 @@ void SCefBrowserSurface::MaybeUpdateCadenceFeedback(double nowSec) const
 	}
 	LastConsumerFrameTimeSec = nowSec;
 
-	const double sendPeriodSec = FMath::Max(0.01, static_cast<double>(CVarCefWebUiCadenceFeedbackPeriodSec.GetValueOnAnyThread()));
-	if (LastCadenceSentTimeSec > 0.0 && (nowSec - LastCadenceSentTimeSec) < sendPeriodSec)
+	if (LastCadenceSentTimeSec > 0.0 && (nowSec - LastCadenceSentTimeSec) < 0.10)
 	{
 		return;
 	}
@@ -586,7 +574,7 @@ void SCefBrowserSurface::MaybeUpdateCursor(const FCefSharedFrame& frame, double 
 		return;
 	}
 
-	const double hz = FMath::Max(0.0, static_cast<double>(CVarCefWebUiCursorUpdateRateHz.GetValueOnAnyThread()));
+	const double hz = kCursorUpdateRateHz;
 	const double minDt = (hz > 0.0) ? (1.0 / hz) : 0.0;
 	if (minDt > 0.0 && (nowSec - LastCursorUpdateTimeSec) < minDt)
 	{
@@ -600,7 +588,7 @@ void SCefBrowserSurface::MaybeUpdateCursor(const FCefSharedFrame& frame, double 
 
 void SCefBrowserSurface::MaybeLogAndResetTelemetry(double nowSec) const
 {
-	const double logPeriodSec = FMath::Max(0.0, static_cast<double>(CVarCefWebUiTelemetryLogPeriodSec.GetValueOnAnyThread()));
+	const double logPeriodSec = kTelemetryLogPeriodSec;
 	if (logPeriodSec <= 0.0)
 	{
 		return;
@@ -617,9 +605,10 @@ void SCefBrowserSurface::MaybeLogAndResetTelemetry(double nowSec) const
 
 	const uint32 avgInputLatencyMs = (TelemetryInputLatencySamples > 0) ? (TelemetryInputLatencyMsSum / TelemetryInputLatencySamples) : 0;
 	UE_LOG(LogCefWebUiTelemetry, Log,
-		TEXT("[CefSlateTelemetry] frames=%u gaps=%u input_latency_avg_ms=%u input_latency_max_ms=%u last_latency_frame_id=%llu"),
+		TEXT("[CefSlateTelemetry] frames=%u gaps=%u fence_not_ready=%u input_latency_avg_ms=%u input_latency_max_ms=%u last_latency_frame_id=%llu"),
 		TelemetryConsumedFrames,
 		TelemetryFrameGapCount,
+		TelemetryFenceNotReadyCount,
 		avgInputLatencyMs,
 		TelemetryInputLatencyMsMax,
 		static_cast<unsigned long long>(LastLatencyFrameId));
@@ -630,10 +619,12 @@ void SCefBrowserSurface::MaybeLogAndResetTelemetry(double nowSec) const
 	TelemetryInputLatencySamples = 0;
 	TelemetryInputLatencyMsSum = 0;
 	TelemetryInputLatencyMsMax = 0;
+	TelemetryFenceNotReadyCount = 0;
 	SET_DWORD_STAT(STAT_CefTel_ConsumedFrames, 0);
 	SET_DWORD_STAT(STAT_CefTel_FrameGaps, 0);
 	SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMs, static_cast<uint32>(LastInputToFrameLatencyMs));
 	SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMaxMs, 0);
+	SET_DWORD_STAT(STAT_CefTel_FenceNotReady, 0);
 }
 
 void SCefBrowserSurface::MarkInputEvent()
@@ -652,24 +643,55 @@ void SCefBrowserSurface::PollLatestFrame() const
 	}
 
 	FCefSharedFrame frame;
-	if (frameReader->PollSharedTexture(frame))
+	if (bHasDeferredFrame)
 	{
+		const bool ready = IsFrameGpuReady(DeferredFrame);
+		if (!ready && DeferredRetryCount == 0)
+		{
+			++DeferredRetryCount;
+			++TelemetryFenceNotReadyCount;
+			SET_DWORD_STAT(STAT_CefTel_FenceNotReady, TelemetryFenceNotReadyCount);
+			return;
+		}
+		LastFrame = DeferredFrame;
+		bHasFrame = true;
+		bHasDeferredFrame = false;
+		DeferredRetryCount = 0;
+	}
+	else if (frameReader->PollSharedTexture(frame))
+	{
+		if (!IsFrameGpuReady(frame))
+		{
+			DeferredFrame = frame;
+			bHasDeferredFrame = true;
+			DeferredRetryCount = 0;
+			++TelemetryFenceNotReadyCount;
+			SET_DWORD_STAT(STAT_CefTel_FenceNotReady, TelemetryFenceNotReadyCount);
+			return;
+		}
+
+		if (LastSeenFrameId != 0 && frame.FrameId <= LastSeenFrameId)
+		{
+			return;
+		}
+
 		LastFrame = frame;
 		bHasFrame = true;
-		if (InputEventSerial != 0 && InputEventSerial != LastLatencyMeasuredInputSerial)
-		{
-			const double nowSec = FPlatformTime::Seconds();
-			const uint32 latencyMs = static_cast<uint32>(FMath::Clamp((nowSec - LastInputEventTimeSec) * 1000.0, 0.0, 10000.0));
-			LastInputToFrameLatencyMs = static_cast<double>(latencyMs);
-			LastLatencyMeasuredInputSerial = InputEventSerial;
-			LastLatencyFrameId = LastFrame.FrameId;
-			++TelemetryInputLatencySamples;
-			const uint32 remaining = (TelemetryInputLatencyMsSum < MAX_uint32) ? (MAX_uint32 - TelemetryInputLatencyMsSum) : 0;
-			TelemetryInputLatencyMsSum += FMath::Min(latencyMs, remaining);
-			TelemetryInputLatencyMsMax = FMath::Max(TelemetryInputLatencyMsMax, latencyMs);
-			SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMs, latencyMs);
-			SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMaxMs, TelemetryInputLatencyMsMax);
-		}
+	}
+
+	if (bHasFrame && InputEventSerial != 0 && InputEventSerial != LastLatencyMeasuredInputSerial)
+	{
+		const double nowSec = FPlatformTime::Seconds();
+		const uint32 latencyMs = static_cast<uint32>(FMath::Clamp((nowSec - LastInputEventTimeSec) * 1000.0, 0.0, 10000.0));
+		LastInputToFrameLatencyMs = static_cast<double>(latencyMs);
+		LastLatencyMeasuredInputSerial = InputEventSerial;
+		LastLatencyFrameId = LastFrame.FrameId;
+		++TelemetryInputLatencySamples;
+		const uint32 remaining = (TelemetryInputLatencyMsSum < MAX_uint32) ? (MAX_uint32 - TelemetryInputLatencyMsSum) : 0;
+		TelemetryInputLatencyMsSum += FMath::Min(latencyMs, remaining);
+		TelemetryInputLatencyMsMax = FMath::Max(TelemetryInputLatencyMsMax, latencyMs);
+		SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMs, latencyMs);
+		SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMaxMs, TelemetryInputLatencyMsMax);
 	}
 
 	if (!bHasFrame)
@@ -683,6 +705,67 @@ void SCefBrowserSurface::PollLatestFrame() const
 	{
 		EnsurePopupPlaneRhi();
 	}
+}
+
+bool SCefBrowserSurface::EnsureSharedGpuFence() const
+{
+	if (SharedGpuFence)
+	{
+		return true;
+	}
+	if (bTriedOpenSharedGpuFence)
+	{
+		return false;
+	}
+	bTriedOpenSharedGpuFence = true;
+
+	ID3D12DynamicRHI* d3d12Rhi = GetID3D12DynamicRHI();
+	if (!d3d12Rhi)
+	{
+		return false;
+	}
+
+	ID3D12Device* d3dDevice = d3d12Rhi->RHIGetDevice(0);
+	if (!d3dDevice)
+	{
+		return false;
+	}
+
+	HANDLE sharedHandle = nullptr;
+	HRESULT hr = d3dDevice->OpenSharedHandleByName(L"Global\\CEFHost_SharedFence", GENERIC_ALL, &sharedHandle);
+	if (FAILED(hr) || !sharedHandle)
+	{
+		return false;
+	}
+
+	ID3D12Fence* fence = nullptr;
+	hr = d3dDevice->OpenSharedHandle(sharedHandle, IID_PPV_ARGS(&fence));
+	CloseHandle(sharedHandle);
+	if (FAILED(hr) || !fence)
+	{
+		return false;
+	}
+
+	SharedGpuFence = fence;
+	return true;
+}
+
+bool SCefBrowserSurface::IsFrameGpuReady(const FCefSharedFrame& frame) const
+{
+	if (!kUseGpuFenceCheck)
+	{
+		return true;
+	}
+	if (frame.GpuFenceValue == 0)
+	{
+		return true;
+	}
+	if (!EnsureSharedGpuFence())
+	{
+		return true;
+	}
+
+	return SharedGpuFence->GetCompletedValue() >= frame.GpuFenceValue;
 }
 
 void SCefBrowserSurface::EnsureSharedRhi() const
@@ -806,6 +889,8 @@ bool SCefBrowserSurface::EnsurePopupPlaneRhi() const
 
 void SCefBrowserSurface::ReleaseResources()
 {
+	UnbindFrameReaderDelegate();
+
 	TSharedPtr<FCefBrowserSurfaceDrawer, ESPMode::ThreadSafe> drawer = CustomDrawer;
 	if (drawer.IsValid())
 	{
@@ -836,8 +921,16 @@ void SCefBrowserSurface::ReleaseResources()
 	}
 	SharedPopupTextureRHI = nullptr;
 	bHasFrame = false;
+	bHasDeferredFrame = false;
+	DeferredRetryCount = 0;
 	FrameReader.Reset();
 	ControlWriter.Reset();
+	if (SharedGpuFence)
+	{
+		SharedGpuFence->Release();
+		SharedGpuFence = nullptr;
+	}
+	bTriedOpenSharedGpuFence = false;
 }
 
 void SCefBrowserSurface::GetBrowserCoords(const FGeometry& inGeometry, const FVector2D& inScreenPosition, int32& outX, int32& outY) const

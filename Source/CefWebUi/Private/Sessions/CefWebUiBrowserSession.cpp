@@ -303,6 +303,12 @@ void UCefWebUiBrowserSession::BindWhenFinishedLoading(const FCefWebUiWhenFinishe
 		return;
 	}
 
+	EnsureRuntimeStarted();
+	if (TSharedPtr<FCefFrameReader> frameReader = RuntimeFrameReader.Pin())
+	{
+		HandleWidgetLoadStateChanged(static_cast<uint8>(frameReader->GetLastKnownLoadState()));
+	}
+
 	if (bInitialLoadingFinished)
 	{
 		FCefWebUiWhenFinishedLoadingDelegate callbackCopy = callback;
@@ -315,16 +321,26 @@ void UCefWebUiBrowserSession::BindWhenFinishedLoading(const FCefWebUiWhenFinishe
 
 void UCefWebUiBrowserSession::HandleWidgetLoadStateChanged(uint8 inState)
 {
+	UE_LOG(LogCefWebUi, Log, TEXT("[%s] Load state event: %u"),
+		*SessionId.ToString(),
+		static_cast<uint32>(inState));
+
 	if (bInitialLoadingFinished)
 	{
 		return;
 	}
-	if (inState != static_cast<uint8>(ECefLoadState::Ready))
+	const uint8 readyState = static_cast<uint8>(ECefLoadState::Ready);
+	const uint8 errorState = static_cast<uint8>(ECefLoadState::Error);
+	if (inState != readyState && inState != errorState)
 	{
 		return;
 	}
 
 	bInitialLoadingFinished = true;
+	UE_LOG(LogCefWebUi, Log, TEXT("[%s] Initial loading finished (state=%u). callbacks=%d"),
+		*SessionId.ToString(),
+		static_cast<uint32>(inState),
+		PendingFinishedLoadingCallbacks.Num());
 	OnFinishedLoading.Broadcast(this);
 
 	for (const FCefWebUiWhenFinishedLoadingDelegate& callback : PendingFinishedLoadingCallbacks)

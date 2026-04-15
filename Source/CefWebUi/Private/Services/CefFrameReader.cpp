@@ -3,7 +3,6 @@
 #include "Services/CefFrameReader.h"
 #include "CefWebUi.h"
 #include "Async/Async.h"
-#include "HAL/IConsoleManager.h"
 #include <atomic>
 
 #include "Windows/AllowWindowsPlatformTypes.h"
@@ -14,17 +13,8 @@
 
 namespace
 {
-static TAutoConsoleVariable<int32> CVarCefWebUiThreadTuning(
-	TEXT("CefWebUi.ThreadTuning"),
-	1,
-	TEXT("Enable thread priority/affinity tuning for CEF frame reader thread (1=on, 0=off)."),
-	ECVF_Default);
-
-static TAutoConsoleVariable<int32> CVarCefWebUiDeliverLatestOnly(
-	TEXT("CefWebUi.DeliverLatestOnly"),
-	1,
-	TEXT("Reader policy: keep latest pending frame only (1) or keep first pending until consumed (0)."),
-	ECVF_Default);
+constexpr bool kEnableThreadTuning = true;
+constexpr int32 kPendingQueueSize = 2;
 
 ULONG_PTR SelectAffinityMask(ULONG_PTR processMask, uint32 logicalIndex)
 {
@@ -129,6 +119,7 @@ bool FCefFrameReader::Start()
 		return false;
 	}
 	LastKnownLoadStateRaw.store(startupHeader->load_state, std::memory_order_relaxed);
+	LastLoadState = static_cast<ECefLoadState>(startupHeader->load_state);
 
 	HEvent = OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE, false, L"CEFHost_FrameReady");
 	if (!HEvent)
@@ -140,6 +131,14 @@ bool FCefFrameReader::Start()
 
 	bRunning = true;
 	Thread = FRunnableThread::Create(this, TEXT("CefFrameReaderThread"), 0, TPri_Normal);
+
+	// Publish startup load state once to avoid missing "already ready" cases
+	// when no new frame event arrives after reader start.
+	const uint8 startupLoadState = startupHeader->load_state;
+	AsyncTask(ENamedThreads::GameThread, [this, startupLoadState]()
+	{
+		OnLoadStateChanged.Broadcast(startupLoadState);
+	});
 
 	UE_LOG(LogCefWebUi, Log, TEXT("FCefFrameReader: Started."));
 	return true;
@@ -159,6 +158,11 @@ void FCefFrameReader::Stop()
 		ThreadToDelete->WaitForCompletion();
 		delete ThreadToDelete;
 	}
+	{
+		FScopeLock Lock(&PendingFrameLock);
+		PendingFrames.Reset();
+		PendingFrameCount.store(0, std::memory_order_relaxed);
+	}
 
 	CloseHandles();
 	UE_LOG(LogCefWebUi, Log, TEXT("FCefFrameReader: Stopped."));
@@ -166,7 +170,7 @@ void FCefFrameReader::Stop()
 
 uint32 FCefFrameReader::Run()
 {
-	if (CVarCefWebUiThreadTuning.GetValueOnAnyThread() != 0)
+	if (kEnableThreadTuning)
 	{
 		TryTuneCurrentThread();
 	}
@@ -195,67 +199,75 @@ uint32 FCefFrameReader::Run()
 		       header->Sequence, LastSequence, header->SharedTextureHandle);
 		       */
 
-		if (header->sequence == LastSequence)
+		const uint32 beginSequence = header->sequence;
+		if (beginSequence == LastSequence)
 			continue;
 
 		std::atomic_thread_fence(std::memory_order_acquire);
+		FCefFrameHeader headerSnapshot = *header;
+		std::atomic_thread_fence(std::memory_order_acquire);
+		const uint32 endSequence = header->sequence;
+		if (beginSequence != endSequence || endSequence == LastSequence)
+		{
+			continue;
+		}
 
-		LastSequence = header->sequence;
+		LastSequence = endSequence;
 
-		uint32 slotCount = header->slot_count;
+		uint32 slotCount = headerSnapshot.slot_count;
 		if (slotCount == 0 || slotCount > CEF_SHM_MAX_SLOTS)
 			slotCount = CEF_SHM_MAX_SLOTS;
 
-		const bool bFrameGap = (LastFrameId != 0 && header->frame_id != (LastFrameId + 1));
+		const bool bFrameGap = (LastFrameId != 0 && headerSnapshot.frame_id != (LastFrameId + 1));
 		const bool bForceFull = bFrameGap ||
-			((header->flags & (CefFrameFlag_FullFrame | CefFrameFlag_Overflow | CefFrameFlag_Resized)) != 0) ||
-			header->dirty_count == 0;
-		LastFrameId = header->frame_id;
+			((headerSnapshot.flags & (CefFrameFlag_FullFrame | CefFrameFlag_Overflow | CefFrameFlag_Resized)) != 0) ||
+			headerSnapshot.dirty_count == 0;
+		LastFrameId = headerSnapshot.frame_id;
 
 		{
-			const bool bHadPending = bFramePending.load(std::memory_order_relaxed);
-			if (bHadPending)
+			FScopeLock Lock(&PendingFrameLock);
+			if (PendingFrames.Num() >= kPendingQueueSize)
 			{
-				if (CVarCefWebUiDeliverLatestOnly.GetValueOnAnyThread() == 0)
-					continue;
+				PendingFrames.RemoveAt(0, 1, EAllowShrinking::No);
 				DroppedPendingFrames.fetch_add(1, std::memory_order_relaxed);
 			}
 
-			FScopeLock Lock(&PendingFrameLock);
-			PendingFrame.Version = header->version;
-			PendingFrame.SlotCount = slotCount;
-			PendingFrame.WriteSlot = header->write_slot;
-			PendingFrame.Width = header->width;
-			PendingFrame.Height = header->height;
-			PendingFrame.Sequence = header->sequence;
-			PendingFrame.FrameId = header->frame_id;
-			PendingFrame.PresentId = header->present_id;
-			PendingFrame.GpuFenceValue = header->gpu_fence_value;
-			PendingFrame.Flags = header->flags;
-			PendingFrame.bPopupVisible = (header->popup_visible != 0);
-			PendingFrame.PopupRect.X = header->popup_rect.x;
-			PendingFrame.PopupRect.Y = header->popup_rect.y;
-			PendingFrame.PopupRect.W = header->popup_rect.w;
-			PendingFrame.PopupRect.H = header->popup_rect.h;
-			PendingFrame.bForceFullRefresh = bForceFull;
-			PendingFrame.DirtyCount = bForceFull ? 0 : header->dirty_count;
+			FCefSharedFrame queuedFrame;
+			queuedFrame.Version = headerSnapshot.version;
+			queuedFrame.SlotCount = slotCount;
+			queuedFrame.WriteSlot = headerSnapshot.write_slot;
+			queuedFrame.Width = headerSnapshot.width;
+			queuedFrame.Height = headerSnapshot.height;
+			queuedFrame.Sequence = headerSnapshot.sequence;
+			queuedFrame.FrameId = headerSnapshot.frame_id;
+			queuedFrame.PresentId = headerSnapshot.present_id;
+			queuedFrame.GpuFenceValue = headerSnapshot.gpu_fence_value;
+			queuedFrame.Flags = headerSnapshot.flags;
+			queuedFrame.bPopupVisible = (headerSnapshot.popup_visible != 0);
+			queuedFrame.PopupRect.X = headerSnapshot.popup_rect.x;
+			queuedFrame.PopupRect.Y = headerSnapshot.popup_rect.y;
+			queuedFrame.PopupRect.W = headerSnapshot.popup_rect.w;
+			queuedFrame.PopupRect.H = headerSnapshot.popup_rect.h;
+			queuedFrame.bForceFullRefresh = bForceFull;
+			queuedFrame.DirtyCount = bForceFull ? 0 : headerSnapshot.dirty_count;
 			if (!bForceFull)
 			{
-				const uint8 n = FMath::Min<uint8>(header->dirty_count, MAX_CEF_DIRTY_RECTS);
+				const uint8 n = FMath::Min<uint8>(headerSnapshot.dirty_count, MAX_CEF_DIRTY_RECTS);
 				for (uint8 i = 0; i < n; ++i)
 				{
-					PendingFrame.DirtyRects[i].X = header->dirty_rects[i].x;
-					PendingFrame.DirtyRects[i].Y = header->dirty_rects[i].y;
-					PendingFrame.DirtyRects[i].W = header->dirty_rects[i].w;
-					PendingFrame.DirtyRects[i].H = header->dirty_rects[i].h;
+					queuedFrame.DirtyRects[i].X = headerSnapshot.dirty_rects[i].x;
+					queuedFrame.DirtyRects[i].Y = headerSnapshot.dirty_rects[i].y;
+					queuedFrame.DirtyRects[i].W = headerSnapshot.dirty_rects[i].w;
+					queuedFrame.DirtyRects[i].H = headerSnapshot.dirty_rects[i].h;
 				}
 			}
-			PendingFrame.CursorType = static_cast<ECefCustomCursorType>(header->cursor_type);
-			PendingFrame.LoadState = static_cast<ECefLoadState>(header->load_state);
+			queuedFrame.CursorType = static_cast<ECefCustomCursorType>(headerSnapshot.cursor_type);
+			queuedFrame.LoadState = static_cast<ECefLoadState>(headerSnapshot.load_state);
+			PendingFrames.Add(queuedFrame);
+			PendingFrameCount.store(static_cast<uint32>(PendingFrames.Num()), std::memory_order_relaxed);
 		}
-		LastKnownLoadStateRaw.store(header->load_state, std::memory_order_relaxed);
+		LastKnownLoadStateRaw.store(headerSnapshot.load_state, std::memory_order_relaxed);
 
-		bFramePending = true;
 		if (!bFrameReadyDispatchPending.exchange(true, std::memory_order_acq_rel))
 		{
 			AsyncTask(ENamedThreads::GameThread, [this]()
@@ -266,7 +278,7 @@ uint32 FCefFrameReader::Run()
 		}
 
 		// Fire load state delegate on game thread if changed
-		ECefLoadState CurrentLoad = static_cast<ECefLoadState>(header->load_state);
+		ECefLoadState CurrentLoad = static_cast<ECefLoadState>(headerSnapshot.load_state);
 		if (CurrentLoad != LastLoadState)
 		{
 			LastLoadState = CurrentLoad;
@@ -284,24 +296,30 @@ uint32 FCefFrameReader::Run()
 
 bool FCefFrameReader::PollSharedTexture(FCefSharedFrame& OutFrame)
 {
-	if (!bFramePending)
+	if (PendingFrameCount.load(std::memory_order_relaxed) == 0)
 		return false;
 
 	FScopeLock Lock(&PendingFrameLock);
-	OutFrame = PendingFrame;
-
-	// Final continuity check at delivery point (game thread).
-	// Reader thread may observe all frames, but game thread can still skip pending
-	// updates between ticks. If that happens, force full refresh for safety.
-	if (LastDeliveredFrameId != 0 && OutFrame.FrameId != (LastDeliveredFrameId + 1))
+	while (PendingFrames.Num() > 0)
 	{
-		OutFrame.bForceFullRefresh = true;
-		OutFrame.DirtyCount = 0;
-	}
-	LastDeliveredFrameId = OutFrame.FrameId;
+		OutFrame = PendingFrames[0];
+		PendingFrames.RemoveAt(0, 1, EAllowShrinking::No);
+		PendingFrameCount.store(static_cast<uint32>(PendingFrames.Num()), std::memory_order_relaxed);
 
-	bFramePending = false;
-	return true;
+		if (LastDeliveredFrameId != 0 && OutFrame.FrameId <= LastDeliveredFrameId)
+		{
+			continue;
+		}
+		if (LastDeliveredFrameId != 0 && OutFrame.FrameId != (LastDeliveredFrameId + 1))
+		{
+			OutFrame.bForceFullRefresh = true;
+			OutFrame.DirtyCount = 0;
+		}
+		LastDeliveredFrameId = OutFrame.FrameId;
+		return true;
+	}
+	PendingFrameCount.store(0, std::memory_order_relaxed);
+	return false;
 }
 
 uint32 FCefFrameReader::ConsumeDroppedPendingFrames()

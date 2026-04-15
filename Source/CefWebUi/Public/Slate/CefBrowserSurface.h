@@ -9,6 +9,8 @@
 #include "Services/CefFrameReader.h"
 #include "Services/CefInputWriter.h"
 
+struct ID3D12Fence;
+
 class FCefInputWriter;
 class FCefFrameReader;
 class FCefControlWriter;
@@ -55,7 +57,8 @@ public:
 	virtual FReply OnKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& CharacterEvent) override;
 
 private:
-	EActiveTimerReturnType HandleActiveTimer(double CurrentTime, float DeltaTime);
+	void HandleFrameReady();
+	void UnbindFrameReaderDelegate();
 	bool TryGetFrameReader(TSharedPtr<FCefFrameReader>& OutFrameReader) const;
 	bool TryGetInputWriter(TSharedPtr<FCefInputWriter>& OutInputWriter) const;
 	bool TryGetControlWriter(TSharedPtr<FCefControlWriter>& OutControlWriter) const;
@@ -68,6 +71,8 @@ private:
 	void MarkInputEvent();
 	void EnsureSharedRhi() const;
 	bool EnsurePopupPlaneRhi() const;
+	bool EnsureSharedGpuFence() const;
+	bool IsFrameGpuReady(const FCefSharedFrame& Frame) const;
 	void ReleaseResources();
 	void GetBrowserCoords(const FGeometry& InGeometry, const FVector2D& InScreenPosition, int32& OutX, int32& OutY) const;
 	static bool SlateButtonToCef(const FKey& InKey, ECefMouseButton& OutButton);
@@ -81,11 +86,17 @@ private:
 
 	mutable TWeakPtr<FCefFrameReader> FrameReader;
 	mutable TWeakPtr<FCefControlWriter> ControlWriter;
+	mutable FDelegateHandle FrameReadyDelegateHandle;
 	mutable FCefSharedFrame LastFrame;
+	mutable FCefSharedFrame DeferredFrame;
 	mutable bool bHasFrame = false;
+	mutable bool bHasDeferredFrame = false;
+	mutable uint32 DeferredRetryCount = 0;
 	mutable uint32 SharedSlotCount = 2;
 	mutable FTextureRHIRef SharedTextureRHI[MaxSharedSlots];
 	mutable FTextureRHIRef SharedPopupTextureRHI;
+	mutable ID3D12Fence* SharedGpuFence = nullptr;
+	mutable bool bTriedOpenSharedGpuFence = false;
 	mutable TSharedPtr<FCefBrowserSurfaceDrawer, ESPMode::ThreadSafe> CustomDrawer;
 	mutable double LastConsumerFrameTimeSec = 0.0;
 	mutable double LastCadenceSentTimeSec = 0.0;
@@ -99,6 +110,7 @@ private:
 	mutable uint64 InputEventSerial = 0;
 	mutable uint64 LastLatencyMeasuredInputSerial = 0;
 	mutable uint64 LastLatencyFrameId = 0;
+	mutable uint32 TelemetryFenceNotReadyCount = 0;
 	mutable ECefCustomCursorType LastCursorType = ECefCustomCursorType::CT_NONE;
 	mutable uint32 TelemetryConsumedFrames = 0;
 	mutable uint32 TelemetryFrameGapCount = 0;

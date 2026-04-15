@@ -95,8 +95,7 @@ private:
 
 private:
 	ECefLoadState LastLoadState = ECefLoadState::Idle;
-
-	FCefSharedFrame PendingFrame;
+	TArray<FCefSharedFrame> PendingFrames;
 	FCriticalSection PendingFrameLock;
 
 	Windows::HANDLE HMap = nullptr;
@@ -104,7 +103,7 @@ private:
 	void* PData = nullptr;
 
 	FRunnableThread* Thread = nullptr;
-	std::atomic<bool> bFramePending{ false };
+	std::atomic<uint32> PendingFrameCount{ 0 };
 	std::atomic<bool> bRunning{ false };
 	std::atomic<uint32> DroppedPendingFrames{ 0 };
 	std::atomic<bool> bFrameReadyDispatchPending{ false };
