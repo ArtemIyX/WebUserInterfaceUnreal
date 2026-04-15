@@ -14,7 +14,7 @@
 namespace
 {
 constexpr bool kEnableThreadTuning = true;
-constexpr int32 kPendingQueueSize = 2;
+constexpr int32 kPendingQueueSize = 8;
 
 ULONG_PTR SelectAffinityMask(ULONG_PTR processMask, uint32 logicalIndex)
 {
@@ -268,14 +268,10 @@ uint32 FCefFrameReader::Run()
 		}
 		LastKnownLoadStateRaw.store(headerSnapshot.load_state, std::memory_order_relaxed);
 
-		if (!bFrameReadyDispatchPending.exchange(true, std::memory_order_acq_rel))
+		AsyncTask(ENamedThreads::GameThread, [this]()
 		{
-			AsyncTask(ENamedThreads::GameThread, [this]()
-			{
-				bFrameReadyDispatchPending.store(false, std::memory_order_release);
-				OnFrameReady.Broadcast();
-			});
-		}
+			OnFrameReady.Broadcast();
+		});
 
 		// Fire load state delegate on game thread if changed
 		ECefLoadState CurrentLoad = static_cast<ECefLoadState>(headerSnapshot.load_state);
@@ -300,26 +296,32 @@ bool FCefFrameReader::PollSharedTexture(FCefSharedFrame& OutFrame)
 		return false;
 
 	FScopeLock Lock(&PendingFrameLock);
-	while (PendingFrames.Num() > 0)
+	if (PendingFrames.Num() == 0)
 	{
-		OutFrame = PendingFrames[0];
-		PendingFrames.RemoveAt(0, 1, EAllowShrinking::No);
-		PendingFrameCount.store(static_cast<uint32>(PendingFrames.Num()), std::memory_order_relaxed);
-
-		if (LastDeliveredFrameId != 0 && OutFrame.FrameId <= LastDeliveredFrameId)
-		{
-			continue;
-		}
-		if (LastDeliveredFrameId != 0 && OutFrame.FrameId != (LastDeliveredFrameId + 1))
-		{
-			OutFrame.bForceFullRefresh = true;
-			OutFrame.DirtyCount = 0;
-		}
-		LastDeliveredFrameId = OutFrame.FrameId;
-		return true;
+		PendingFrameCount.store(0, std::memory_order_relaxed);
+		return false;
 	}
+
+	if (PendingFrames.Num() > 1)
+	{
+		DroppedPendingFrames.fetch_add(static_cast<uint32>(PendingFrames.Num() - 1), std::memory_order_relaxed);
+	}
+
+	OutFrame = PendingFrames.Last();
+	PendingFrames.Reset();
 	PendingFrameCount.store(0, std::memory_order_relaxed);
-	return false;
+
+	if (LastDeliveredFrameId != 0 && OutFrame.FrameId <= LastDeliveredFrameId)
+	{
+		return false;
+	}
+	if (LastDeliveredFrameId != 0 && OutFrame.FrameId != (LastDeliveredFrameId + 1))
+	{
+		OutFrame.bForceFullRefresh = true;
+		OutFrame.DirtyCount = 0;
+	}
+	LastDeliveredFrameId = OutFrame.FrameId;
+	return true;
 }
 
 uint32 FCefFrameReader::ConsumeDroppedPendingFrames()

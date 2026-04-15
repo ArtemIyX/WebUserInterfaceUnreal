@@ -209,6 +209,10 @@ void SCefBrowserSurface::Construct(const FArguments& inArgs)
 	TelemetryInputLatencySamples = 0;
 	TelemetryInputLatencyMsSum = 0;
 	TelemetryInputLatencyMsMax = 0;
+	TelemetryPaintCalls = 0;
+	TelemetryTickCalls = 0;
+	TelemetryTimerCalls = 0;
+	TelemetryPollSuccess = 0;
 	TelemetryFenceNotReadyCount = 0;
 	SET_DWORD_STAT(STAT_CefTel_ConsumedFrames, 0);
 	SET_DWORD_STAT(STAT_CefTel_FrameGaps, 0);
@@ -242,6 +246,7 @@ int32 SCefBrowserSurface::OnPaint(
 	bool bParentEnabled) const
 {
 	SCOPE_CYCLE_COUNTER(STAT_CefSlate_Draw);
+	++TelemetryPaintCalls;
 	PollLatestFrame();
 	if (!bHasFrame)
 	{
@@ -287,6 +292,13 @@ int32 SCefBrowserSurface::OnPaint(
 
 	FSlateDrawElement::MakeCustom(outDrawElements, layerId, CustomDrawer);
 	return layerId + 1;
+}
+
+void SCefBrowserSurface::Tick(const FGeometry& allottedGeometry, const double inCurrentTime, const float inDeltaTime)
+{
+	SLeafWidget::Tick(allottedGeometry, inCurrentTime, inDeltaTime);
+	++TelemetryTickCalls;
+	Invalidate(EInvalidateWidgetReason::Paint);
 }
 
 FVector2D SCefBrowserSurface::ComputeDesiredSize(float layoutScaleMultiplier) const
@@ -418,6 +430,7 @@ void SCefBrowserSurface::HandleFrameReady()
 
 EActiveTimerReturnType SCefBrowserSurface::HandleActiveTimer(double currentTime, float deltaTime)
 {
+	++TelemetryTimerCalls;
 	Invalidate(EInvalidateWidgetReason::Paint);
 	return EActiveTimerReturnType::Continue;
 }
@@ -613,12 +626,16 @@ void SCefBrowserSurface::MaybeLogAndResetTelemetry(double nowSec) const
 
 	const uint32 avgInputLatencyMs = (TelemetryInputLatencySamples > 0) ? (TelemetryInputLatencyMsSum / TelemetryInputLatencySamples) : 0;
 	UE_LOG(LogCefWebUiTelemetry, Log,
-		TEXT("[CefSlateTelemetry] frames=%u gaps=%u fence_not_ready=%u input_latency_avg_ms=%u input_latency_max_ms=%u last_latency_frame_id=%llu"),
+		TEXT("[CefSlateTelemetry] frames=%u gaps=%u fence_not_ready=%u input_latency_avg_ms=%u input_latency_max_ms=%u paint_calls=%u tick_calls=%u timer_calls=%u poll_success=%u last_latency_frame_id=%llu"),
 		TelemetryConsumedFrames,
 		TelemetryFrameGapCount,
 		TelemetryFenceNotReadyCount,
 		avgInputLatencyMs,
 		TelemetryInputLatencyMsMax,
+		TelemetryPaintCalls,
+		TelemetryTickCalls,
+		TelemetryTimerCalls,
+		TelemetryPollSuccess,
 		static_cast<unsigned long long>(LastLatencyFrameId));
 
 	LastTelemetryLogTimeSec = nowSec;
@@ -627,6 +644,10 @@ void SCefBrowserSurface::MaybeLogAndResetTelemetry(double nowSec) const
 	TelemetryInputLatencySamples = 0;
 	TelemetryInputLatencyMsSum = 0;
 	TelemetryInputLatencyMsMax = 0;
+	TelemetryPaintCalls = 0;
+	TelemetryTickCalls = 0;
+	TelemetryTimerCalls = 0;
+	TelemetryPollSuccess = 0;
 	TelemetryFenceNotReadyCount = 0;
 	SET_DWORD_STAT(STAT_CefTel_ConsumedFrames, 0);
 	SET_DWORD_STAT(STAT_CefTel_FrameGaps, 0);
@@ -668,6 +689,7 @@ void SCefBrowserSurface::PollLatestFrame() const
 	}
 	else if (frameReader->PollSharedTexture(frame))
 	{
+		++TelemetryPollSuccess;
 		if (!IsFrameGpuReady(frame))
 		{
 			DeferredFrame = frame;

@@ -44,8 +44,10 @@ public:
 		int32 LayerId,
 		const FWidgetStyle& InWidgetStyle,
 		bool bParentEnabled) const override;
+	virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 
 	virtual FVector2D ComputeDesiredSize(float LayoutScaleMultiplier) const override;
+	virtual bool ComputeVolatility() const override { return true; }
 	virtual bool SupportsKeyboardFocus() const override { return true; }
 
 	virtual FReply OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
@@ -118,4 +120,8 @@ private:
 	mutable uint32 TelemetryInputLatencySamples = 0;
 	mutable uint32 TelemetryInputLatencyMsSum = 0;
 	mutable uint32 TelemetryInputLatencyMsMax = 0;
+	mutable uint32 TelemetryPaintCalls = 0;
+	mutable uint32 TelemetryTickCalls = 0;
+	mutable uint32 TelemetryTimerCalls = 0;
+	mutable uint32 TelemetryPollSuccess = 0;
 };

@@ -76,3 +76,35 @@ YYYY-MM-DD HH:MM
 - Telemetry improved to near-zero `gaps` and `fence_not_ready` in many windows.
 - Rendering remained stable.
 - Residual issue still exists: intermittent brief stutters/latency spikes, not fully resolved yet.
+
+---
+
+## 2026-04-15 20:10
+
+### Changed
+- Increased `FCefFrameReader` pending queue depth (`2 -> 8`) for burst tolerance.
+- Switched frame-ready dispatch to per-event game-thread broadcast (removed coalescing gate).
+- Updated `FCefFrameReader::PollSharedTexture` to newest-frame-first consumption:
+  - drops stale queued frames,
+  - presents latest available frame immediately,
+  - preserves monotonic delivery checks.
+- Updated `SCefBrowserSurface` cadence/diagnostics:
+  - `ComputeVolatility()` returns `true`,
+  - added `Tick(...)` backup paint invalidation,
+  - kept active timer invalidation,
+  - extended telemetry with:
+    - `paint_calls`
+    - `tick_calls`
+    - `timer_calls`
+    - `poll_success`
+
+### Why
+- Determine whether stutter/gaps were caused by reader queueing/coalescing or by UE widget paint cadence.
+- Add direct observability of surface repaint cadence versus host frame production.
+
+### Impact
+- Diagnostics clearly showed UE editor-side cadence limit:
+  - `paint_calls/tick_calls/timer_calls` near ~80 per 2s window (~40 FPS),
+  - while host produced ~60 FPS.
+- This mismatch explains persistent `gaps`; issue is primarily UE editor viewport cadence, not host IPC/render transport.
+- In runtime/game mode at 60/120 FPS, playback is smooth and near-browser quality.
