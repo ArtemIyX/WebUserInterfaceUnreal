@@ -108,3 +108,17 @@ YYYY-MM-DD HH:MM
   - while host produced ~60 FPS.
 - This mismatch explains persistent `gaps`; issue is primarily UE editor viewport cadence, not host IPC/render transport.
 - In runtime/game mode at 60/120 FPS, playback is smooth and near-browser quality.
+
+---
+
+## 2026-04-17 12:52
+
+### Changed
+- Updated host tuning push default in `SCefBrowserSurface`:
+  - `kHostMaxInFlightBeginFrames` set from `2` to `0`.
+
+### Why
+- User-observed interaction latency (slider drag and burst typing stalls) needed A/B with no begin-frame in-flight cap.
+
+### Impact
+- Plugin now requests uncapped begin-frame in-flight behavior from host by default for latency validation.
