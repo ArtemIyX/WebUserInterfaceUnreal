@@ -20,6 +20,7 @@ class FCefBrowserSurfaceDrawer;
 class CEFWEBUI_API SCefBrowserSurface : public SLeafWidget
 {
 public:
+#pragma region Lifecycle
 	virtual ~SCefBrowserSurface() override;
 
 	SLATE_BEGIN_ARGS(SCefBrowserSurface)
@@ -32,10 +33,14 @@ public:
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
+#pragma endregion
 
+#pragma region PublicApi
 	void SetBrowserSession(TWeakObjectPtr<UCefWebUiBrowserSession> InBrowserSession);
 	void SetBrowserSize(int32 InBrowserWidth, int32 InBrowserHeight);
+#pragma endregion
 
+#pragma region SWidget
 	virtual int32 OnPaint(
 		const FPaintArgs& Args,
 		const FGeometry& AllottedGeometry,
@@ -57,8 +62,10 @@ public:
 	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& KeyEvent) override;
 	virtual FReply OnKeyUp(const FGeometry& MyGeometry, const FKeyEvent& KeyEvent) override;
 	virtual FReply OnKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& CharacterEvent) override;
+#pragma endregion
 
 private:
+#pragma region InternalMethods
 	EActiveTimerReturnType HandleActiveTimer(double CurrentTime, float DeltaTime);
 	void HandleFrameReady();
 	void UnbindFrameReaderDelegate();
@@ -79,8 +86,10 @@ private:
 	void ReleaseResources();
 	void GetBrowserCoords(const FGeometry& InGeometry, const FVector2D& InScreenPosition, int32& OutX, int32& OutY) const;
 	static bool SlateButtonToCef(const FKey& InKey, ECefMouseButton& OutButton);
+#pragma endregion
 
 private:
+#pragma region InternalState
 	static constexpr uint32 MaxSharedSlots = 3;
 
 	TWeakObjectPtr<UCefWebUiBrowserSession> BrowserSession;
@@ -124,4 +133,5 @@ private:
 	mutable uint32 TelemetryTickCalls = 0;
 	mutable uint32 TelemetryTimerCalls = 0;
 	mutable uint32 TelemetryPollSuccess = 0;
+#pragma endregion
 };

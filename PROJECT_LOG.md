@@ -122,3 +122,32 @@ YYYY-MM-DD HH:MM
 
 ### Impact
 - Plugin now requests uncapped begin-frame in-flight behavior from host by default for latency validation.
+
+---
+
+## 2026-04-17 13:35
+
+### Changed
+- Fixed keyboard shortcut modifier mapping in `SCefBrowserSurface`:
+  - replaced incorrect key modifier encoding with CEF-compatible flags via `BuildCefKeyModifiers(...)`.
+  - `OnKeyDown/OnKeyUp` now send full modifier state (Ctrl/Shift/Alt/Command, left/right, repeat, keypad).
+  - `OnKeyChar` now suppresses char event forwarding while Ctrl/Alt/Command is held.
+- Refactored `SCefBrowserSurface` support code:
+  - moved constants to `Public/Slate/CefBrowserSurfaceConstants.h`.
+  - moved free helper declarations to `Public/Slate/CefBrowserSurfaceFunctions.h`.
+  - moved stats declarations to `Public/Slate/CefBrowserSurfaceStats.h`.
+  - moved helper implementations to `Private/Slate/CefBrowserSurfaceFunctions.cpp`.
+  - removed anonymous namespace usage for these helpers/constants.
+- Fixed popup-plane readiness handling:
+  - `EnsurePopupPlaneRhi()` result is now checked and used in paint/poll flow.
+- Applied `#pragma region` only inside class body in `CefBrowserSurface.h` (removed file-level regions).
+
+### Why
+- `Ctrl+X` and other shortcuts were not working due to wrong modifier bit mapping.
+- Requested code organization split by concern and region-style policy update.
+- Popup-plane open failures needed explicit handling.
+
+### Impact
+- Browser shortcuts now map correctly through UE input path.
+- Surface code is split into clearer units with public headers for shared constants/helpers.
+- Popup-plane path now fails safely when shared popup texture is not ready.

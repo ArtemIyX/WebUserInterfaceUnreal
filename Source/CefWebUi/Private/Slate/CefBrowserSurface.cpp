@@ -1,13 +1,14 @@
 #include "Slate/CefBrowserSurface.h"
 
 #include "CefWebUi.h"
-#include "GlobalShader.h"
 #include "ID3D12DynamicRHI.h"
 #include "InputCoreTypes.h"
-#include "PixelShaderUtils.h"
 #include "RenderGraphUtils.h"
 #include "RenderingThread.h"
 #include "RHI.h"
+#include "Slate/CefBrowserSurfaceConstants.h"
+#include "Slate/CefBrowserSurfaceFunctions.h"
+#include "Slate/CefBrowserSurfaceStats.h"
 #include "Sessions/CefWebUiBrowserSession.h"
 #include "Services/CefControlWriter.h"
 #include "Services/CefInputWriter.h"
@@ -15,88 +16,6 @@
 #include "Windows/AllowWindowsPlatformTypes.h"
 #include <d3d12.h>
 #include "Windows/HideWindowsPlatformTypes.h"
-
-DECLARE_STATS_GROUP(TEXT("CefWebUiTelemetry"), STATGROUP_CefWebUiTelemetry, STATCAT_Advanced);
-DECLARE_CYCLE_STAT(TEXT("CefSlate: PollFrame"), STAT_CefSlate_PollFrame, STATGROUP_CefWebUiTelemetry);
-DECLARE_CYCLE_STAT(TEXT("CefSlate: Draw"), STAT_CefSlate_Draw, STATGROUP_CefWebUiTelemetry);
-DECLARE_DWORD_COUNTER_STAT(TEXT("Consumed Frames"), STAT_CefTel_ConsumedFrames, STATGROUP_CefWebUiTelemetry);
-DECLARE_DWORD_COUNTER_STAT(TEXT("Frame Gaps"), STAT_CefTel_FrameGaps, STATGROUP_CefWebUiTelemetry);
-DECLARE_DWORD_COUNTER_STAT(TEXT("Input->Frame Latency Ms"), STAT_CefTel_InputToFrameLatencyMs, STATGROUP_CefWebUiTelemetry);
-DECLARE_DWORD_COUNTER_STAT(TEXT("Input->Frame Max Ms"), STAT_CefTel_InputToFrameLatencyMaxMs, STATGROUP_CefWebUiTelemetry);
-DECLARE_DWORD_COUNTER_STAT(TEXT("Fence Not Ready"), STAT_CefTel_FenceNotReady, STATGROUP_CefWebUiTelemetry);
-
-namespace
-{
-constexpr bool   kEnableCadenceFeedback = false;
-constexpr double kTelemetryLogPeriodSec = 2.0;
-constexpr double kHostTuningPushPeriodSec = 0.5;
-constexpr uint32 kHostMaxInFlightBeginFrames = 0;
-constexpr uint32 kHostFlushIntervalFrames = 1;
-constexpr uint32 kHostKeyframeIntervalUs = 0;
-constexpr uint32 kHostFrameRate = 60;
-constexpr double kCursorUpdateRateHz = 120.0;
-constexpr float  kActiveRepaintPeriodSec = 1.0f / 60.0f;
-constexpr bool   kUseGpuFenceCheck = false;
-}
-
-class FCefSlateBlitPS : public FGlobalShader
-{
-	DECLARE_GLOBAL_SHADER(FCefSlateBlitPS);
-	SHADER_USE_PARAMETER_STRUCT(FCefSlateBlitPS, FGlobalShader);
-
-	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
-		SHADER_PARAMETER_RDG_TEXTURE_SRV(Texture2D, InputTexture)
-		SHADER_PARAMETER_SAMPLER(SamplerState, InputSampler)
-		SHADER_PARAMETER(FVector2f, DestMin)
-		SHADER_PARAMETER(FVector2f, DestSize)
-		SHADER_PARAMETER(FVector2f, SrcMin)
-		SHADER_PARAMETER(FVector2f, SrcSize)
-		SHADER_PARAMETER(FVector2f, SrcTexSize)
-		RENDER_TARGET_BINDING_SLOTS()
-	END_SHADER_PARAMETER_STRUCT()
-};
-
-IMPLEMENT_GLOBAL_SHADER(FCefSlateBlitPS, "/Plugin/CefWebUi/Private/CefSlateBlit.usf", "MainPS", SF_Pixel);
-
-static FIntRect MakeIntersection(const FIntRect& a, const FIntRect& b)
-{
-	FIntRect r = a;
-	r.Clip(b);
-	return r;
-}
-
-static void AddCefSlateBlitPass(
-	FRDGBuilder& graphBuilder,
-	FRDGTextureRef inputTexture,
-	FRDGTextureRef outputTexture,
-	const FIntRect& destRect,
-	const FIntRect& srcRect,
-	const FIntPoint& srcExtent)
-{
-	if (!inputTexture || !outputTexture || destRect.Width() <= 0 || destRect.Height() <= 0 || srcRect.Width() <= 0 || srcRect.Height() <= 0)
-	{
-		return;
-	}
-
-	TShaderMapRef<FCefSlateBlitPS> pixelShader(GetGlobalShaderMap(GMaxRHIFeatureLevel));
-	FCefSlateBlitPS::FParameters* passParameters = graphBuilder.AllocParameters<FCefSlateBlitPS::FParameters>();
-	passParameters->InputTexture = graphBuilder.CreateSRV(FRDGTextureSRVDesc::Create(inputTexture));
-	passParameters->InputSampler = TStaticSamplerState<SF_Bilinear>::GetRHI();
-	passParameters->DestMin = FVector2f(static_cast<float>(destRect.Min.X), static_cast<float>(destRect.Min.Y));
-	passParameters->DestSize = FVector2f(static_cast<float>(destRect.Width()), static_cast<float>(destRect.Height()));
-	passParameters->SrcMin = FVector2f(static_cast<float>(srcRect.Min.X), static_cast<float>(srcRect.Min.Y));
-	passParameters->SrcSize = FVector2f(static_cast<float>(srcRect.Width()), static_cast<float>(srcRect.Height()));
-	passParameters->SrcTexSize = FVector2f(static_cast<float>(FMath::Max(1, srcExtent.X)), static_cast<float>(FMath::Max(1, srcExtent.Y)));
-	passParameters->RenderTargets[0] = FRenderTargetBinding(outputTexture, ERenderTargetLoadAction::ELoad);
-
-	FPixelShaderUtils::AddFullscreenPass(
-		graphBuilder,
-		GetGlobalShaderMap(GMaxRHIFeatureLevel),
-		RDG_EVENT_NAME("CefSlateBlit"),
-		pixelShader,
-		passParameters,
-		destRect);
-}
 
 class FCefBrowserSurfaceDrawer : public ICustomSlateElement, public TSharedFromThis<FCefBrowserSurfaceDrawer, ESPMode::ThreadSafe>
 {
@@ -140,7 +59,7 @@ public:
 		}
 
 		const FIntRect outputRect(FIntPoint::ZeroValue, inputs.OutputTexture->Desc.Extent);
-		FIntRect clippedDest = MakeIntersection(MakeIntersection(destRect, inputs.SceneViewRect), outputRect);
+		FIntRect clippedDest = CefWebUi::BrowserSurface::MakeIntersection(CefWebUi::BrowserSurface::MakeIntersection(destRect, inputs.SceneViewRect), outputRect);
 		if (clippedDest.Width() <= 0 || clippedDest.Height() <= 0)
 		{
 			return;
@@ -148,7 +67,7 @@ public:
 
 		FRDGTextureRef mainTex = RegisterExternalTexture(graphBuilder, mainTexture.GetReference(), TEXT("CefSlateMainTex"), ERDGTextureFlags::ForceImmediateFirstBarrier);
 		const FIntRect srcRect(0, 0, srcSize.X, srcSize.Y);
-		AddCefSlateBlitPass(graphBuilder, mainTex, inputs.OutputTexture, clippedDest, srcRect, srcSize);
+		CefWebUi::BrowserSurface::AddCefSlateBlitPass(graphBuilder, mainTex, inputs.OutputTexture, clippedDest, srcRect, srcSize);
 
 		if (!bPopupPlane || !bPopupVisible || !popupTexture.IsValid() || popupRect.Width() <= 0 || popupRect.Height() <= 0)
 		{
@@ -162,14 +81,14 @@ public:
 			destRect.Min.Y + FMath::RoundToInt(static_cast<float>(popupRect.Min.Y) * sy),
 			destRect.Min.X + FMath::RoundToInt(static_cast<float>(popupRect.Max.X) * sx),
 			destRect.Min.Y + FMath::RoundToInt(static_cast<float>(popupRect.Max.Y) * sy));
-		popupDest = MakeIntersection(MakeIntersection(popupDest, clippedDest), outputRect);
+		popupDest = CefWebUi::BrowserSurface::MakeIntersection(CefWebUi::BrowserSurface::MakeIntersection(popupDest, clippedDest), outputRect);
 		if (popupDest.Width() <= 0 || popupDest.Height() <= 0)
 		{
 			return;
 		}
 
 		FRDGTextureRef popupTex = RegisterExternalTexture(graphBuilder, popupTexture.GetReference(), TEXT("CefSlatePopupTex"), ERDGTextureFlags::ForceImmediateFirstBarrier);
-		AddCefSlateBlitPass(graphBuilder, popupTex, inputs.OutputTexture, popupDest, popupRect, srcSize);
+		CefWebUi::BrowserSurface::AddCefSlateBlitPass(graphBuilder, popupTex, inputs.OutputTexture, popupDest, popupRect, srcSize);
 	}
 
 private:
@@ -219,7 +138,7 @@ void SCefBrowserSurface::Construct(const FArguments& inArgs)
 	SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMs, 0);
 	SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMaxMs, 0);
 	SET_DWORD_STAT(STAT_CefTel_FenceNotReady, 0);
-	RegisterActiveTimer(kActiveRepaintPeriodSec, FWidgetActiveTimerDelegate::CreateSP(this, &SCefBrowserSurface::HandleActiveTimer));
+	RegisterActiveTimer(CefWebUi::BrowserSurface::ActiveRepaintPeriodSec, FWidgetActiveTimerDelegate::CreateSP(this, &SCefBrowserSurface::HandleActiveTimer));
 }
 
 void SCefBrowserSurface::SetBrowserSession(TWeakObjectPtr<UCefWebUiBrowserSession> inBrowserSession)
@@ -275,7 +194,11 @@ int32 SCefBrowserSurface::OnPaint(
 	const bool usePopupPlane = ((LastFrame.Flags & CefFrameFlag_PopupPlane) != 0);
 	if (usePopupPlane)
 	{
-		EnsurePopupPlaneRhi();
+		const bool bPopupPlaneReady = EnsurePopupPlaneRhi();
+		if (!bPopupPlaneReady)
+		{
+			return layerId;
+		}
 	}
 
 	const FSlateRect renderRect = allottedGeometry.GetRenderBoundingRect();
@@ -391,7 +314,7 @@ FReply SCefBrowserSurface::OnKeyDown(const FGeometry& myGeometry, const FKeyEven
 		return FReply::Unhandled();
 	}
 
-	const uint32 modifiers = keyEvent.GetModifierKeys().IsLeftControlDown() ? 0x0002u : 0u;
+	const uint32 modifiers = CefWebUi::BrowserSurface::BuildCefKeyModifiers(keyEvent);
 	inputWriter->WriteKey(keyEvent.GetKeyCode(), modifiers, true);
 	return FReply::Handled();
 }
@@ -405,7 +328,7 @@ FReply SCefBrowserSurface::OnKeyUp(const FGeometry& myGeometry, const FKeyEvent&
 		return FReply::Unhandled();
 	}
 
-	const uint32 modifiers = keyEvent.GetModifierKeys().IsLeftControlDown() ? 0x0002u : 0u;
+	const uint32 modifiers = CefWebUi::BrowserSurface::BuildCefKeyModifiers(keyEvent);
 	inputWriter->WriteKey(keyEvent.GetKeyCode(), modifiers, false);
 	return FReply::Handled();
 }
@@ -417,6 +340,12 @@ FReply SCefBrowserSurface::OnKeyChar(const FGeometry& myGeometry, const FCharact
 	if (!TryGetInputWriter(inputWriter))
 	{
 		return FReply::Unhandled();
+	}
+
+	const FModifierKeysState& mk = characterEvent.GetModifierKeys();
+	if (mk.IsControlDown() || mk.IsAltDown() || mk.IsCommandDown())
+	{
+		return FReply::Handled();
 	}
 
 	inputWriter->WriteChar(static_cast<uint16>(characterEvent.GetCharacter()));
@@ -519,21 +448,21 @@ void SCefBrowserSurface::MaybePushHostTuning(double nowSec) const
 		return;
 	}
 
-	if (LastHostTuningPushTimeSec > 0.0 && (nowSec - LastHostTuningPushTimeSec) < kHostTuningPushPeriodSec)
+	if (LastHostTuningPushTimeSec > 0.0 && (nowSec - LastHostTuningPushTimeSec) < CefWebUi::BrowserSurface::HostTuningPushPeriodSec)
 	{
 		return;
 	}
 
-	controlWriter->SetFrameRate(kHostFrameRate);
-	controlWriter->SetMaxInFlightBeginFrames(kHostMaxInFlightBeginFrames);
-	controlWriter->SetFlushIntervalFrames(kHostFlushIntervalFrames);
-	controlWriter->SetKeyframeIntervalUs(kHostKeyframeIntervalUs);
+	controlWriter->SetFrameRate(CefWebUi::BrowserSurface::HostFrameRate);
+	controlWriter->SetMaxInFlightBeginFrames(CefWebUi::BrowserSurface::HostMaxInFlightBeginFrames);
+	controlWriter->SetFlushIntervalFrames(CefWebUi::BrowserSurface::HostFlushIntervalFrames);
+	controlWriter->SetKeyframeIntervalUs(CefWebUi::BrowserSurface::HostKeyframeIntervalUs);
 	LastHostTuningPushTimeSec = nowSec;
 }
 
 void SCefBrowserSurface::MaybeUpdateCadenceFeedback(double nowSec) const
 {
-	if (!kEnableCadenceFeedback)
+	if (!CefWebUi::BrowserSurface::EnableCadenceFeedback)
 	{
 		return;
 	}
@@ -595,7 +524,7 @@ void SCefBrowserSurface::MaybeUpdateCursor(const FCefSharedFrame& frame, double 
 		return;
 	}
 
-	const double hz = kCursorUpdateRateHz;
+	const double hz = CefWebUi::BrowserSurface::CursorUpdateRateHz;
 	const double minDt = (hz > 0.0) ? (1.0 / hz) : 0.0;
 	if (minDt > 0.0 && (nowSec - LastCursorUpdateTimeSec) < minDt)
 	{
@@ -609,7 +538,7 @@ void SCefBrowserSurface::MaybeUpdateCursor(const FCefSharedFrame& frame, double 
 
 void SCefBrowserSurface::MaybeLogAndResetTelemetry(double nowSec) const
 {
-	const double logPeriodSec = kTelemetryLogPeriodSec;
+	const double logPeriodSec = CefWebUi::BrowserSurface::TelemetryLogPeriodSec;
 	if (logPeriodSec <= 0.0)
 	{
 		return;
@@ -733,7 +662,12 @@ void SCefBrowserSurface::PollLatestFrame() const
 	EnsureSharedRhi();
 	if ((LastFrame.Flags & CefFrameFlag_PopupPlane) != 0)
 	{
-		EnsurePopupPlaneRhi();
+		const bool bPopupPlaneReady = EnsurePopupPlaneRhi();
+		if (!bPopupPlaneReady)
+		{
+			bHasFrame = false;
+			return;
+		}
 	}
 }
 
@@ -782,7 +716,7 @@ bool SCefBrowserSurface::EnsureSharedGpuFence() const
 
 bool SCefBrowserSurface::IsFrameGpuReady(const FCefSharedFrame& frame) const
 {
-	if (!kUseGpuFenceCheck)
+	if (!CefWebUi::BrowserSurface::UseGpuFenceCheck)
 	{
 		return true;
 	}
