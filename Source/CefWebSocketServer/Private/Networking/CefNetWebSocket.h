@@ -26,6 +26,10 @@ public:
 	void OnRawWebSocketWritable(CefWebSocketInternal* Wsi);
 	void OnClose();
 
+private:
+	void FlushInternal();
+
+public:
 	FCefNetWebSocketPacketReceivedCallback ReceivedCallback;
 	FCefNetWebSocketInfoCallback ConnectedCallBack;
 	FCefNetWebSocketInfoCallback ErrorCallBack;
@@ -35,5 +39,6 @@ public:
 	FCriticalSection OutgoingLock;
 	CefWebSocketInternalContext* Context = nullptr;
 	CefWebSocketInternal* Wsi = nullptr;
-	struct sockaddr_in RemoteAddr;
+	FString RemoteIp;
+	int32 RemotePort = 0;
 };

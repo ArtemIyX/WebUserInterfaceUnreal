@@ -33,12 +33,12 @@ bool FCefWebSocketServerInstance::Start()
 	}
 
 	Backend = MakeUnique<FCefWebSocketServerBackend>();
-	FCefNetWebSocketClientConnectedCallback OnConnected;
-	OnConnected.BindRaw(this, &FCefWebSocketServerInstance::HandleClientConnected);
-	FCefNetWebSocketClientDisconnectedCallback OnDisconnected;
-	OnDisconnected.BindRaw(this, &FCefWebSocketServerInstance::HandleClientDisconnected);
+	FCefNetWebSocketClientConnectedCallback onConnected;
+	onConnected.BindRaw(this, &FCefWebSocketServerInstance::HandleClientConnected);
+	FCefNetWebSocketClientDisconnectedCallback onDisconnected;
+	onDisconnected.BindRaw(this, &FCefWebSocketServerInstance::HandleClientDisconnected);
 
-	if (!Backend->Init(static_cast<uint32>(BoundPort), OnConnected, OnDisconnected))
+	if (!Backend->Init(static_cast<uint32>(BoundPort), onConnected, onDisconnected))
 	{
 		if (OwnerServer.IsValid())
 		{
@@ -109,14 +109,14 @@ void FCefWebSocketServerInstance::Stop()
 	ReadRunnable.Reset();
 	WriteRunnable.Reset();
 
-	TArray<ICefNetWebSocket*> ToClose;
+	TArray<ICefNetWebSocket*> socketsToClose;
 	{
-		FScopeLock Lock(&ClientLock);
-		for (TPair<int64, FCefClientState>& Pair : Clients)
+		FScopeLock lock(&ClientLock);
+		for (TPair<int64, FCefClientState>& pair : Clients)
 		{
-			if (Pair.Value.Socket)
+			if (pair.Value.Socket)
 			{
-				ToClose.Add(Pair.Value.Socket);
+				socketsToClose.Add(pair.Value.Socket);
 			}
 		}
 		Clients.Empty();
@@ -133,9 +133,9 @@ void FCefWebSocketServerInstance::Stop()
 		QueueDepthSamples = 0;
 	}
 
-	for (ICefNetWebSocket* Socket : ToClose)
+	for (ICefNetWebSocket* socket : socketsToClose)
 	{
-		Socket->Close();
+		socket->Close();
 	}
 
 	Backend.Reset();
@@ -174,52 +174,52 @@ bool FCefWebSocketServerInstance::PumpOutgoingOnWriteThread()
 		FCefOutboundMessage Message;
 	};
 
-	TArray<FSendWork> Work;
+	TArray<FSendWork> workItems;
 	{
-		FScopeLock Lock(&ClientLock);
-		for (TPair<int64, FCefClientState>& Pair : Clients)
+		FScopeLock lock(&ClientLock);
+		for (TPair<int64, FCefClientState>& pair : Clients)
 		{
-			FCefOutboundMessage Msg;
-			if (Pair.Value.Outbox.Dequeue(Msg))
+			FCefOutboundMessage message;
+			if (pair.Value.Outbox && pair.Value.Outbox->Dequeue(message))
 			{
-				Pair.Value.QueueMessages = FMath::Max(0, Pair.Value.QueueMessages - 1);
-				Pair.Value.QueueBytes = FMath::Max<int64>(0, Pair.Value.QueueBytes - Msg.Payload.Num());
+				pair.Value.QueueMessages = FMath::Max(0, pair.Value.QueueMessages - 1);
+				pair.Value.QueueBytes = FMath::Max<int64>(0, pair.Value.QueueBytes - message.Payload.Num());
 				Stats.QueueDepth = FMath::Max<int64>(0, Stats.QueueDepth - 1);
 				RecordQueueDepthSample_NoLock();
-				FSendWork& Item = Work.AddDefaulted_GetRef();
-				Item.ClientId = Pair.Key;
-				Item.Socket = Pair.Value.Socket;
-				Item.Message = MoveTemp(Msg);
+				FSendWork& item = workItems.AddDefaulted_GetRef();
+				item.ClientId = pair.Key;
+				item.Socket = pair.Value.Socket;
+				item.Message = MoveTemp(message);
 			}
 		}
 	}
 
-	if (Work.Num() == 0)
+	if (workItems.Num() == 0)
 	{
 		return false;
 	}
 
-	int64 SentBytes = 0;
-	for (const FSendWork& Item : Work)
+	int64 sentBytes = 0;
+	for (const FSendWork& item : workItems)
 	{
-		if (!Item.Socket || Item.Message.Payload.Num() == 0)
+		if (!item.Socket || item.Message.Payload.Num() == 0)
 		{
 			continue;
 		}
-		if (!Item.Socket->Send(Item.Message.Payload.GetData(), static_cast<uint32>(Item.Message.Payload.Num()), false))
+		if (!item.Socket->Send(item.Message.Payload.GetData(), static_cast<uint32>(item.Message.Payload.Num()), false))
 		{
 			if (OwnerServer.IsValid())
 			{
-				OwnerServer->NotifyClientError(Item.ClientId, ECefWebSocketErrorCode::SocketSendFailed, TEXT("Socket send failed"));
+				OwnerServer->NotifyClientError(item.ClientId, ECefWebSocketErrorCode::SocketSendFailed, TEXT("Socket send failed"));
 			}
 			continue;
 		}
-		SentBytes += Item.Message.Payload.Num();
+		sentBytes += item.Message.Payload.Num();
 	}
 
 	{
-		FScopeLock Lock(&ClientLock);
-		Stats.TxBytes += SentBytes;
+		FScopeLock lock(&ClientLock);
+		Stats.TxBytes += sentBytes;
 		UpdateRateStats_NoLock();
 	}
 
@@ -237,32 +237,31 @@ void FCefWebSocketServerInstance::HandleClientConnected(ICefNetWebSocket* Socket
 		return;
 	}
 
-	FCefWebSocketClientInfo Info;
-	Info.ClientId = NextClientId++;
-	Info.RemoteAddress = Socket->RemoteEndPoint(true);
-	Info.ConnectedAt = FDateTime::UtcNow();
+	FCefWebSocketClientInfo info;
+	info.ClientId = NextClientId++;
+	info.RemoteAddress = Socket->RemoteEndPoint(true);
+	info.ConnectedAt = FDateTime::UtcNow();
 
-	FCefNetWebSocketPacketReceivedCallback OnReceive;
-	OnReceive.BindLambda([this, Socket](void* Data, int32 Count, bool bBinary)
+	FCefNetWebSocketPacketReceivedCallback onReceive;
+	onReceive.BindLambda([this, Socket](void* data, int32 count, bool bBinary)
 	{
-		HandleClientPacket(Socket, static_cast<const uint8*>(Data), Count, bBinary);
+		HandleClientPacket(Socket, static_cast<const uint8*>(data), count, bBinary);
 	});
-	Socket->SetReceiveCallBack(OnReceive);
+	Socket->SetReceiveCallBack(onReceive);
 
 	{
-		FScopeLock Lock(&ClientLock);
-		FCefClientState State;
-		State.Info = Info;
-		State.Socket = Socket;
-		Clients.Add(Info.ClientId, MoveTemp(State));
-		ClientIdsBySocket.Add(Socket, Info.ClientId);
+		FScopeLock lock(&ClientLock);
+		FCefClientState& state = Clients.FindOrAdd(info.ClientId);
+		state.Info = info;
+		state.Socket = Socket;
+		ClientIdsBySocket.Add(Socket, info.ClientId);
 		Stats.ActiveClients = Clients.Num();
 		RecordQueueDepthSample_NoLock();
 	}
 
 	if (OwnerServer.IsValid())
 	{
-		OwnerServer->NotifyClientConnected(Info);
+		OwnerServer->NotifyClientConnected(info);
 	}
 }
 
@@ -273,22 +272,22 @@ void FCefWebSocketServerInstance::HandleClientDisconnected(ICefNetWebSocket* Soc
 		return;
 	}
 
-	int64 ClientId = 0;
+	int64 clientId = 0;
 	{
-		FScopeLock Lock(&ClientLock);
-		if (int64* Found = ClientIdsBySocket.Find(Socket))
+		FScopeLock lock(&ClientLock);
+		if (int64* found = ClientIdsBySocket.Find(Socket))
 		{
-			ClientId = *Found;
+			clientId = *found;
 			ClientIdsBySocket.Remove(Socket);
-			Clients.Remove(ClientId);
+			Clients.Remove(clientId);
 			Stats.ActiveClients = Clients.Num();
 			RecordQueueDepthSample_NoLock();
 		}
 	}
 
-	if (ClientId != 0 && OwnerServer.IsValid())
+	if (clientId != 0 && OwnerServer.IsValid())
 	{
-		OwnerServer->NotifyClientDisconnected(ClientId, ECefWebSocketCloseReason::ClientClosed);
+		OwnerServer->NotifyClientDisconnected(clientId, ECefWebSocketCloseReason::ClientClosed);
 	}
 }
 
@@ -300,44 +299,44 @@ void FCefWebSocketServerInstance::HandleClientPacket(ICefNetWebSocket* Socket, c
 	}
 	if (Count > CefWebSocketCVars::GetMaxMessageBytes())
 	{
-		int64 ClientId = 0;
+		int64 clientId = 0;
 		{
-			FScopeLock Lock(&ClientLock);
-			if (int64* Found = ClientIdsBySocket.Find(Socket))
+			FScopeLock lock(&ClientLock);
+			if (int64* found = ClientIdsBySocket.Find(Socket))
 			{
-				ClientId = *Found;
+				clientId = *found;
 			}
 		}
-		if (ClientId != 0 && OwnerServer.IsValid())
+		if (clientId != 0 && OwnerServer.IsValid())
 		{
-			OwnerServer->NotifyClientError(ClientId, ECefWebSocketErrorCode::InvalidPayload, TEXT("Incoming message exceeds cefws.max_message_bytes"));
+			OwnerServer->NotifyClientError(clientId, ECefWebSocketErrorCode::InvalidPayload, TEXT("Incoming message exceeds cefws.max_message_bytes"));
 		}
 		return;
 	}
 
-	int64 ClientId = 0;
+	int64 clientId = 0;
 	{
-		FScopeLock Lock(&ClientLock);
-		if (int64* Found = ClientIdsBySocket.Find(Socket))
+		FScopeLock lock(&ClientLock);
+		if (int64* found = ClientIdsBySocket.Find(Socket))
 		{
-			ClientId = *Found;
+			clientId = *found;
 			Stats.RxBytes += Count;
 			UpdateRateStats_NoLock();
 		}
 	}
 
-	if (ClientId == 0)
+	if (clientId == 0)
 	{
 		return;
 	}
 
 	SET_DWORD_STAT(STAT_CefWs_RxBytes, static_cast<uint32>(FMath::Min<int64>(Stats.RxBytes, MAX_uint32)));
 
-	TArray<uint8> Payload;
-	Payload.Append(Data, Count);
+	TArray<uint8> payload;
+	payload.Append(Data, Count);
 	if (OwnerServer.IsValid())
 	{
-		OwnerServer->NotifyClientMessage(ClientId, Payload, bBinary);
+		OwnerServer->NotifyClientMessage(clientId, payload, bBinary);
 	}
 }
 
@@ -356,42 +355,46 @@ ECefWebSocketSendResult FCefWebSocketServerInstance::EnqueueToClient(int64 Clien
 		return ECefWebSocketSendResult::TooLarge;
 	}
 
-	FScopeLock Lock(&ClientLock);
-	FCefClientState* Found = Clients.Find(ClientId);
-	if (!Found || !Found->Socket)
+	FScopeLock lock(&ClientLock);
+	FCefClientState* found = Clients.Find(ClientId);
+	if (!found || !found->Socket)
 	{
 		return ECefWebSocketSendResult::InvalidClient;
 	}
 
-	const int32 MaxMessages = FMath::Max(1, CefWebSocketCVars::GetMaxQueueMessagesPerClient());
-	const int32 MaxBytes = FMath::Max(1, CefWebSocketCVars::GetMaxQueueBytesPerClient());
+	const int32 maxMessages = FMath::Max(1, CefWebSocketCVars::GetMaxQueueMessagesPerClient());
+	const int32 maxBytes = FMath::Max(1, CefWebSocketCVars::GetMaxQueueBytesPerClient());
 
-	while ((Found->QueueMessages >= MaxMessages || Found->QueueBytes + Count > MaxBytes) && Found->QueueMessages > 0)
+	while ((found->QueueMessages >= maxMessages || found->QueueBytes + Count > maxBytes) && found->QueueMessages > 0)
 	{
-		FCefOutboundMessage Dropped;
-		if (!Found->Outbox.Dequeue(Dropped))
+		FCefOutboundMessage dropped;
+		if (!found->Outbox || !found->Outbox->Dequeue(dropped))
 		{
 			break;
 		}
-		Found->QueueMessages = FMath::Max(0, Found->QueueMessages - 1);
-		Found->QueueBytes = FMath::Max<int64>(0, Found->QueueBytes - Dropped.Payload.Num());
+		found->QueueMessages = FMath::Max(0, found->QueueMessages - 1);
+		found->QueueBytes = FMath::Max<int64>(0, found->QueueBytes - dropped.Payload.Num());
 		Stats.DroppedMessages += 1;
 		Stats.QueueDepth = FMath::Max<int64>(0, Stats.QueueDepth - 1);
 		RecordQueueDepthSample_NoLock();
 	}
 
-	if (Found->QueueMessages >= MaxMessages || Found->QueueBytes + Count > MaxBytes)
+	if (found->QueueMessages >= maxMessages || found->QueueBytes + Count > maxBytes)
 	{
 		Stats.DroppedMessages += 1;
 		return ECefWebSocketSendResult::QueueFull;
 	}
 
-	FCefOutboundMessage Message;
-	Message.Payload.Append(Data, Count);
-	Message.bBinary = bBinary;
-	Found->Outbox.Enqueue(MoveTemp(Message));
-	Found->QueueMessages += 1;
-	Found->QueueBytes += Count;
+	FCefOutboundMessage message;
+	message.Payload.Append(Data, Count);
+	message.bBinary = bBinary;
+	if (!found->Outbox)
+	{
+		found->Outbox = MakeUnique<TQueue<FCefOutboundMessage, EQueueMode::Mpsc>>();
+	}
+	found->Outbox->Enqueue(MoveTemp(message));
+	found->QueueMessages += 1;
+	found->QueueBytes += Count;
 	Stats.QueueDepth += 1;
 	RecordQueueDepthSample_NoLock();
 
@@ -401,16 +404,16 @@ ECefWebSocketSendResult FCefWebSocketServerInstance::EnqueueToClient(int64 Clien
 
 ECefWebSocketSendResult FCefWebSocketServerInstance::EnqueueToClients(const TArray<int64>& ClientIds, const uint8* Data, int32 Count, bool bBinary)
 {
-	ECefWebSocketSendResult FinalResult = ECefWebSocketSendResult::Ok;
-	for (const int64 ClientId : ClientIds)
+	ECefWebSocketSendResult finalResult = ECefWebSocketSendResult::Ok;
+	for (const int64 clientId : ClientIds)
 	{
-		const ECefWebSocketSendResult Result = EnqueueToClient(ClientId, Data, Count, bBinary);
-		if (Result != ECefWebSocketSendResult::Ok)
+		const ECefWebSocketSendResult result = EnqueueToClient(clientId, Data, Count, bBinary);
+		if (result != ECefWebSocketSendResult::Ok)
 		{
-			FinalResult = Result;
+			finalResult = result;
 		}
 	}
-	return FinalResult;
+	return finalResult;
 }
 
 void FCefWebSocketServerInstance::WakeWriteThread()
@@ -428,12 +431,12 @@ ECefWebSocketSendResult FCefWebSocketServerInstance::SendToClientString(int64 Cl
 		return ECefWebSocketSendResult::InvalidServer;
 	}
 
-	FTCHARToUTF8 Utf8(*Message);
-	if (Utf8.Length() <= 0)
+	FTCHARToUTF8 utf8(*Message);
+	if (utf8.Length() <= 0)
 	{
 		return ECefWebSocketSendResult::InvalidUtf8;
 	}
-	return EnqueueToClient(ClientId, reinterpret_cast<const uint8*>(Utf8.Get()), Utf8.Length(), false);
+	return EnqueueToClient(ClientId, reinterpret_cast<const uint8*>(utf8.Get()), utf8.Length(), false);
 }
 
 ECefWebSocketSendResult FCefWebSocketServerInstance::SendToClientBytes(int64 ClientId, const TArray<uint8>& Bytes)
@@ -451,18 +454,18 @@ ECefWebSocketSendResult FCefWebSocketServerInstance::SendToClientBytes(int64 Cli
 
 ECefWebSocketSendResult FCefWebSocketServerInstance::BroadcastString(const FString& Message)
 {
-	FTCHARToUTF8 Utf8(*Message);
-	if (Utf8.Length() <= 0)
+	FTCHARToUTF8 utf8(*Message);
+	if (utf8.Length() <= 0)
 	{
 		return ECefWebSocketSendResult::InvalidUtf8;
 	}
 
-	TArray<int64> TargetClients;
+	TArray<int64> targetClients;
 	{
-		FScopeLock Lock(&ClientLock);
-		Clients.GetKeys(TargetClients);
+		FScopeLock lock(&ClientLock);
+		Clients.GetKeys(targetClients);
 	}
-	return EnqueueToClients(TargetClients, reinterpret_cast<const uint8*>(Utf8.Get()), Utf8.Length(), false);
+	return EnqueueToClients(targetClients, reinterpret_cast<const uint8*>(utf8.Get()), utf8.Length(), false);
 }
 
 ECefWebSocketSendResult FCefWebSocketServerInstance::BroadcastBytes(const TArray<uint8>& Bytes)
@@ -471,33 +474,33 @@ ECefWebSocketSendResult FCefWebSocketServerInstance::BroadcastBytes(const TArray
 	{
 		return ECefWebSocketSendResult::InternalError;
 	}
-	TArray<int64> TargetClients;
+	TArray<int64> targetClients;
 	{
-		FScopeLock Lock(&ClientLock);
-		Clients.GetKeys(TargetClients);
+		FScopeLock lock(&ClientLock);
+		Clients.GetKeys(targetClients);
 	}
-	return EnqueueToClients(TargetClients, Bytes.GetData(), Bytes.Num(), true);
+	return EnqueueToClients(targetClients, Bytes.GetData(), Bytes.Num(), true);
 }
 
 ECefWebSocketSendResult FCefWebSocketServerInstance::BroadcastStringExcept(int64 ExcludedClientId, const FString& Message)
 {
-	FTCHARToUTF8 Utf8(*Message);
-	if (Utf8.Length() <= 0)
+	FTCHARToUTF8 utf8(*Message);
+	if (utf8.Length() <= 0)
 	{
 		return ECefWebSocketSendResult::InvalidUtf8;
 	}
-	TArray<int64> TargetClients;
+	TArray<int64> targetClients;
 	{
-		FScopeLock Lock(&ClientLock);
-		for (const TPair<int64, FCefClientState>& Pair : Clients)
+		FScopeLock lock(&ClientLock);
+		for (const TPair<int64, FCefClientState>& pair : Clients)
 		{
-			if (Pair.Key != ExcludedClientId)
+			if (pair.Key != ExcludedClientId)
 			{
-				TargetClients.Add(Pair.Key);
+				targetClients.Add(pair.Key);
 			}
 		}
 	}
-	return EnqueueToClients(TargetClients, reinterpret_cast<const uint8*>(Utf8.Get()), Utf8.Length(), false);
+	return EnqueueToClients(targetClients, reinterpret_cast<const uint8*>(utf8.Get()), utf8.Length(), false);
 }
 
 ECefWebSocketSendResult FCefWebSocketServerInstance::BroadcastBytesExcept(int64 ExcludedClientId, const TArray<uint8>& Bytes)
@@ -506,55 +509,55 @@ ECefWebSocketSendResult FCefWebSocketServerInstance::BroadcastBytesExcept(int64 
 	{
 		return ECefWebSocketSendResult::InternalError;
 	}
-	TArray<int64> TargetClients;
+	TArray<int64> targetClients;
 	{
-		FScopeLock Lock(&ClientLock);
-		for (const TPair<int64, FCefClientState>& Pair : Clients)
+		FScopeLock lock(&ClientLock);
+		for (const TPair<int64, FCefClientState>& pair : Clients)
 		{
-			if (Pair.Key != ExcludedClientId)
+			if (pair.Key != ExcludedClientId)
 			{
-				TargetClients.Add(Pair.Key);
+				targetClients.Add(pair.Key);
 			}
 		}
 	}
-	return EnqueueToClients(TargetClients, Bytes.GetData(), Bytes.Num(), true);
+	return EnqueueToClients(targetClients, Bytes.GetData(), Bytes.Num(), true);
 }
 
 ECefWebSocketSendResult FCefWebSocketServerInstance::DisconnectClient(int64 ClientId, ECefWebSocketCloseReason Reason)
 {
 	(void)Reason;
-	ICefNetWebSocket* Socket = nullptr;
+	ICefNetWebSocket* socket = nullptr;
 	{
-		FScopeLock Lock(&ClientLock);
-		if (FCefClientState* Found = Clients.Find(ClientId))
+		FScopeLock lock(&ClientLock);
+		if (FCefClientState* found = Clients.Find(ClientId))
 		{
-			Socket = Found->Socket;
+			socket = found->Socket;
 		}
 	}
-	if (!Socket)
+	if (!socket)
 	{
 		return ECefWebSocketSendResult::InvalidClient;
 	}
 
-	Socket->Close();
+	socket->Close();
 	return ECefWebSocketSendResult::Ok;
 }
 
 TArray<FCefWebSocketClientInfo> FCefWebSocketServerInstance::GetClients() const
 {
-	FScopeLock Lock(&ClientLock);
-	TArray<FCefWebSocketClientInfo> OutClients;
-	OutClients.Reserve(Clients.Num());
-	for (const TPair<int64, FCefClientState>& Pair : Clients)
+	FScopeLock lock(&ClientLock);
+	TArray<FCefWebSocketClientInfo> outClients;
+	outClients.Reserve(Clients.Num());
+	for (const TPair<int64, FCefClientState>& pair : Clients)
 	{
-		OutClients.Add(Pair.Value.Info);
+		outClients.Add(pair.Value.Info);
 	}
-	return OutClients;
+	return outClients;
 }
 
 FCefWebSocketServerStats FCefWebSocketServerInstance::GetStats() const
 {
-	FScopeLock Lock(&ClientLock);
+	FScopeLock lock(&ClientLock);
 	const_cast<FCefWebSocketServerInstance*>(this)->UpdateRateStats_NoLock();
 	if (QueueDepthSamples > 0)
 	{
@@ -569,10 +572,10 @@ FCefWebSocketServerStats FCefWebSocketServerInstance::GetStats() const
 
 FCefWebSocketClientInfo FCefWebSocketServerInstance::FindClientInfo(int64 ClientId) const
 {
-	FScopeLock Lock(&ClientLock);
-	if (const FCefClientState* Found = Clients.Find(ClientId))
+	FScopeLock lock(&ClientLock);
+	if (const FCefClientState* found = Clients.Find(ClientId))
 	{
-		return Found->Info;
+		return found->Info;
 	}
 	return FCefWebSocketClientInfo();
 }
@@ -589,10 +592,10 @@ void FCefWebSocketServerInstance::RecordQueueDepthSample_NoLock()
 
 void FCefWebSocketServerInstance::UpdateRateStats_NoLock()
 {
-	const double NowSec = FPlatformTime::Seconds();
+	const double nowSec = FPlatformTime::Seconds();
 	if (LastRateSampleTimeSec <= 0.0)
 	{
-		LastRateSampleTimeSec = NowSec;
+		LastRateSampleTimeSec = nowSec;
 		LastRateRxBytes = Stats.RxBytes;
 		LastRateTxBytes = Stats.TxBytes;
 		Stats.RxBytesPerSec = 0.0f;
@@ -600,17 +603,17 @@ void FCefWebSocketServerInstance::UpdateRateStats_NoLock()
 		return;
 	}
 
-	const double DeltaSec = NowSec - LastRateSampleTimeSec;
-	if (DeltaSec < 0.05)
+	const double deltaSec = nowSec - LastRateSampleTimeSec;
+	if (deltaSec < 0.05)
 	{
 		return;
 	}
 
-	const int64 DeltaRx = Stats.RxBytes - LastRateRxBytes;
-	const int64 DeltaTx = Stats.TxBytes - LastRateTxBytes;
-	Stats.RxBytesPerSec = static_cast<float>(static_cast<double>(DeltaRx) / DeltaSec);
-	Stats.TxBytesPerSec = static_cast<float>(static_cast<double>(DeltaTx) / DeltaSec);
-	LastRateSampleTimeSec = NowSec;
+	const int64 deltaRx = Stats.RxBytes - LastRateRxBytes;
+	const int64 deltaTx = Stats.TxBytes - LastRateTxBytes;
+	Stats.RxBytesPerSec = static_cast<float>(static_cast<double>(deltaRx) / deltaSec);
+	Stats.TxBytesPerSec = static_cast<float>(static_cast<double>(deltaTx) / deltaSec);
+	LastRateSampleTimeSec = nowSec;
 	LastRateRxBytes = Stats.RxBytes;
 	LastRateTxBytes = Stats.TxBytes;
 }

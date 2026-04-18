@@ -160,14 +160,14 @@ void UCefWebSocketServerBase::StopServer()
 	{
 		Instance->Stop();
 	}
-	FScopeLock Lock(&ClientObjectsLock);
+	FScopeLock lock(&ClientObjectsLock);
 	ClientObjects.Empty();
 }
 
 TArray<UCefWebSocketClientBase*> UCefWebSocketServerBase::GetClients() const
 {
 	TArray<UCefWebSocketClientBase*> OutClients;
-	FScopeLock Lock(&ClientObjectsLock);
+	FScopeLock lock(&ClientObjectsLock);
 	for (const TPair<int64, TObjectPtr<UCefWebSocketClientBase>>& Pair : ClientObjects)
 	{
 		if (Pair.Value)
@@ -180,7 +180,7 @@ TArray<UCefWebSocketClientBase*> UCefWebSocketServerBase::GetClients() const
 
 UCefWebSocketClientBase* UCefWebSocketServerBase::GetClient(int64 ClientId) const
 {
-	FScopeLock Lock(&ClientObjectsLock);
+	FScopeLock lock(&ClientObjectsLock);
 	if (const TObjectPtr<UCefWebSocketClientBase>* Found = ClientObjects.Find(ClientId))
 	{
 		return *Found;
@@ -222,7 +222,7 @@ void UCefWebSocketServerBase::NotifyClientConnected(const FCefWebSocketClientInf
 
 	ClientObject->InitializeClient(this, ClientInfo);
 	{
-		FScopeLock Lock(&ClientObjectsLock);
+		FScopeLock lock(&ClientObjectsLock);
 		ClientObjects.Add(ClientInfo.ClientId, ClientObject);
 	}
 	OnClientConnected.Broadcast(ClientInfo);
@@ -244,7 +244,7 @@ void UCefWebSocketServerBase::NotifyClientDisconnected(int64 ClientId, ECefWebSo
 	}
 
 	{
-		FScopeLock Lock(&ClientObjectsLock);
+		FScopeLock lock(&ClientObjectsLock);
 		ClientObjects.Remove(ClientId);
 	}
 	OnClientDisconnected.Broadcast(ClientId, Reason);
@@ -288,7 +288,7 @@ void UCefWebSocketServerBase::NotifyClientMessage(int64 ClientId, const TArray<u
 {
 	UCefWebSocketClientBase* Client = nullptr;
 	{
-		FScopeLock Lock(&ClientObjectsLock);
+		FScopeLock lock(&ClientObjectsLock);
 		if (const TObjectPtr<UCefWebSocketClientBase>* Found = ClientObjects.Find(ClientId))
 		{
 			Client = *Found;

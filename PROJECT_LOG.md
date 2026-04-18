@@ -269,3 +269,29 @@ YYYY-MM-DD HH:MM
 
 ### Impact
 - Runtime debugging of active servers/clients is available through UE console commands.
+
+---
+
+## 2026-04-18 20:06
+
+### Changed
+- Stabilized `CefWebSocketServer` compile/runtime integration after Phase 4:
+  - fixed reflected delegate registration in `Data/CefWebSocketDelegates.h` by adding `UDELEGATE()` for dynamic multicast delegates.
+  - fixed map value construction issue for `FCefClientState`:
+    - changed per-client outbox to pointer-owned queue (`TUniquePtr<TQueue<...>>`) in `CefWebSocketServerInstance`.
+  - fixed socket endpoint storage in `CefNetWebSocket`:
+    - removed header-level `sockaddr_in` member,
+    - stored remote endpoint as `RemoteIp` + `RemotePort`.
+  - removed destructor-time virtual call warning:
+    - added non-virtual `FlushInternal()` and switched `~FCefNetWebSocket()` to call it directly.
+  - applied style normalization on touched websocket files:
+    - lower camel case local variables,
+    - `In...` prefix for command args in debug command handlers,
+    - replaced plain `int` with `int32` where allowed by APIs.
+
+### Why
+- Resolve current build failures/warnings and enforce requested code conventions.
+
+### Impact
+- Websocket server code path compiles cleanly for the addressed issues.
+- Networking/destructor behavior is safer and code style is consistent with project rules.

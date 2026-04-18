@@ -17,10 +17,10 @@ public:
 
 private:
 #pragma region Commands
-	void HandleList(const TArray<FString>& Args) const;
-	void HandleStop(const TArray<FString>& Args) const;
-	void HandleKick(const TArray<FString>& Args) const;
-	void HandleStats(const TArray<FString>& Args) const;
+	void HandleList(const TArray<FString>& InArgs) const;
+	void HandleStop(const TArray<FString>& InArgs) const;
+	void HandleKick(const TArray<FString>& InArgs) const;
+	void HandleStats(const TArray<FString>& InArgs) const;
 #pragma endregion
 
 private:

@@ -9,11 +9,11 @@
 
 void FCefWebSocketDebugCommands::Startup()
 {
-	IConsoleManager& ConsoleManager = IConsoleManager::Get();
+	IConsoleManager& consoleManager = IConsoleManager::Get();
 
 	if (!CommandList)
 	{
-		CommandList = ConsoleManager.RegisterConsoleCommand(
+		CommandList = consoleManager.RegisterConsoleCommand(
 			TEXT("ws.list"),
 			TEXT("List websocket servers."),
 			FConsoleCommandWithArgsDelegate::CreateRaw(this, &FCefWebSocketDebugCommands::HandleList));
@@ -21,7 +21,7 @@ void FCefWebSocketDebugCommands::Startup()
 
 	if (!CommandStop)
 	{
-		CommandStop = ConsoleManager.RegisterConsoleCommand(
+		CommandStop = consoleManager.RegisterConsoleCommand(
 			TEXT("ws.stop"),
 			TEXT("Stop websocket server by name: ws.stop <name>."),
 			FConsoleCommandWithArgsDelegate::CreateRaw(this, &FCefWebSocketDebugCommands::HandleStop));
@@ -29,7 +29,7 @@ void FCefWebSocketDebugCommands::Startup()
 
 	if (!CommandKick)
 	{
-		CommandKick = ConsoleManager.RegisterConsoleCommand(
+		CommandKick = consoleManager.RegisterConsoleCommand(
 			TEXT("ws.kick"),
 			TEXT("Disconnect websocket client: ws.kick <server> <clientId>."),
 			FConsoleCommandWithArgsDelegate::CreateRaw(this, &FCefWebSocketDebugCommands::HandleKick));
@@ -37,7 +37,7 @@ void FCefWebSocketDebugCommands::Startup()
 
 	if (!CommandStats)
 	{
-		CommandStats = ConsoleManager.RegisterConsoleCommand(
+		CommandStats = consoleManager.RegisterConsoleCommand(
 			TEXT("ws.stats"),
 			TEXT("Print websocket server stats: ws.stats <name>."),
 			FConsoleCommandWithArgsDelegate::CreateRaw(this, &FCefWebSocketDebugCommands::HandleStats));
@@ -46,26 +46,26 @@ void FCefWebSocketDebugCommands::Startup()
 
 void FCefWebSocketDebugCommands::Shutdown()
 {
-	IConsoleManager& ConsoleManager = IConsoleManager::Get();
+	IConsoleManager& consoleManager = IConsoleManager::Get();
 
 	if (CommandList)
 	{
-		ConsoleManager.UnregisterConsoleObject(CommandList);
+		consoleManager.UnregisterConsoleObject(CommandList);
 		CommandList = nullptr;
 	}
 	if (CommandStop)
 	{
-		ConsoleManager.UnregisterConsoleObject(CommandStop);
+		consoleManager.UnregisterConsoleObject(CommandStop);
 		CommandStop = nullptr;
 	}
 	if (CommandKick)
 	{
-		ConsoleManager.UnregisterConsoleObject(CommandKick);
+		consoleManager.UnregisterConsoleObject(CommandKick);
 		CommandKick = nullptr;
 	}
 	if (CommandStats)
 	{
-		ConsoleManager.UnregisterConsoleObject(CommandStats);
+		consoleManager.UnregisterConsoleObject(CommandStats);
 		CommandStats = nullptr;
 	}
 }
@@ -77,143 +77,143 @@ UCefWebSocketSubsystem* FCefWebSocketDebugCommands::ResolveSubsystem() const
 		return nullptr;
 	}
 
-	for (const FWorldContext& WorldContext : GEngine->GetWorldContexts())
+	for (const FWorldContext& worldContext : GEngine->GetWorldContexts())
 	{
-		UGameInstance* GameInstance = WorldContext.OwningGameInstance;
-		if (!GameInstance)
+		UGameInstance* gameInstance = worldContext.OwningGameInstance;
+		if (!gameInstance)
 		{
 			continue;
 		}
 
-		if (UCefWebSocketSubsystem* Subsystem = GameInstance->GetSubsystem<UCefWebSocketSubsystem>())
+		if (UCefWebSocketSubsystem* subsystem = gameInstance->GetSubsystem<UCefWebSocketSubsystem>())
 		{
-			return Subsystem;
+			return subsystem;
 		}
 	}
 
 	return nullptr;
 }
 
-void FCefWebSocketDebugCommands::HandleList(const TArray<FString>& Args) const
+void FCefWebSocketDebugCommands::HandleList(const TArray<FString>& InArgs) const
 {
-	(void)Args;
-	UCefWebSocketSubsystem* Subsystem = ResolveSubsystem();
-	if (!Subsystem)
+	(void)InArgs;
+	UCefWebSocketSubsystem* subsystem = ResolveSubsystem();
+	if (!subsystem)
 	{
 		UE_LOG(LogCefWebSocketServer, Warning, TEXT("ws.list: subsystem not available"));
 		return;
 	}
 
-	const TArray<UCefWebSocketServerBase*> Servers = Subsystem->GetAllServers();
-	UE_LOG(LogCefWebSocketServer, Log, TEXT("ws.list: %d server(s)"), Servers.Num());
-	for (UCefWebSocketServerBase* Server : Servers)
+	const TArray<UCefWebSocketServerBase*> servers = subsystem->GetAllServers();
+	UE_LOG(LogCefWebSocketServer, Log, TEXT("ws.list: %d server(s)"), servers.Num());
+	for (UCefWebSocketServerBase* server : servers)
 	{
-		if (!Server)
+		if (!server)
 		{
 			continue;
 		}
-		const FCefWebSocketServerStats Stats = Server->GetStats();
+		const FCefWebSocketServerStats stats = server->GetStats();
 		UE_LOG(
 			LogCefWebSocketServer,
 			Log,
 			TEXT("  name=%s port=%d running=%s clients=%d queue=%lld"),
-			*Server->GetServerNameId().ToString(),
-			Server->GetBoundPort(),
-			Server->IsRunning() ? TEXT("true") : TEXT("false"),
-			Stats.ActiveClients,
-			Stats.QueueDepth);
+			*server->GetServerNameId().ToString(),
+			server->GetBoundPort(),
+			server->IsRunning() ? TEXT("true") : TEXT("false"),
+			stats.ActiveClients,
+			stats.QueueDepth);
 	}
 }
 
-void FCefWebSocketDebugCommands::HandleStop(const TArray<FString>& Args) const
+void FCefWebSocketDebugCommands::HandleStop(const TArray<FString>& InArgs) const
 {
-	if (Args.Num() < 1)
+	if (InArgs.Num() < 1)
 	{
 		UE_LOG(LogCefWebSocketServer, Warning, TEXT("ws.stop usage: ws.stop <name>"));
 		return;
 	}
 
-	UCefWebSocketSubsystem* Subsystem = ResolveSubsystem();
-	if (!Subsystem)
+	UCefWebSocketSubsystem* subsystem = ResolveSubsystem();
+	if (!subsystem)
 	{
 		UE_LOG(LogCefWebSocketServer, Warning, TEXT("ws.stop: subsystem not available"));
 		return;
 	}
 
-	const FName NameId(*Args[0]);
-	const bool bStopped = Subsystem->StopServer(NameId);
-	UE_LOG(LogCefWebSocketServer, Log, TEXT("ws.stop: name=%s stopped=%s"), *NameId.ToString(), bStopped ? TEXT("true") : TEXT("false"));
+	const FName nameId(*InArgs[0]);
+	const bool bStopped = subsystem->StopServer(nameId);
+	UE_LOG(LogCefWebSocketServer, Log, TEXT("ws.stop: name=%s stopped=%s"), *nameId.ToString(), bStopped ? TEXT("true") : TEXT("false"));
 }
 
-void FCefWebSocketDebugCommands::HandleKick(const TArray<FString>& Args) const
+void FCefWebSocketDebugCommands::HandleKick(const TArray<FString>& InArgs) const
 {
-	if (Args.Num() < 2)
+	if (InArgs.Num() < 2)
 	{
 		UE_LOG(LogCefWebSocketServer, Warning, TEXT("ws.kick usage: ws.kick <server> <clientId>"));
 		return;
 	}
 
-	UCefWebSocketSubsystem* Subsystem = ResolveSubsystem();
-	if (!Subsystem)
+	UCefWebSocketSubsystem* subsystem = ResolveSubsystem();
+	if (!subsystem)
 	{
 		UE_LOG(LogCefWebSocketServer, Warning, TEXT("ws.kick: subsystem not available"));
 		return;
 	}
 
-	const FName NameId(*Args[0]);
-	UCefWebSocketServerBase* Server = Subsystem->GetServer(NameId);
-	if (!Server)
+	const FName nameId(*InArgs[0]);
+	UCefWebSocketServerBase* server = subsystem->GetServer(nameId);
+	if (!server)
 	{
-		UE_LOG(LogCefWebSocketServer, Warning, TEXT("ws.kick: server not found for '%s'"), *NameId.ToString());
+		UE_LOG(LogCefWebSocketServer, Warning, TEXT("ws.kick: server not found for '%s'"), *nameId.ToString());
 		return;
 	}
 
-	int64 ClientId = 0;
-	if (!LexTryParseString(ClientId, *Args[1]))
+	int64 clientId = 0;
+	if (!LexTryParseString(clientId, *InArgs[1]))
 	{
-		UE_LOG(LogCefWebSocketServer, Warning, TEXT("ws.kick: invalid client id '%s'"), *Args[1]);
+		UE_LOG(LogCefWebSocketServer, Warning, TEXT("ws.kick: invalid client id '%s'"), *InArgs[1]);
 		return;
 	}
 
-	const ECefWebSocketSendResult Result = Server->DisconnectClient(ClientId, ECefWebSocketCloseReason::Kicked);
-	UE_LOG(LogCefWebSocketServer, Log, TEXT("ws.kick: server=%s client=%lld result=%d"), *NameId.ToString(), ClientId, static_cast<int32>(Result));
+	const ECefWebSocketSendResult result = server->DisconnectClient(clientId, ECefWebSocketCloseReason::Kicked);
+	UE_LOG(LogCefWebSocketServer, Log, TEXT("ws.kick: server=%s client=%lld result=%d"), *nameId.ToString(), clientId, static_cast<int32>(result));
 }
 
-void FCefWebSocketDebugCommands::HandleStats(const TArray<FString>& Args) const
+void FCefWebSocketDebugCommands::HandleStats(const TArray<FString>& InArgs) const
 {
-	if (Args.Num() < 1)
+	if (InArgs.Num() < 1)
 	{
 		UE_LOG(LogCefWebSocketServer, Warning, TEXT("ws.stats usage: ws.stats <name>"));
 		return;
 	}
 
-	UCefWebSocketSubsystem* Subsystem = ResolveSubsystem();
-	if (!Subsystem)
+	UCefWebSocketSubsystem* subsystem = ResolveSubsystem();
+	if (!subsystem)
 	{
 		UE_LOG(LogCefWebSocketServer, Warning, TEXT("ws.stats: subsystem not available"));
 		return;
 	}
 
-	const FName NameId(*Args[0]);
-	UCefWebSocketServerBase* Server = Subsystem->GetServer(NameId);
-	if (!Server)
+	const FName nameId(*InArgs[0]);
+	UCefWebSocketServerBase* server = subsystem->GetServer(nameId);
+	if (!server)
 	{
-		UE_LOG(LogCefWebSocketServer, Warning, TEXT("ws.stats: server not found for '%s'"), *NameId.ToString());
+		UE_LOG(LogCefWebSocketServer, Warning, TEXT("ws.stats: server not found for '%s'"), *nameId.ToString());
 		return;
 	}
 
-	const FCefWebSocketServerStats Stats = Server->GetStats();
+	const FCefWebSocketServerStats stats = server->GetStats();
 	UE_LOG(
 		LogCefWebSocketServer,
 		Log,
 		TEXT("ws.stats: name=%s clients=%d rx=%lld tx=%lld rx_s=%.2f tx_s=%.2f dropped=%lld queue=%lld avg_queue=%.2f"),
-		*NameId.ToString(),
-		Stats.ActiveClients,
-		Stats.RxBytes,
-		Stats.TxBytes,
-		Stats.RxBytesPerSec,
-		Stats.TxBytesPerSec,
-		Stats.DroppedMessages,
-		Stats.QueueDepth,
-		Stats.AvgQueueDepth);
+		*nameId.ToString(),
+		stats.ActiveClients,
+		stats.RxBytes,
+		stats.TxBytes,
+		stats.RxBytesPerSec,
+		stats.TxBytesPerSec,
+		stats.DroppedMessages,
+		stats.QueueDepth,
+		stats.AvgQueueDepth);
 }

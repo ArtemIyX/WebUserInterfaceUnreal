@@ -12,15 +12,20 @@ FCefNetWebSocket::FCefNetWebSocket(CefWebSocketInternalContext* InContext, CefWe
 	: Context(InContext)
 	, Wsi(InWsi)
 {
-	int Sock = lws_get_socket_fd(Wsi);
-	socklen_t Len = sizeof(RemoteAddr);
-	FMemory::Memzero(&RemoteAddr, sizeof(RemoteAddr));
-	getpeername(Sock, (struct sockaddr*)&RemoteAddr, &Len);
+	const int32 sock = static_cast<int32>(lws_get_socket_fd(Wsi));
+	struct sockaddr_in remoteAddr;
+	FMemory::Memzero(&remoteAddr, sizeof(remoteAddr));
+	socklen_t remoteAddrLen = sizeof(remoteAddr);
+	getpeername(sock, reinterpret_cast<struct sockaddr*>(&remoteAddr), &remoteAddrLen);
+
+	ANSICHAR ipBuffer[INET_ADDRSTRLEN];
+	RemoteIp = ANSI_TO_TCHAR(inet_ntop(AF_INET, &remoteAddr.sin_addr, ipBuffer, INET_ADDRSTRLEN));
+	RemotePort = static_cast<int32>(ntohs(remoteAddr.sin_port));
 }
 
 FCefNetWebSocket::~FCefNetWebSocket()
 {
-	Flush();
+	FlushInternal();
 	ReceivedCallback.Unbind();
 }
 
@@ -51,13 +56,13 @@ bool FCefNetWebSocket::Send(const uint8* Data, uint32 Size, bool bPrependSize)
 		return false;
 	}
 
-	TArray<uint8> Buffer;
-	Buffer.AddDefaulted(LWS_PRE);
-	Buffer.Append(Data, Size);
+	TArray<uint8> buffer;
+	buffer.AddDefaulted(LWS_PRE);
+	buffer.Append(Data, Size);
 
 	{
-		FScopeLock Lock(&OutgoingLock);
-		OutgoingBuffer.Add(MoveTemp(Buffer));
+		FScopeLock lock(&OutgoingLock);
+		OutgoingBuffer.Add(MoveTemp(buffer));
 	}
 
 	if (Wsi)
@@ -74,6 +79,11 @@ void FCefNetWebSocket::Tick()
 
 void FCefNetWebSocket::Flush()
 {
+	FlushInternal();
+}
+
+void FCefNetWebSocket::FlushInternal()
+{
 	if (!Wsi)
 	{
 		return;
@@ -81,12 +91,12 @@ void FCefNetWebSocket::Flush()
 
 	for (;;)
 	{
-		int32 Count = 0;
+		int32 messageCount = 0;
 		{
-			FScopeLock Lock(&OutgoingLock);
-			Count = OutgoingBuffer.Num();
+			FScopeLock lock(&OutgoingLock);
+			messageCount = OutgoingBuffer.Num();
 		}
-		if (Count == 0)
+		if (messageCount == 0)
 		{
 			break;
 		}
@@ -108,29 +118,28 @@ void FCefNetWebSocket::Close()
 
 FString FCefNetWebSocket::RemoteEndPoint(bool bAppendPort)
 {
-	ANSICHAR Buffer[INET_ADDRSTRLEN];
-	FString Remote(ANSI_TO_TCHAR(inet_ntop(AF_INET, &RemoteAddr.sin_addr, Buffer, INET_ADDRSTRLEN)));
+	FString remote = RemoteIp;
 	if (bAppendPort)
 	{
-		Remote += FString::Printf(TEXT(":%i"), ntohs(RemoteAddr.sin_port));
+		remote += FString::Printf(TEXT(":%i"), RemotePort);
 	}
-	return Remote;
+	return remote;
 }
 
 FString FCefNetWebSocket::LocalEndPoint(bool bAppendPort)
 {
-	int Sock = lws_get_socket_fd(Wsi);
-	struct sockaddr_in Addr;
-	socklen_t Len = sizeof(Addr);
-	getsockname(Sock, (struct sockaddr*)&Addr, &Len);
+	const int32 sock = static_cast<int32>(lws_get_socket_fd(Wsi));
+	struct sockaddr_in localAddr;
+	socklen_t localAddrLen = sizeof(localAddr);
+	getsockname(sock, reinterpret_cast<struct sockaddr*>(&localAddr), &localAddrLen);
 
-	ANSICHAR Buffer[INET_ADDRSTRLEN];
-	FString Local(ANSI_TO_TCHAR(inet_ntop(AF_INET, &Addr.sin_addr, Buffer, INET_ADDRSTRLEN)));
+	ANSICHAR ipBuffer[INET_ADDRSTRLEN];
+	FString local(ANSI_TO_TCHAR(inet_ntop(AF_INET, &localAddr.sin_addr, ipBuffer, INET_ADDRSTRLEN)));
 	if (bAppendPort)
 	{
-		Local += FString::Printf(TEXT(":%i"), ntohs(Addr.sin_port));
+		local += FString::Printf(TEXT(":%i"), ntohs(localAddr.sin_port));
 	}
-	return Local;
+	return local;
 }
 
 void FCefNetWebSocket::OnReceive(void* Data, uint32 Size, bool bIsBinary)
@@ -140,29 +149,29 @@ void FCefNetWebSocket::OnReceive(void* Data, uint32 Size, bool bIsBinary)
 
 void FCefNetWebSocket::OnRawWebSocketWritable(CefWebSocketInternal* InWsi)
 {
-	TArray<uint8> Packet;
+	TArray<uint8> packet;
 	{
-		FScopeLock Lock(&OutgoingLock);
+		FScopeLock lock(&OutgoingLock);
 		if (OutgoingBuffer.Num() == 0)
 		{
 			return;
 		}
-		Packet = MoveTemp(OutgoingBuffer[0]);
+		packet = MoveTemp(OutgoingBuffer[0]);
 		OutgoingBuffer.RemoveAt(0);
 	}
 
-	uint32 DataToSend = Packet.Num() - LWS_PRE;
-	uint32 Offset = 0;
-	while (DataToSend > 0)
+	uint32 bytesToSend = packet.Num() - LWS_PRE;
+	uint32 sentOffset = 0;
+	while (bytesToSend > 0)
 	{
-		const int Sent = lws_write(InWsi, Packet.GetData() + LWS_PRE + Offset, DataToSend, LWS_WRITE_BINARY);
-		if (Sent < 0)
+		const int32 sent = static_cast<int32>(lws_write(InWsi, packet.GetData() + LWS_PRE + sentOffset, bytesToSend, LWS_WRITE_BINARY));
+		if (sent < 0)
 		{
 			ErrorCallBack.ExecuteIfBound();
 			return;
 		}
-		Offset += static_cast<uint32>(Sent);
-		DataToSend -= static_cast<uint32>(Sent);
+		sentOffset += static_cast<uint32>(sent);
+		bytesToSend -= static_cast<uint32>(sent);
 	}
 }
 

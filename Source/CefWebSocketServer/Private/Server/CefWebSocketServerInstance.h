@@ -57,9 +57,14 @@ private:
 
 	struct FCefClientState
 	{
+		FCefClientState()
+			: Outbox(MakeUnique<TQueue<FCefOutboundMessage, EQueueMode::Mpsc>>())
+		{
+		}
+
 		FCefWebSocketClientInfo Info;
 		ICefNetWebSocket* Socket = nullptr;
-		TQueue<FCefOutboundMessage, EQueueMode::Mpsc> Outbox;
+		TUniquePtr<TQueue<FCefOutboundMessage, EQueueMode::Mpsc>> Outbox;
 		int64 QueueBytes = 0;
 		int32 QueueMessages = 0;
 	};
