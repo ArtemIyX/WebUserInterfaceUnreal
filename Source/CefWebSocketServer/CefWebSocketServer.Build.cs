@@ -10,6 +10,8 @@ public class CefWebSocketServer : ModuleRules
             new string[]
             {
                 "Core",
+                "WebSockets",
+                "Sockets"
             }
         );
 
@@ -18,9 +20,19 @@ public class CefWebSocketServer : ModuleRules
             {
                 "CoreUObject",
                 "Engine",
-                "Slate",
-                "SlateCore"
+                "NetCore",
+                "EngineSettings",
+                "ImageCore",
+                "PacketHandler",
+                "Json",
+                "JsonUtilities",
+                "Projects",
+                "OpenSSL",
+                "libWebSockets",
+                "zlib"
             }
         );
+
+        PublicDefinitions.Add("USE_LIBWEBSOCKET=1");
     }
 }

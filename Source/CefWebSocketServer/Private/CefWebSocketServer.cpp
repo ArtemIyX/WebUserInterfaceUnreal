@@ -1,17 +1,15 @@
 ﻿#include "CefWebSocketServer.h"
 
-#define LOCTEXT_NAMESPACE "FCefWebSocketServerModule"
+#include "Logging/CefWebSocketLog.h"
 
 void FCefWebSocketServerModule::StartupModule()
 {
-    
+	UE_LOG(LogCefWebSocket, Log, TEXT("CefWebSocketServer module started"));
 }
 
 void FCefWebSocketServerModule::ShutdownModule()
 {
-    
+	UE_LOG(LogCefWebSocket, Log, TEXT("CefWebSocketServer module shutdown"));
 }
 
-#undef LOCTEXT_NAMESPACE
-    
 IMPLEMENT_MODULE(FCefWebSocketServerModule, CefWebSocketServer)

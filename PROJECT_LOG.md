@@ -151,3 +151,37 @@ YYYY-MM-DD HH:MM
 - Browser shortcuts now map correctly through UE input path.
 - Surface code is split into clearer units with public headers for shared constants/helpers.
 - Popup-plane path now fails safely when shared popup texture is not ready.
+
+---
+
+## 2026-04-18 12:05
+
+### Changed
+- Phase 1 for new `CefWebSocketServer` module:
+  - expanded module dependencies for websocket server/runtime/json support.
+  - added separated public data files:
+    - `Data/CefWebSocketEnums.h`
+    - `Data/CefWebSocketStructs.h`
+    - `Data/CefWebSocketDelegates.h`
+  - added separated infrastructure files:
+    - logs (`Private/Logging/CefWebSocketLog.h/.cpp`)
+    - cvars (`Private/Config/CefWebSocketCVars.h/.cpp`)
+    - stats (`Private/Stats/CefWebSocketStats.h/.cpp`)
+  - added subsystem/server/client contracts:
+    - `Subsystems/CefWebSocketSubsystem.h/.cpp`
+    - `Server/CefWebSocketServerBase.h/.cpp`
+    - `Server/CefWebSocketClientBase.h/.cpp`
+  - added initial server instance scaffolding:
+    - `Private/Server/CefWebSocketServerInstance.h/.cpp`
+  - added backend interface contracts:
+    - `Public/Networking/ICefNetWebSocket.h`
+    - `Public/Networking/ICefWebSocketServerBackend.h`
+    - `Public/Networking/CefNetWebSocketDelegates.h`
+
+### Why
+- Prepare stable API/ownership boundaries before implementing low-level websocket backend and FRunnable thread model.
+- Keep files small and split by concern (enums/structs/logs/stats/cvars/subsystem).
+
+### Impact
+- `CefWebSocketServer` now has complete public contracts and module structure for phased implementation.
+- Runtime behavior is still scaffold-level; backend threading and real socket flow are not wired yet.
