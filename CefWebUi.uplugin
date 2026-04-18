@@ -18,6 +18,11 @@
 			"Name": "CefWebUi",
 			"Type": "Runtime",
 			"LoadingPhase": "PostConfigInit"
+		},
+		{
+			"Name": "CefWebSocketServer",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
 		}
 	]
 }
