@@ -90,8 +90,14 @@ public:
 protected:
 #pragma region InternalApi
 	friend class UCefWebSocketSubsystem;
+	friend class FCefWebSocketServerInstance;
 	bool StartServerInternal(FName InNameId, int32 InBoundPort, TSubclassOf<UCefWebSocketClientBase> InClientClass);
 	void AttachInstance(TSharedPtr<FCefWebSocketServerInstance> InInstance);
+	void NotifyClientConnected(const FCefWebSocketClientInfo& ClientInfo);
+	void NotifyClientDisconnected(int64 ClientId, ECefWebSocketCloseReason Reason);
+	void NotifyServerError(ECefWebSocketErrorCode ErrorCode, const FString& Message);
+	void NotifyClientError(int64 ClientId, ECefWebSocketErrorCode ErrorCode, const FString& Message);
+	void NotifyClientMessage(int64 ClientId, const TArray<uint8>& Payload, bool bBinary);
 #pragma endregion
 
 private:

@@ -185,3 +185,32 @@ YYYY-MM-DD HH:MM
 ### Impact
 - `CefWebSocketServer` now has complete public contracts and module structure for phased implementation.
 - Runtime behavior is still scaffold-level; backend threading and real socket flow are not wired yet.
+
+---
+
+## 2026-04-18 12:45
+
+### Changed
+- Phase 2 for `CefWebSocketServer`:
+  - added low-level websocket backend implementation files:
+    - `Private/Networking/CefWebSocketPrivate.h`
+    - `Private/Networking/CefNetWebSocket.h/.cpp`
+    - `Private/Networking/CefWebSocketServerBackend.h/.cpp`
+  - updated packet callback delegate to include text/binary flag.
+  - wired `FCefWebSocketServerInstance` to:
+    - create and initialize backend,
+    - bind connected/disconnected/packet callbacks,
+    - register server tick through `FTSTicker`,
+    - maintain real client maps (`ClientId <-> Socket`),
+    - route client connect/disconnect/message notifications to `UCefWebSocketServerBase`.
+  - updated `UCefWebSocketSubsystem::CreateOrGetServer` to attempt port auto-increment startup loop and return `PortAutoAdjusted` when needed.
+  - implemented server-side UObject client creation/removal notifications in `UCefWebSocketServerBase`.
+
+### Why
+- Move from contracts-only scaffolding to actual server lifecycle and connection handling.
+- Establish stable runtime path before introducing dedicated read/write FRunnable threads.
+
+### Impact
+- Servers now attempt to bind and run with real websocket backend callbacks.
+- Client objects are created on connect and removed on disconnect.
+- Next phase will migrate backend ticking/sending off ticker path to dedicated read/write threads.

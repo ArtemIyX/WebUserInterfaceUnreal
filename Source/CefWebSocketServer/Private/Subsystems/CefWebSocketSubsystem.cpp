@@ -47,32 +47,38 @@ FCefWebSocketServerCreateResult UCefWebSocketSubsystem::CreateOrGetServer(
 		return Out;
 	}
 
-	int32 ResolvedPort = 0;
-	bool bAdjusted = false;
-	if (!TryResolvePort(Options.RequestedPort, ResolvedPort, bAdjusted))
+	int32 BasePort = 0;
+	bool bInitialAdjusted = false;
+	if (!TryResolvePort(Options.RequestedPort, BasePort, bInitialAdjusted))
 	{
-		UE_LOG(LogCefWebSocketServer, Error, TEXT("CreateOrGetServer: Failed to resolve port for %s"), *Options.NameId.ToString());
+		UE_LOG(LogCefWebSocketServer, Error, TEXT("CreateOrGetServer: Failed to resolve base port for %s"), *Options.NameId.ToString());
 		return Out;
 	}
 
+	const int32 MaxScan = FMath::Max(1, CefWebSocketCVars::GetMaxPortScan());
 	UClass* ServerUClass = ServerClass ? ServerClass.Get() : UCefWebSocketServerBase::StaticClass();
-	UCefWebSocketServerBase* NewServer = NewObject<UCefWebSocketServerBase>(this, ServerUClass);
-	if (!NewServer)
+
+	for (int32 Attempt = 0; Attempt <= MaxScan; ++Attempt)
 	{
-		UE_LOG(LogCefWebSocketServer, Error, TEXT("CreateOrGetServer: Failed to allocate server object for %s"), *Options.NameId.ToString());
-		return Out;
+		const int32 CandidatePort = BasePort + Attempt;
+		UCefWebSocketServerBase* NewServer = NewObject<UCefWebSocketServerBase>(this, ServerUClass);
+		if (!NewServer)
+		{
+			continue;
+		}
+
+		if (NewServer->StartServerInternal(Options.NameId, CandidatePort, ClientClass))
+		{
+			Servers.Add(Options.NameId, NewServer);
+			OutServer = NewServer;
+			Out.BoundPort = NewServer->GetBoundPort();
+			Out.Result = (Attempt > 0 || bInitialAdjusted) ? ECefWebSocketCreateResult::PortAutoAdjusted : ECefWebSocketCreateResult::Created;
+			UE_LOG(LogCefWebSocketServer, Log, TEXT("CreateOrGetServer: Started '%s' on port %d"), *Options.NameId.ToString(), Out.BoundPort);
+			return Out;
+		}
 	}
 
-	if (!NewServer->StartServerInternal(Options.NameId, ResolvedPort, ClientClass))
-	{
-		UE_LOG(LogCefWebSocketServer, Error, TEXT("CreateOrGetServer: StartServerInternal failed for %s"), *Options.NameId.ToString());
-		return Out;
-	}
-
-	Servers.Add(Options.NameId, NewServer);
-	OutServer = NewServer;
-	Out.BoundPort = ResolvedPort;
-	Out.Result = bAdjusted ? ECefWebSocketCreateResult::PortAutoAdjusted : ECefWebSocketCreateResult::Created;
+	UE_LOG(LogCefWebSocketServer, Error, TEXT("CreateOrGetServer: Failed to start '%s' after %d attempts"), *Options.NameId.ToString(), MaxScan + 1);
 	return Out;
 }
 
@@ -135,27 +141,5 @@ bool UCefWebSocketSubsystem::TryResolvePort(int32 RequestedPort, int32& OutResol
 		bOutAdjusted = true;
 	}
 
-	const int32 MaxScan = FMath::Max(1, CefWebSocketCVars::GetMaxPortScan());
-	TSet<int32> UsedPorts;
-	for (const TPair<FName, TObjectPtr<UCefWebSocketServerBase>>& Pair : Servers)
-	{
-		if (Pair.Value)
-		{
-			UsedPorts.Add(Pair.Value->GetBoundPort());
-		}
-	}
-
-	int32 Candidate = OutResolvedPort;
-	for (int32 i = 0; i <= MaxScan; ++i)
-	{
-		if (!UsedPorts.Contains(Candidate))
-		{
-			OutResolvedPort = Candidate;
-			bOutAdjusted = (Candidate != RequestedPort);
-			return true;
-		}
-		++Candidate;
-	}
-
-	return false;
+	return true;
 }

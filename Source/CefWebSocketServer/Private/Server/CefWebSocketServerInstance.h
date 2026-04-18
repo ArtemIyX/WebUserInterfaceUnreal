@@ -1,9 +1,12 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "Containers/Ticker.h"
 #include "Data/CefWebSocketStructs.h"
 #include "Data/CefWebSocketEnums.h"
 
+class ICefNetWebSocket;
+class ICefWebSocketServerBackend;
 class UCefWebSocketServerBase;
 
 class FCefWebSocketServerInstance : public TSharedFromThis<FCefWebSocketServerInstance>
@@ -29,11 +32,27 @@ public:
 	FCefWebSocketClientInfo FindClientInfo(int64 ClientId) const;
 
 private:
+	struct FCefClientState
+	{
+		FCefWebSocketClientInfo Info;
+		ICefNetWebSocket* Socket = nullptr;
+	};
+
+	bool TickServer(float DeltaTime);
+	void HandleClientConnected(ICefNetWebSocket* Socket);
+	void HandleClientDisconnected(ICefNetWebSocket* Socket);
+	void HandleClientPacket(ICefNetWebSocket* Socket, const uint8* Data, int32 Count, bool bBinary);
+	ECefWebSocketSendResult SendToSocket(ICefNetWebSocket* Socket, const uint8* Data, int32 Count);
+
 	FName NameId = NAME_None;
 	int32 BoundPort = 0;
 	TWeakObjectPtr<UCefWebSocketServerBase> OwnerServer;
 	TAtomic<bool> bRunning = false;
 	mutable FCriticalSection ClientLock;
-	TMap<int64, FCefWebSocketClientInfo> Clients;
+	TMap<int64, FCefClientState> Clients;
+	TMap<ICefNetWebSocket*, int64> ClientIdsBySocket;
+	TUniquePtr<ICefWebSocketServerBackend> Backend;
+	FTSTicker::FDelegateHandle TickHandle;
+	int64 NextClientId = 1;
 	FCefWebSocketServerStats Stats;
 };

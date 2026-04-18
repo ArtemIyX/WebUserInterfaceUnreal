@@ -1,7 +1,8 @@
 ﻿#include "Server/CefWebSocketServerBase.h"
 
-#include "Data/CefWebSocketStructs.h"`r`n#include "Serialization/JsonSerializer.h"`r`n#include "Serialization/JsonWriter.h"
-#include "JsonObjectConverter.h"
+#include "Data/CefWebSocketStructs.h"
+#include "Serialization/JsonSerializer.h"
+#include "Serialization/JsonWriter.h"
 #include "Server/CefWebSocketClientBase.h"
 #include "Server/CefWebSocketServerInstance.h"
 
@@ -61,9 +62,9 @@ ECefWebSocketSendResult UCefWebSocketServerBase::SendToClientJson(int64 ClientId
 	}
 
 	FString Serialized;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Serialized);
 	if (JsonObject.IsValid())
 	{
-		TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Serialized);
 		if (!FJsonSerializer::Serialize(JsonObject.ToSharedRef(), Writer))
 		{
 			return ECefWebSocketSendResult::SerializeFailed;
@@ -71,7 +72,6 @@ ECefWebSocketSendResult UCefWebSocketServerBase::SendToClientJson(int64 ClientId
 	}
 	else
 	{
-		TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Serialized);
 		if (!FJsonSerializer::Serialize(JsonValue.ToSharedRef(), TEXT(""), Writer))
 		{
 			return ECefWebSocketSendResult::SerializeFailed;
@@ -107,9 +107,9 @@ ECefWebSocketSendResult UCefWebSocketServerBase::BroadcastJson(const TSharedPtr<
 	}
 
 	FString Serialized;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Serialized);
 	if (JsonObject.IsValid())
 	{
-		TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Serialized);
 		if (!FJsonSerializer::Serialize(JsonObject.ToSharedRef(), Writer))
 		{
 			return ECefWebSocketSendResult::SerializeFailed;
@@ -117,7 +117,6 @@ ECefWebSocketSendResult UCefWebSocketServerBase::BroadcastJson(const TSharedPtr<
 	}
 	else
 	{
-		TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Serialized);
 		if (!FJsonSerializer::Serialize(JsonValue.ToSharedRef(), TEXT(""), Writer))
 		{
 			return ECefWebSocketSendResult::SerializeFailed;
@@ -151,7 +150,6 @@ ECefWebSocketSendResult UCefWebSocketServerBase::DisconnectClient(int64 ClientId
 	{
 		return ECefWebSocketSendResult::InvalidServer;
 	}
-	ClientObjects.Remove(ClientId);
 	return Instance->DisconnectClient(ClientId, Reason);
 }
 
@@ -195,6 +193,57 @@ FCefWebSocketServerStats UCefWebSocketServerBase::GetStats() const
 	return Instance->GetStats();
 }
 
+void UCefWebSocketServerBase::NotifyClientConnected(const FCefWebSocketClientInfo& ClientInfo)
+{
+	UClass* ClientUClass = ClientClass ? ClientClass.Get() : UCefWebSocketClientBase::StaticClass();
+	UCefWebSocketClientBase* ClientObject = NewObject<UCefWebSocketClientBase>(this, ClientUClass);
+	if (!ClientObject)
+	{
+		NotifyClientError(ClientInfo.ClientId, ECefWebSocketErrorCode::Unknown, TEXT("Failed to create client object"));
+		return;
+	}
+
+	ClientObject->InitializeClient(this, ClientInfo);
+	ClientObjects.Add(ClientInfo.ClientId, ClientObject);
+	OnClientConnected.Broadcast(ClientInfo);
+}
+
+void UCefWebSocketServerBase::NotifyClientDisconnected(int64 ClientId, ECefWebSocketCloseReason Reason)
+{
+	ClientObjects.Remove(ClientId);
+	OnClientDisconnected.Broadcast(ClientId, Reason);
+}
+
+void UCefWebSocketServerBase::NotifyServerError(ECefWebSocketErrorCode ErrorCode, const FString& Message)
+{
+	OnServerError.Broadcast(NameId, ErrorCode, Message);
+}
+
+void UCefWebSocketServerBase::NotifyClientError(int64 ClientId, ECefWebSocketErrorCode ErrorCode, const FString& Message)
+{
+	OnClientError.Broadcast(ClientId, ErrorCode, Message);
+}
+
+void UCefWebSocketServerBase::NotifyClientMessage(int64 ClientId, const TArray<uint8>& Payload, bool bBinary)
+{
+	UCefWebSocketClientBase* Client = GetClient(ClientId);
+	if (!Client)
+	{
+		return;
+	}
+
+	Client->HandleBytesFromClient(Payload);
+	HandleClientBytes(Client, Payload);
+
+	if (!bBinary)
+	{
+		FUTF8ToTCHAR Converter(reinterpret_cast<const ANSICHAR*>(Payload.GetData()), Payload.Num());
+		const FString Text(Converter.Length(), Converter.Get());
+		Client->HandleStringFromClient(Text);
+		HandleClientString(Client, Text);
+	}
+}
+
 void UCefWebSocketServerBase::HandleClientBytes(UCefWebSocketClientBase* Client, const TArray<uint8>& Data)
 {
 }
@@ -202,4 +251,3 @@ void UCefWebSocketServerBase::HandleClientBytes(UCefWebSocketClientBase* Client,
 void UCefWebSocketServerBase::HandleClientString(UCefWebSocketClientBase* Client, const FString& Message)
 {
 }
-
