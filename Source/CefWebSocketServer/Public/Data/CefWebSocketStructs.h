@@ -62,4 +62,13 @@ struct CEFWEBSOCKETSERVER_API FCefWebSocketServerStats
 
 	UPROPERTY(BlueprintReadOnly, Category = "CefWebSocket|Stats")
 	int64 QueueDepth = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "CefWebSocket|Stats")
+	float RxBytesPerSec = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "CefWebSocket|Stats")
+	float TxBytesPerSec = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "CefWebSocket|Stats")
+	float AvgQueueDepth = 0.0f;
 };

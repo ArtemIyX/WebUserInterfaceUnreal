@@ -214,3 +214,37 @@ YYYY-MM-DD HH:MM
 - Servers now attempt to bind and run with real websocket backend callbacks.
 - Client objects are created on connect and removed on disconnect.
 - Next phase will migrate backend ticking/sending off ticker path to dedicated read/write threads.
+
+---
+
+## 2026-04-18 12:59
+
+### Changed
+- Phase 3 for `CefWebSocketServer` threading and dispatch:
+  - added dedicated FRunnable thread files:
+    - `Private/Threads/CefWebSocketReadRunnable.h/.cpp`
+    - `Private/Threads/CefWebSocketWriteRunnable.h/.cpp`
+  - migrated backend processing from ticker model to dedicated read/write thread flow in `FCefWebSocketServerInstance`:
+    - read thread now ticks backend service loop.
+    - write thread now drains per-client outbound queues.
+    - added write wake event for low-idle spin.
+  - added per-client outbound queue state and bounded queue behavior in server instance:
+    - message/byte queue accounting per client,
+    - oldest-drop pressure handling,
+    - queue-full send result fallback.
+  - updated `UCefWebSocketServerBase` dispatch behavior:
+    - connect/disconnect/server-error/client-error notifications marshaled to game thread,
+    - payload handling remains on read thread,
+    - synchronized client UObject map with critical section.
+
+### Why
+- Implement required two-thread model (read/write) with scalable multi-client queues.
+- Avoid ticker-coupled network pacing and keep callback safety for Blueprint-facing events.
+
+### Impact
+- Server runtime now uses dedicated websocket IO worker threads.
+- Outbound sends are decoupled from caller thread and backpressure is bounded per client.
+- BP delegates are now game-thread safe for lifecycle/error events.
+
+---
+

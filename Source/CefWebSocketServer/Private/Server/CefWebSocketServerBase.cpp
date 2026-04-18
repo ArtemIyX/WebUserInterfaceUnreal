@@ -1,5 +1,6 @@
 ﻿#include "Server/CefWebSocketServerBase.h"
 
+#include "Async/Async.h"
 #include "Data/CefWebSocketStructs.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
@@ -159,12 +160,14 @@ void UCefWebSocketServerBase::StopServer()
 	{
 		Instance->Stop();
 	}
+	FScopeLock Lock(&ClientObjectsLock);
 	ClientObjects.Empty();
 }
 
 TArray<UCefWebSocketClientBase*> UCefWebSocketServerBase::GetClients() const
 {
 	TArray<UCefWebSocketClientBase*> OutClients;
+	FScopeLock Lock(&ClientObjectsLock);
 	for (const TPair<int64, TObjectPtr<UCefWebSocketClientBase>>& Pair : ClientObjects)
 	{
 		if (Pair.Value)
@@ -177,6 +180,7 @@ TArray<UCefWebSocketClientBase*> UCefWebSocketServerBase::GetClients() const
 
 UCefWebSocketClientBase* UCefWebSocketServerBase::GetClient(int64 ClientId) const
 {
+	FScopeLock Lock(&ClientObjectsLock);
 	if (const TObjectPtr<UCefWebSocketClientBase>* Found = ClientObjects.Find(ClientId))
 	{
 		return *Found;
@@ -195,6 +199,19 @@ FCefWebSocketServerStats UCefWebSocketServerBase::GetStats() const
 
 void UCefWebSocketServerBase::NotifyClientConnected(const FCefWebSocketClientInfo& ClientInfo)
 {
+	if (!IsInGameThread())
+	{
+		TWeakObjectPtr<UCefWebSocketServerBase> WeakThis(this);
+		AsyncTask(ENamedThreads::GameThread, [WeakThis, ClientInfo]()
+		{
+			if (WeakThis.IsValid())
+			{
+				WeakThis->NotifyClientConnected(ClientInfo);
+			}
+		});
+		return;
+	}
+
 	UClass* ClientUClass = ClientClass ? ClientClass.Get() : UCefWebSocketClientBase::StaticClass();
 	UCefWebSocketClientBase* ClientObject = NewObject<UCefWebSocketClientBase>(this, ClientUClass);
 	if (!ClientObject)
@@ -204,29 +221,79 @@ void UCefWebSocketServerBase::NotifyClientConnected(const FCefWebSocketClientInf
 	}
 
 	ClientObject->InitializeClient(this, ClientInfo);
-	ClientObjects.Add(ClientInfo.ClientId, ClientObject);
+	{
+		FScopeLock Lock(&ClientObjectsLock);
+		ClientObjects.Add(ClientInfo.ClientId, ClientObject);
+	}
 	OnClientConnected.Broadcast(ClientInfo);
 }
 
 void UCefWebSocketServerBase::NotifyClientDisconnected(int64 ClientId, ECefWebSocketCloseReason Reason)
 {
-	ClientObjects.Remove(ClientId);
+	if (!IsInGameThread())
+	{
+		TWeakObjectPtr<UCefWebSocketServerBase> WeakThis(this);
+		AsyncTask(ENamedThreads::GameThread, [WeakThis, ClientId, Reason]()
+		{
+			if (WeakThis.IsValid())
+			{
+				WeakThis->NotifyClientDisconnected(ClientId, Reason);
+			}
+		});
+		return;
+	}
+
+	{
+		FScopeLock Lock(&ClientObjectsLock);
+		ClientObjects.Remove(ClientId);
+	}
 	OnClientDisconnected.Broadcast(ClientId, Reason);
 }
 
 void UCefWebSocketServerBase::NotifyServerError(ECefWebSocketErrorCode ErrorCode, const FString& Message)
 {
+	if (!IsInGameThread())
+	{
+		TWeakObjectPtr<UCefWebSocketServerBase> WeakThis(this);
+		AsyncTask(ENamedThreads::GameThread, [WeakThis, ErrorCode, Message]()
+		{
+			if (WeakThis.IsValid())
+			{
+				WeakThis->NotifyServerError(ErrorCode, Message);
+			}
+		});
+		return;
+	}
 	OnServerError.Broadcast(NameId, ErrorCode, Message);
 }
 
 void UCefWebSocketServerBase::NotifyClientError(int64 ClientId, ECefWebSocketErrorCode ErrorCode, const FString& Message)
 {
+	if (!IsInGameThread())
+	{
+		TWeakObjectPtr<UCefWebSocketServerBase> WeakThis(this);
+		AsyncTask(ENamedThreads::GameThread, [WeakThis, ClientId, ErrorCode, Message]()
+		{
+			if (WeakThis.IsValid())
+			{
+				WeakThis->NotifyClientError(ClientId, ErrorCode, Message);
+			}
+		});
+		return;
+	}
 	OnClientError.Broadcast(ClientId, ErrorCode, Message);
 }
 
 void UCefWebSocketServerBase::NotifyClientMessage(int64 ClientId, const TArray<uint8>& Payload, bool bBinary)
 {
-	UCefWebSocketClientBase* Client = GetClient(ClientId);
+	UCefWebSocketClientBase* Client = nullptr;
+	{
+		FScopeLock Lock(&ClientObjectsLock);
+		if (const TObjectPtr<UCefWebSocketClientBase>* Found = ClientObjects.Find(ClientId))
+		{
+			Client = *Found;
+		}
+	}
 	if (!Client)
 	{
 		return;

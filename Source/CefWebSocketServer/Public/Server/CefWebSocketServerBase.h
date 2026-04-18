@@ -105,6 +105,7 @@ private:
 	FName NameId = NAME_None;
 	int32 BoundPort = 0;
 	TSubclassOf<UCefWebSocketClientBase> ClientClass;
+	mutable FCriticalSection ClientObjectsLock;
 	TMap<int64, TObjectPtr<UCefWebSocketClientBase>> ClientObjects;
 	TSharedPtr<FCefWebSocketServerInstance> Instance;
 #pragma endregion
