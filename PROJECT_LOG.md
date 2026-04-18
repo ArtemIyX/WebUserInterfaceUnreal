@@ -248,3 +248,24 @@ YYYY-MM-DD HH:MM
 
 ---
 
+
+---
+
+## 2026-04-18 13:00
+
+### Changed
+- Phase 4 for `CefWebSocketServer` observability/debug tooling:
+  - added split debug command files:
+    - `Private/Debug/CefWebSocketDebugCommands.h/.cpp`
+  - wired debug command lifecycle in module startup/shutdown.
+  - added console commands:
+    - `ws.list`
+    - `ws.kick <server> <clientId>`
+    - `ws.stop <name>`
+    - `ws.stats <name>`
+
+### Why
+- Provide first-pass runtime inspection and operational controls without custom UI.
+
+### Impact
+- Runtime debugging of active servers/clients is available through UE console commands.
