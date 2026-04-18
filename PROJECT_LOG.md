@@ -295,3 +295,24 @@ YYYY-MM-DD HH:MM
 ### Impact
 - Websocket server code path compiles cleanly for the addressed issues.
 - Networking/destructor behavior is safer and code style is consistent with project rules.
+
+---
+
+## 2026-04-18 20:10
+
+### Changed
+- Added websocket usage documentation:
+  - `Source/CefWebSocketServer/README.md`
+- Documented:
+  - subsystem/server/client setup flow,
+  - Blueprint and C++ quick start,
+  - subclassing points,
+  - JSON send API,
+  - debug commands,
+  - cvars and lifecycle notes.
+
+### Why
+- Provide a single practical reference for integrating and operating websocket servers in projects.
+
+### Impact
+- Team can onboard and test websocket server flow without reading implementation files first.
