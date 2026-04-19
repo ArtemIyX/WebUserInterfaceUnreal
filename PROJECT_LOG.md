@@ -666,3 +666,21 @@ YYYY-MM-DD HH:MM
 - Batch size is tunable at runtime.
 
 ---
+## 2026-04-19 19:04
+
+### Changed
+- Subtask 4/14: tuned read-thread idle backoff with runtime controls.
+- Added CVars:
+  - cefws.read_busy_sleep_ms
+  - cefws.read_idle_max_sleep_ms
+- Changed read-stage tick API to return activity signal (TickBackendOnReadThread() -> bool).
+- Added read-activity flag updates on connect/disconnect/packet callbacks.
+- Updated read runnable to use exponential idle backoff between busy/idle sleep bounds.
+
+### Why
+- Reduce CPU usage during idle periods while keeping read responsiveness when traffic resumes.
+
+### Impact
+- Read thread now adapts sleep duration automatically based on observed activity.
+
+---

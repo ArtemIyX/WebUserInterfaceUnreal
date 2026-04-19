@@ -239,14 +239,15 @@ void FCefWebSocketServerInstance::SetPacketCodec(const TSharedPtr<ICefWebSocketP
 	CustomCodec = InCodec;
 }
 
-void FCefWebSocketServerInstance::TickBackendOnReadThread()
+bool FCefWebSocketServerInstance::TickBackendOnReadThread()
 {
 	if (!bRunning.Load() || !Backend)
 	{
-		return;
+		return false;
 	}
 	Backend->Tick();
 	SweepConnectionHealthOnReadThread();
+	return bReadActivity.Exchange(false);
 }
 
 bool FCefWebSocketServerInstance::PumpInboundOnHandleThread()
@@ -455,6 +456,7 @@ void FCefWebSocketServerInstance::HandleClientConnected(ICefNetWebSocket* InSock
 		Stats.ActiveClients = Clients.Num();
 		RecordQueueDepthSample_NoLock();
 	}
+	bReadActivity.Store(true);
 
 	if (OwnerServer.IsValid())
 	{
@@ -485,6 +487,7 @@ void FCefWebSocketServerInstance::HandleClientDisconnected(ICefNetWebSocket* InS
 			RecordQueueDepthSample_NoLock();
 		}
 	}
+	bReadActivity.Store(true);
 
 	if (clientId != 0 && OwnerServer.IsValid())
 	{
@@ -531,6 +534,7 @@ void FCefWebSocketServerInstance::HandleClientPacket(ICefNetWebSocket* InSocket,
 			UpdateRateStats_NoLock();
 		}
 	}
+	bReadActivity.Store(true);
 
 	if (clientId == 0)
 	{
@@ -942,3 +946,5 @@ void FCefWebSocketServerInstance::SweepConnectionHealthOnReadThread()
 		socket->Close();
 	}
 }
+
+

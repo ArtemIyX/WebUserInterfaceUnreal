@@ -10,6 +10,8 @@ namespace
 	TAutoConsoleVariable<int32> CVarCefWsQueueDropPolicy(TEXT("cefws.queue_drop_policy"), 0, TEXT("Queue overflow policy: 0=drop_oldest, 1=reject_new."));
 	TAutoConsoleVariable<int32> CVarCefWsWriteBatchMaxMessages(TEXT("cefws.write_batch_max_messages"), 16, TEXT("Maximum messages drained per client on one write pass."));
 	TAutoConsoleVariable<int32> CVarCefWsWriteBatchMaxBytes(TEXT("cefws.write_batch_max_bytes"), 128 * 1024, TEXT("Maximum bytes drained per client on one write pass."));
+	TAutoConsoleVariable<int32> CVarCefWsReadBusySleepMs(TEXT("cefws.read_busy_sleep_ms"), 1, TEXT("Read thread sleep in milliseconds when activity is detected."));
+	TAutoConsoleVariable<int32> CVarCefWsReadIdleMaxSleepMs(TEXT("cefws.read_idle_max_sleep_ms"), 16, TEXT("Read thread max backoff sleep in milliseconds during idle periods."));
 	TAutoConsoleVariable<int32> CVarCefWsWriteIdleSleepMs(TEXT("cefws.write_idle_sleep_ms"), 2, TEXT("Write thread idle wait in milliseconds."));
 	TAutoConsoleVariable<int32> CVarCefWsShutdownTimeoutMs(TEXT("cefws.shutdown_timeout_ms"), 1000, TEXT("Server shutdown grace timeout in milliseconds."));
 	TAutoConsoleVariable<int32> CVarCefWsMaxPortScan(TEXT("cefws.max_port_scan"), 32, TEXT("Maximum ports to probe for auto-next-port behavior."));
@@ -27,6 +29,8 @@ namespace CefWebSocketCVars
 	int32 GetQueueDropPolicy() { return CVarCefWsQueueDropPolicy.GetValueOnAnyThread(); }
 	int32 GetWriteBatchMaxMessages() { return CVarCefWsWriteBatchMaxMessages.GetValueOnAnyThread(); }
 	int32 GetWriteBatchMaxBytes() { return CVarCefWsWriteBatchMaxBytes.GetValueOnAnyThread(); }
+	int32 GetReadBusySleepMs() { return CVarCefWsReadBusySleepMs.GetValueOnAnyThread(); }
+	int32 GetReadIdleMaxSleepMs() { return CVarCefWsReadIdleMaxSleepMs.GetValueOnAnyThread(); }
 	int32 GetWriteIdleSleepMs() { return CVarCefWsWriteIdleSleepMs.GetValueOnAnyThread(); }
 	int32 GetShutdownTimeoutMs() { return CVarCefWsShutdownTimeoutMs.GetValueOnAnyThread(); }
 	int32 GetMaxPortScan() { return CVarCefWsMaxPortScan.GetValueOnAnyThread(); }

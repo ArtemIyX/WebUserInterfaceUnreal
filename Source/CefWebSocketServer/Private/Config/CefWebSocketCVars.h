@@ -10,6 +10,8 @@ namespace CefWebSocketCVars
 	int32 GetQueueDropPolicy();
 	int32 GetWriteBatchMaxMessages();
 	int32 GetWriteBatchMaxBytes();
+	int32 GetReadBusySleepMs();
+	int32 GetReadIdleMaxSleepMs();
 	int32 GetWriteIdleSleepMs();
 	int32 GetShutdownTimeoutMs();
 	int32 GetMaxPortScan();
