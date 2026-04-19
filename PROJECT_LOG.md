@@ -684,3 +684,20 @@ YYYY-MM-DD HH:MM
 - Read thread now adapts sleep duration automatically based on observed activity.
 
 ---
+## 2026-04-19 19:05
+
+### Changed
+- Subtask 5/14: added stricter payload size guardrails.
+- Added CVars:
+  - cefws.max_text_message_bytes
+  - cefws.max_outbound_message_bytes
+- Inbound handling now rejects oversized text frames separately from global message limit.
+- Outbound queue path now rejects oversized send requests early (ECefWebSocketSendResult::TooLarge).
+
+### Why
+- Protect local websocket runtime from large-frame spikes and enforce explicit text/binary limits.
+
+### Impact
+- Oversized text inbound or outbound payloads are now blocked before queue pressure escalates.
+
+---

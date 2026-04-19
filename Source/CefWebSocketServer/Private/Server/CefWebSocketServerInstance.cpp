@@ -519,6 +519,23 @@ void FCefWebSocketServerInstance::HandleClientPacket(ICefNetWebSocket* InSocket,
 		}
 		return;
 	}
+	if (!bInBinary && InCount > CefWebSocketCVars::GetMaxTextMessageBytes())
+	{
+		int64 clientId = 0;
+		{
+			FScopeLock lock(&ClientLock);
+			if (int64* found = ClientIdsBySocket.Find(InSocket))
+			{
+				clientId = *found;
+			}
+		}
+		if (clientId != 0 && OwnerServer.IsValid())
+		{
+			OwnerServer->NotifyClientError(clientId, ECefWebSocketErrorCode::InvalidPayload,
+			                               TEXT("Incoming text message exceeds cefws.max_text_message_bytes"));
+		}
+		return;
+	}
 
 	int64 clientId = 0;
 	{
@@ -569,6 +586,17 @@ ECefWebSocketSendResult FCefWebSocketServerInstance::QueueSendRequest(FCefWebSoc
 	if (!IsRunning())
 	{
 		return ECefWebSocketSendResult::InvalidServer;
+	}
+
+	int32 payloadSizeBytes = InRequest.BytesPayload.Num();
+	if (payloadSizeBytes <= 0 && !InRequest.TextPayload.IsEmpty())
+	{
+		FTCHARToUTF8 utf8Payload(*InRequest.TextPayload);
+		payloadSizeBytes = utf8Payload.Length();
+	}
+	if (payloadSizeBytes > CefWebSocketCVars::GetMaxOutboundMessageBytes())
+	{
+		return ECefWebSocketSendResult::TooLarge;
 	}
 
 	if (SendQueueDepth.Load() >= FMath::Max(1, PipelineConfig.InSendQueueMax))

@@ -5,6 +5,8 @@
 namespace
 {
 	TAutoConsoleVariable<int32> CVarCefWsMaxMessageBytes(TEXT("cefws.max_message_bytes"), 1024 * 1024, TEXT("Maximum accepted websocket message size in bytes."));
+	TAutoConsoleVariable<int32> CVarCefWsMaxTextMessageBytes(TEXT("cefws.max_text_message_bytes"), 512 * 1024, TEXT("Maximum accepted text websocket message size in bytes."));
+	TAutoConsoleVariable<int32> CVarCefWsMaxOutboundMessageBytes(TEXT("cefws.max_outbound_message_bytes"), 1024 * 1024, TEXT("Maximum outbound websocket payload size in bytes."));
 	TAutoConsoleVariable<int32> CVarCefWsMaxQueueMessagesPerClient(TEXT("cefws.max_queue_messages_per_client"), 1024, TEXT("Maximum queued outbound messages per client."));
 	TAutoConsoleVariable<int32> CVarCefWsMaxQueueBytesPerClient(TEXT("cefws.max_queue_bytes_per_client"), 8 * 1024 * 1024, TEXT("Maximum queued outbound bytes per client."));
 	TAutoConsoleVariable<int32> CVarCefWsQueueDropPolicy(TEXT("cefws.queue_drop_policy"), 0, TEXT("Queue overflow policy: 0=drop_oldest, 1=reject_new."));
@@ -24,6 +26,8 @@ namespace
 namespace CefWebSocketCVars
 {
 	int32 GetMaxMessageBytes() { return CVarCefWsMaxMessageBytes.GetValueOnAnyThread(); }
+	int32 GetMaxTextMessageBytes() { return CVarCefWsMaxTextMessageBytes.GetValueOnAnyThread(); }
+	int32 GetMaxOutboundMessageBytes() { return CVarCefWsMaxOutboundMessageBytes.GetValueOnAnyThread(); }
 	int32 GetMaxQueueMessagesPerClient() { return CVarCefWsMaxQueueMessagesPerClient.GetValueOnAnyThread(); }
 	int32 GetMaxQueueBytesPerClient() { return CVarCefWsMaxQueueBytesPerClient.GetValueOnAnyThread(); }
 	int32 GetQueueDropPolicy() { return CVarCefWsQueueDropPolicy.GetValueOnAnyThread(); }

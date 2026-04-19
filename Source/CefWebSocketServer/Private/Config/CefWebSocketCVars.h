@@ -5,6 +5,8 @@
 namespace CefWebSocketCVars
 {
 	int32 GetMaxMessageBytes();
+	int32 GetMaxTextMessageBytes();
+	int32 GetMaxOutboundMessageBytes();
 	int32 GetMaxQueueMessagesPerClient();
 	int32 GetMaxQueueBytesPerClient();
 	int32 GetQueueDropPolicy();
