@@ -44,6 +44,8 @@ public:
 public:
 #pragma region ThreadApi
 	void TickBackendOnReadThread();
+	bool PumpInboundOnHandleThread();
+	bool PumpOutgoingOnSendThread();
 	bool PumpOutgoingOnWriteThread();
 #pragma endregion
 

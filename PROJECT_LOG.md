@@ -431,3 +431,24 @@ YYYY-MM-DD HH:MM
 - Runtime refactor can consume these contracts without changing public API later.
 
 ---
+
+## 2026-04-19 14:22
+
+### Changed
+- Added new worker thread classes for planned 4-stage architecture:
+  - `Private/Threads/CefWebSocketHandleRunnable.h/.cpp`
+  - `Private/Threads/CefWebSocketSendRunnable.h/.cpp`
+- Extended `FCefWebSocketServerInstance` thread API with stage entry points:
+  - `PumpInboundOnHandleThread()`
+  - `PumpOutgoingOnSendThread()`
+- Added temporary no-op implementations for the new stage pumps to keep build flow stable before full queue wiring.
+
+### Why
+- Introduce dedicated execution lanes for Handle and Send stages.
+- Prepare incremental migration without breaking existing runtime path.
+
+### Impact
+- Thread primitives for 4-stage pipeline now exist.
+- Next task will wire these stages into server instance queues and lifecycle.
+
+---

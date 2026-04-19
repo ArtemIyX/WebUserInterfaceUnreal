@@ -167,6 +167,16 @@ void FCefWebSocketServerInstance::TickBackendOnReadThread()
 	Backend->Tick();
 }
 
+bool FCefWebSocketServerInstance::PumpInboundOnHandleThread()
+{
+	return false;
+}
+
+bool FCefWebSocketServerInstance::PumpOutgoingOnSendThread()
+{
+	return false;
+}
+
 bool FCefWebSocketServerInstance::PumpOutgoingOnWriteThread()
 {
 	if (!bRunning.Load())
