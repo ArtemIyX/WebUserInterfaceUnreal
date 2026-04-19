@@ -1,13 +1,17 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Data/CefWebSocketStructs.h"
 #include "Data/CefWebSocketEnums.h"
 #include "Containers/Queue.h"
+#include "Pipeline/CefWebSocketPipelineTypes.h"
 
 class ICefNetWebSocket;
 class ICefWebSocketServerBackend;
+class ICefWebSocketPacketCodec;
 class FCefWebSocketReadRunnable;
+class FCefWebSocketHandleRunnable;
+class FCefWebSocketSendRunnable;
 class FCefWebSocketWriteRunnable;
 class FRunnableThread;
 class UCefWebSocketServerBase;
@@ -33,6 +37,9 @@ public:
 	ECefWebSocketSendResult BroadcastStringExcept(int64 InExcludedClientId, const FString& InMessage);
 	ECefWebSocketSendResult BroadcastBytesExcept(int64 InExcludedClientId, const TArray<uint8>& InBytes);
 	ECefWebSocketSendResult DisconnectClient(int64 InClientId, ECefWebSocketCloseReason InReason);
+
+	void SetPayloadFormat(ECefWebSocketPayloadFormat InPayloadFormat);
+	void SetPacketCodec(const TSharedPtr<ICefWebSocketPacketCodec>& InCodec);
 
 	TArray<FCefWebSocketClientInfo> GetClients() const;
 	FCefWebSocketServerStats GetStats() const;
@@ -77,11 +84,16 @@ private:
 	void HandleClientConnected(ICefNetWebSocket* InSocket);
 	void HandleClientDisconnected(ICefNetWebSocket* InSocket);
 	void HandleClientPacket(ICefNetWebSocket* InSocket, const uint8* InData, int32 InCount, bool bInBinary);
-	ECefWebSocketSendResult EnqueueToClient(int64 InClientId, const uint8* InData, int32 InCount, bool bInBinary);
-	ECefWebSocketSendResult EnqueueToClients(const TArray<int64>& InClientIds, const uint8* InData, int32 InCount, bool bInBinary);
+
+	ECefWebSocketSendResult QueueSendRequest(FCefWebSocketSendRequest&& InRequest);
+	void WakeHandleThread();
+	void WakeSendThread();
+	void WakeWriteThread();
+
+	TSharedPtr<ICefWebSocketPacketCodec> ResolveCodec(ECefWebSocketPayloadFormat InPayloadFormat) const;
+	bool EnqueueWritePacket(int64 InClientId, const uint8* InData, int32 InCount, bool bInBinary);
 	void RecordQueueDepthSample_NoLock();
 	void UpdateRateStats_NoLock();
-	void WakeWriteThread();
 #pragma endregion
 
 private:
@@ -90,9 +102,26 @@ private:
 	int32 BoundPort = 0;
 	TWeakObjectPtr<UCefWebSocketServerBase> OwnerServer;
 	TAtomic<bool> bRunning = false;
+
 	mutable FCriticalSection ClientLock;
 	TMap<int64, FCefClientState> Clients;
 	TMap<ICefNetWebSocket*, int64> ClientIdsBySocket;
+
+	mutable FCriticalSection CodecLock;
+	ECefWebSocketPayloadFormat PayloadFormat = ECefWebSocketPayloadFormat::Binary;
+	TSharedPtr<ICefWebSocketPacketCodec> CustomCodec;
+	TSharedPtr<ICefWebSocketPacketCodec> BinaryCodec;
+	TSharedPtr<ICefWebSocketPacketCodec> Utf8Codec;
+	TSharedPtr<ICefWebSocketPacketCodec> JsonCodec;
+	TSharedPtr<ICefWebSocketPacketCodec> XmlCodec;
+
+	TQueue<FCefWebSocketInboundPacket, EQueueMode::Mpsc> InboundQueue;
+	TQueue<FCefWebSocketSendRequest, EQueueMode::Mpsc> SendQueue;
+	TAtomic<int64> InboundQueueDepth = 0;
+	TAtomic<int64> SendQueueDepth = 0;
+	int32 InboundQueueMax = 2048;
+	int32 SendQueueMax = 2048;
+
 	TUniquePtr<ICefWebSocketServerBackend> Backend;
 	int64 NextClientId = 1;
 	FCefWebSocketServerStats Stats;
@@ -103,9 +132,15 @@ private:
 	int64 QueueDepthSamples = 0;
 
 	TUniquePtr<FCefWebSocketReadRunnable> ReadRunnable;
+	TUniquePtr<FCefWebSocketHandleRunnable> HandleRunnable;
+	TUniquePtr<FCefWebSocketSendRunnable> SendRunnable;
 	TUniquePtr<FCefWebSocketWriteRunnable> WriteRunnable;
 	FRunnableThread* ReadThread = nullptr;
+	FRunnableThread* HandleThread = nullptr;
+	FRunnableThread* SendThread = nullptr;
 	FRunnableThread* WriteThread = nullptr;
+	FEvent* HandleWakeEvent = nullptr;
+	FEvent* SendWakeEvent = nullptr;
 	FEvent* WriteWakeEvent = nullptr;
 #pragma endregion
 };

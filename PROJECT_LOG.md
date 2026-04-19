@@ -452,3 +452,30 @@ YYYY-MM-DD HH:MM
 - Next task will wire these stages into server instance queues and lifecycle.
 
 ---
+
+## 2026-04-19 14:26
+
+### Changed
+- Refactored `FCefWebSocketServerInstance` into a 4-stage pipeline runtime:
+  - Read stage: backend tick + socket callbacks enqueue inbound packets.
+  - Handle stage: `PumpInboundOnHandleThread()` dequeues inbound packets, runs codec decode, dispatches to `NotifyClientMessage`.
+  - Send stage: `PumpOutgoingOnSendThread()` dequeues logical send requests, encodes via codec, produces write packets.
+  - Write stage: `PumpOutgoingOnWriteThread()` drains per-client write queues and sends bytes to sockets.
+- Added full 4-thread lifecycle management in start/stop:
+  - read/handle/send/write runnable creation and shutdown synchronization.
+  - wake events for handle/send/write queues.
+- Added codec integration in server instance:
+  - built-in codec selection by payload format.
+  - optional custom codec override path.
+- Added queue depth accounting for stage visibility and stats fields updates.
+
+### Why
+- Implement requested architecture split to decouple IO, packet handling, encoding, and writes.
+- Enable future protocol extensibility with codec-based routing.
+
+### Impact
+- Server instance no longer handles inbound packets directly in read callback path.
+- Outbound APIs now enqueue logical send requests and are encoded on dedicated send thread.
+- Runtime now has explicit per-stage wake/scheduling behavior for better control and scaling.
+
+---
