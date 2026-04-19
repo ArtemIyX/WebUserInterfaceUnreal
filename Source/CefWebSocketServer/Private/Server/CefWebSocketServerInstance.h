@@ -77,6 +77,8 @@ private:
 		TUniquePtr<TQueue<FCefOutboundMessage, EQueueMode::Mpsc>> Outbox;
 		int64 QueueBytes = 0;
 		int32 QueueMessages = 0;
+		double LastActivityTimeSec = 0.0;
+		double LastHeartbeatSentTimeSec = 0.0;
 	};
 #pragma endregion
 
@@ -95,6 +97,7 @@ private:
 	bool EnqueueWritePacket(int64 InClientId, const uint8* InData, int32 InCount, bool bInBinary);
 	void RecordQueueDepthSample_NoLock();
 	void UpdateRateStats_NoLock();
+	void SweepConnectionHealthOnReadThread();
 #pragma endregion
 
 private:

@@ -10,6 +10,8 @@ namespace
 	TAutoConsoleVariable<int32> CVarCefWsWriteIdleSleepMs(TEXT("cefws.write_idle_sleep_ms"), 2, TEXT("Write thread idle wait in milliseconds."));
 	TAutoConsoleVariable<int32> CVarCefWsShutdownTimeoutMs(TEXT("cefws.shutdown_timeout_ms"), 1000, TEXT("Server shutdown grace timeout in milliseconds."));
 	TAutoConsoleVariable<int32> CVarCefWsMaxPortScan(TEXT("cefws.max_port_scan"), 32, TEXT("Maximum ports to probe for auto-next-port behavior."));
+	TAutoConsoleVariable<float> CVarCefWsHeartbeatIntervalSec(TEXT("cefws.heartbeat_interval_sec"), 15.0f, TEXT("Heartbeat send interval in seconds. <=0 disables heartbeat."));
+	TAutoConsoleVariable<float> CVarCefWsIdleTimeoutSec(TEXT("cefws.idle_timeout_sec"), 60.0f, TEXT("Client idle timeout in seconds. <=0 disables timeout."));
 	TAutoConsoleVariable<int32> CVarCefWsValidateUtf8(TEXT("cefws.validate_utf8"), 1, TEXT("Validate UTF-8 payloads when processing text frames."));
 	TAutoConsoleVariable<int32> CVarCefWsLogTraffic(TEXT("cefws.log_traffic"), 0, TEXT("Enable traffic logging for websocket payload flow."));
 }
@@ -22,6 +24,8 @@ namespace CefWebSocketCVars
 	int32 GetWriteIdleSleepMs() { return CVarCefWsWriteIdleSleepMs.GetValueOnAnyThread(); }
 	int32 GetShutdownTimeoutMs() { return CVarCefWsShutdownTimeoutMs.GetValueOnAnyThread(); }
 	int32 GetMaxPortScan() { return CVarCefWsMaxPortScan.GetValueOnAnyThread(); }
+	float GetHeartbeatIntervalSec() { return CVarCefWsHeartbeatIntervalSec.GetValueOnAnyThread(); }
+	float GetIdleTimeoutSec() { return CVarCefWsIdleTimeoutSec.GetValueOnAnyThread(); }
 	bool GetValidateUtf8() { return CVarCefWsValidateUtf8.GetValueOnAnyThread() != 0; }
 	bool GetLogTraffic() { return CVarCefWsLogTraffic.GetValueOnAnyThread() != 0; }
 }

@@ -614,3 +614,22 @@ YYYY-MM-DD HH:MM
 - Module usage is now documented for future teams.
 
 ---
+## 2026-04-19 19:01
+
+### Changed
+- Subtask 1/14: added connection health controls for websocket runtime.
+- Added CVars:
+  - cefws.heartbeat_interval_sec
+  - cefws.idle_timeout_sec
+- Added per-client activity/heartbeat timestamps in FCefWebSocketServerInstance client state.
+- Read thread now runs SweepConnectionHealthOnReadThread() after backend tick:
+  - periodic lightweight heartbeat payload send,
+  - idle timeout disconnect for inactive clients.
+
+### Why
+- Detect stale local websocket clients and keep connections observable/alive during low traffic.
+
+### Impact
+- Server can automatically close idle clients and periodically emit heartbeat traffic without user code.
+
+---

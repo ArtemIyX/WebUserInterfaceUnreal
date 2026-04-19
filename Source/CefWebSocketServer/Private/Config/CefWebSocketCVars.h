@@ -10,6 +10,8 @@ namespace CefWebSocketCVars
 	int32 GetWriteIdleSleepMs();
 	int32 GetShutdownTimeoutMs();
 	int32 GetMaxPortScan();
+	float GetHeartbeatIntervalSec();
+	float GetIdleTimeoutSec();
 	bool GetValidateUtf8();
 	bool GetLogTraffic();
 }

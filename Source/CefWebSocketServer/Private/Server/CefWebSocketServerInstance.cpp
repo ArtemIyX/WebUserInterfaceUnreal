@@ -246,6 +246,7 @@ void FCefWebSocketServerInstance::TickBackendOnReadThread()
 		return;
 	}
 	Backend->Tick();
+	SweepConnectionHealthOnReadThread();
 }
 
 bool FCefWebSocketServerInstance::PumpInboundOnHandleThread()
@@ -421,6 +422,7 @@ void FCefWebSocketServerInstance::HandleClientConnected(ICefNetWebSocket* InSock
 	info.ClientId = NextClientId++;
 	info.RemoteAddress = InSocket->RemoteEndPoint(true);
 	info.ConnectedAt = FDateTime::UtcNow();
+	const double nowSec = FPlatformTime::Seconds();
 
 	FCefNetWebSocketPacketReceivedCallback onReceive;
 	onReceive.BindLambda([this, InSocket](void* data, int32 count, bool bBinary)
@@ -434,6 +436,8 @@ void FCefWebSocketServerInstance::HandleClientConnected(ICefNetWebSocket* InSock
 		FCefClientState& state = Clients.FindOrAdd(info.ClientId);
 		state.Info = info;
 		state.Socket = InSocket;
+		state.LastActivityTimeSec = nowSec;
+		state.LastHeartbeatSentTimeSec = 0.0;
 		ClientIdsBySocket.Add(InSocket, info.ClientId);
 		Stats.ActiveClients = Clients.Num();
 		RecordQueueDepthSample_NoLock();
@@ -507,6 +511,10 @@ void FCefWebSocketServerInstance::HandleClientPacket(ICefNetWebSocket* InSocket,
 		{
 			clientId = *found;
 			Stats.RxBytes += InCount;
+			if (FCefClientState* state = Clients.Find(clientId))
+			{
+				state->LastActivityTimeSec = FPlatformTime::Seconds();
+			}
 			UpdateRateStats_NoLock();
 		}
 	}
@@ -859,4 +867,63 @@ void FCefWebSocketServerInstance::UpdateRateStats_NoLock()
 	LastRateSampleTimeSec = nowSec;
 	LastRateRxBytes = Stats.RxBytes;
 	LastRateTxBytes = Stats.TxBytes;
+}
+
+void FCefWebSocketServerInstance::SweepConnectionHealthOnReadThread()
+{
+	const float heartbeatIntervalSec = CefWebSocketCVars::GetHeartbeatIntervalSec();
+	const float idleTimeoutSec = CefWebSocketCVars::GetIdleTimeoutSec();
+	if (heartbeatIntervalSec <= 0.0f && idleTimeoutSec <= 0.0f)
+	{
+		return;
+	}
+
+	const double nowSec = FPlatformTime::Seconds();
+	TArray<ICefNetWebSocket*> socketsToHeartbeat;
+	TArray<ICefNetWebSocket*> socketsToClose;
+
+	{
+		FScopeLock lock(&ClientLock);
+		for (TPair<int64, FCefClientState>& pair : Clients)
+		{
+			FCefClientState& state = pair.Value;
+			if (!state.Socket)
+			{
+				continue;
+			}
+
+			if (idleTimeoutSec > 0.0f && state.LastActivityTimeSec > 0.0 &&
+				nowSec - state.LastActivityTimeSec >= static_cast<double>(idleTimeoutSec))
+			{
+				socketsToClose.Add(state.Socket);
+				continue;
+			}
+
+			if (heartbeatIntervalSec > 0.0f &&
+				(nowSec - state.LastHeartbeatSentTimeSec) >= static_cast<double>(heartbeatIntervalSec))
+			{
+				socketsToHeartbeat.Add(state.Socket);
+				state.LastHeartbeatSentTimeSec = nowSec;
+			}
+		}
+	}
+
+	static const uint8 heartbeatPayload[] = {'_', '_', 'c', 'e', 'f', 'w', 's', '_', 'h', 'b', '_', '_'};
+	for (ICefNetWebSocket* socket : socketsToHeartbeat)
+	{
+		if (!socket)
+		{
+			continue;
+		}
+		socket->Send(heartbeatPayload, static_cast<uint32>(UE_ARRAY_COUNT(heartbeatPayload)), false);
+	}
+
+	for (ICefNetWebSocket* socket : socketsToClose)
+	{
+		if (!socket)
+		{
+			continue;
+		}
+		socket->Close();
+	}
 }
