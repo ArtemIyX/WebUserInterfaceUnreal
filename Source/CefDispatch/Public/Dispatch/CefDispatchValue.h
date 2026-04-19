@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include <type_traits>
 
 struct FCefDispatchTypeId
 {
@@ -79,4 +80,21 @@ const TCefDispatchValue<T>* CefDispatchTryGetValue(const ICefDispatchValue& InVa
 		return nullptr;
 	}
 	return static_cast<const TCefDispatchValue<T>*>(&InValue);
+}
+
+template <typename T>
+TCefDispatchValue<T>* CefDispatchTryGetValue(ICefDispatchValue& InValue)
+{
+	if (InValue.GetTypeId() != FCefDispatchTypeId::Of<T>())
+	{
+		return nullptr;
+	}
+	return static_cast<TCefDispatchValue<T>*>(&InValue);
+}
+
+template <typename T>
+TUniquePtr<ICefDispatchValue> MakeCefDispatchValue(T&& InValue)
+{
+	using FValueType = std::decay_t<T>;
+	return MakeUnique<TCefDispatchValue<FValueType>>(Forward<T>(InValue));
 }

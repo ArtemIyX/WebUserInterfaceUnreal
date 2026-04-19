@@ -593,3 +593,24 @@ YYYY-MM-DD HH:MM
 - Existing registry API remains compatible with manual registration.
 
 ---
+## 2026-04-19 18:33
+
+### Changed
+- Added dispatch value utility helpers:
+  - mutable CefDispatchTryGetValue<T>(...)
+  - MakeCefDispatchValue(...) creator helper.
+- Added Source/CefDispatch/README.md with:
+  - manual factory registration example,
+  - semi-auto macro registration example,
+  - typed decode/read example,
+  - protobuf integration note.
+
+### Why
+- Reduce boilerplate for route factories and typed payload extraction.
+- Document how CefDispatch supports protobuf and non-protobuf payloads with the same API.
+
+### Impact
+- Developers can register and consume typed dispatch values faster.
+- Module usage is now documented for future teams.
+
+---
