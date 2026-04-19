@@ -112,7 +112,7 @@ private:
 	TWeakObjectPtr<UCefWebSocketServerBase> OwnerServer;
 	TAtomic<bool> bRunning = false;
 
-	mutable FCriticalSection ClientLock;
+	mutable FRWLock ClientLock;
 	TMap<int64, FCefClientState> Clients;
 	TMap<ICefNetWebSocket*, int64> ClientIdsBySocket;
 

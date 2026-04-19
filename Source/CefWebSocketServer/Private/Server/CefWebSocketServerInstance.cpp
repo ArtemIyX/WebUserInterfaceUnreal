@@ -226,7 +226,7 @@ void FCefWebSocketServerInstance::Stop()
 
 	TArray<ICefNetWebSocket*> socketsToClose;
 	{
-		FScopeLock lock(&ClientLock);
+		FWriteScopeLock lock(ClientLock);
 		for (TPair<int64, FCefClientState>& pair : Clients)
 		{
 			if (pair.Value.Socket)
@@ -361,7 +361,7 @@ bool FCefWebSocketServerInstance::PumpOutgoingOnSendThread()
 
 		if (sendRequest.bBroadcast && sendRequest.TargetClientIds.Num() == 0)
 		{
-			FScopeLock lock(&ClientLock);
+			FReadScopeLock lock(ClientLock);
 			Clients.GetKeys(sendRequest.TargetClientIds);
 		}
 
@@ -421,7 +421,7 @@ bool FCefWebSocketServerInstance::PumpOutgoingOnWriteThread()
 	const int32 maxBatchMessagesPerClient = FMath::Max(1, CefWebSocketCVars::GetWriteBatchMaxMessages());
 	const int32 maxBatchBytesPerClient = FMath::Max(1, CefWebSocketCVars::GetWriteBatchMaxBytes());
 	{
-		FScopeLock lock(&ClientLock);
+		FWriteScopeLock lock(ClientLock);
 		for (TPair<int64, FCefClientState>& pair : Clients)
 		{
 			if (!pair.Value.Outbox)
@@ -468,7 +468,7 @@ bool FCefWebSocketServerInstance::PumpOutgoingOnWriteThread()
 
 		bool bTxLimited = false;
 		{
-			FScopeLock lock(&ClientLock);
+			FWriteScopeLock lock(ClientLock);
 			if (FCefClientState* state = Clients.Find(item.ClientId))
 			{
 				const double nowSec = FPlatformTime::Seconds();
@@ -506,7 +506,7 @@ bool FCefWebSocketServerInstance::PumpOutgoingOnWriteThread()
 	}
 
 	{
-		FScopeLock lock(&ClientLock);
+		FWriteScopeLock lock(ClientLock);
 		Stats.TxBytes += sentBytes;
 		UpdateRateStats_NoLock();
 		Stats.InWriteQueueDepth = Stats.QueueDepth;
@@ -542,7 +542,7 @@ void FCefWebSocketServerInstance::HandleClientConnected(ICefNetWebSocket* InSock
 	InSocket->SetReceiveCallBack(onReceive);
 
 	{
-		FScopeLock lock(&ClientLock);
+		FWriteScopeLock lock(ClientLock);
 		FCefClientState& state = Clients.FindOrAdd(info.ClientId);
 		state.Info = info;
 		state.Socket = InSocket;
@@ -573,7 +573,7 @@ void FCefWebSocketServerInstance::HandleClientDisconnected(ICefNetWebSocket* InS
 
 	int64 clientId = 0;
 	{
-		FScopeLock lock(&ClientLock);
+		FWriteScopeLock lock(ClientLock);
 		if (int64* found = ClientIdsBySocket.Find(InSocket))
 		{
 			clientId = *found;
@@ -606,7 +606,7 @@ void FCefWebSocketServerInstance::HandleClientPacket(ICefNetWebSocket* InSocket,
 	{
 		int64 clientId = 0;
 		{
-			FScopeLock lock(&ClientLock);
+			FWriteScopeLock lock(ClientLock);
 			if (int64* found = ClientIdsBySocket.Find(InSocket))
 			{
 				clientId = *found;
@@ -623,7 +623,7 @@ void FCefWebSocketServerInstance::HandleClientPacket(ICefNetWebSocket* InSocket,
 	{
 		int64 clientId = 0;
 		{
-			FScopeLock lock(&ClientLock);
+			FWriteScopeLock lock(ClientLock);
 			if (int64* found = ClientIdsBySocket.Find(InSocket))
 			{
 				clientId = *found;
@@ -641,7 +641,7 @@ void FCefWebSocketServerInstance::HandleClientPacket(ICefNetWebSocket* InSocket,
 	bool bRxLimited = false;
 	const int32 maxRxBytesPerSec = CefWebSocketCVars::GetMaxRxBytesPerSecPerClient();
 	{
-		FScopeLock lock(&ClientLock);
+		FWriteScopeLock lock(ClientLock);
 		if (int64* found = ClientIdsBySocket.Find(InSocket))
 		{
 			clientId = *found;
@@ -740,7 +740,7 @@ bool FCefWebSocketServerInstance::EnqueueWritePacket(int64 InClientId, const uin
 		return false;
 	}
 
-	FScopeLock lock(&ClientLock);
+	FWriteScopeLock lock(ClientLock);
 	FCefClientState* found = Clients.Find(InClientId);
 	if (!found || !found->Socket)
 	{
@@ -925,7 +925,7 @@ ECefWebSocketSendResult FCefWebSocketServerInstance::DisconnectClient(int64 InCl
 {
 	ICefNetWebSocket* socket = nullptr;
 	{
-		FScopeLock lock(&ClientLock);
+		FReadScopeLock lock(ClientLock);
 		if (FCefClientState* found = Clients.Find(InClientId))
 		{
 			socket = found->Socket;
@@ -942,7 +942,7 @@ ECefWebSocketSendResult FCefWebSocketServerInstance::DisconnectClient(int64 InCl
 
 TArray<FCefWebSocketClientInfo> FCefWebSocketServerInstance::GetClients() const
 {
-	FScopeLock lock(&ClientLock);
+	FReadScopeLock lock(ClientLock);
 	TArray<FCefWebSocketClientInfo> outClients;
 	outClients.Reserve(Clients.Num());
 	for (const TPair<int64, FCefClientState>& pair : Clients)
@@ -954,7 +954,7 @@ TArray<FCefWebSocketClientInfo> FCefWebSocketServerInstance::GetClients() const
 
 FCefWebSocketServerStats FCefWebSocketServerInstance::GetStats() const
 {
-	FScopeLock lock(&ClientLock);
+	FWriteScopeLock lock(ClientLock);
 	const_cast<FCefWebSocketServerInstance*>(this)->UpdateRateStats_NoLock();
 	if (QueueDepthSamples > 0)
 	{
@@ -974,7 +974,7 @@ FCefWebSocketServerStats FCefWebSocketServerInstance::GetStats() const
 
 FCefWebSocketClientInfo FCefWebSocketServerInstance::FindClientInfo(int64 InClientId) const
 {
-	FScopeLock lock(&ClientLock);
+	FReadScopeLock lock(ClientLock);
 	if (const FCefClientState* found = Clients.Find(InClientId))
 	{
 		return found->Info;
@@ -1034,7 +1034,7 @@ void FCefWebSocketServerInstance::SweepConnectionHealthOnReadThread()
 	TArray<ICefNetWebSocket*> socketsToClose;
 
 	{
-		FScopeLock lock(&ClientLock);
+		FWriteScopeLock lock(ClientLock);
 		for (TPair<int64, FCefClientState>& pair : Clients)
 		{
 			FCefClientState& state = pair.Value;
@@ -1087,7 +1087,7 @@ bool FCefWebSocketServerInstance::AreQueuesDrained() const
 		return false;
 	}
 
-	FScopeLock lock(&ClientLock);
+	FReadScopeLock lock(ClientLock);
 	if (Stats.QueueDepth > 0)
 	{
 		return false;
@@ -1101,5 +1101,8 @@ bool FCefWebSocketServerInstance::AreQueuesDrained() const
 	}
 	return true;
 }
+
+
+
 
 

@@ -803,3 +803,23 @@ YYYY-MM-DD HH:MM
 - Close paths now communicate specific reason categories instead of always normal closure.
 
 ---
+## 2026-04-19 19:13
+
+### Changed
+- Subtask 12/14: reduced client-map lock contention in websocket runtime.
+- Replaced ClientLock with FRWLock.
+- Switched selected read-only paths to read locks:
+  - broadcast target snapshot in send stage,
+  - disconnect socket lookup,
+  - GetClients(),
+  - FindClientInfo(),
+  - AreQueuesDrained().
+- Kept write locks on mutation paths.
+
+### Why
+- Allow concurrent readers of client state while preserving correctness on updates.
+
+### Impact
+- Lower contention pressure on hot read paths under multi-threaded load.
+
+---
