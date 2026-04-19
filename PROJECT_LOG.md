@@ -508,3 +508,26 @@ YYYY-MM-DD HH:MM
 - Pipeline queue/backpressure behavior is now externally configurable.
 
 ---
+
+## 2026-04-19 14:30
+
+### Changed
+- Updated debug command output to reflect pipeline architecture:
+  - `ws.list` now prints payload format and stage queue depths.
+  - `ws.stats` now prints payload format plus inbound/handle/send/write queue depths.
+- Added `GetPayloadFormat()` accessor to server public API (`UCefWebSocketServerBase`).
+- Updated `Source/CefWebSocketServer/README.md`:
+  - documented 4-thread pipeline model,
+  - documented payload format and codec control APIs,
+  - documented create-options pipeline fields,
+  - documented stage queue stats visibility.
+
+### Why
+- Make new architecture observable and easy to operate for plugin consumers.
+- Ensure future developers understand where to customize encoding/handling flow.
+
+### Impact
+- Runtime diagnostics now expose per-stage pressure points.
+- Documentation now matches current architecture and extension points.
+
+---

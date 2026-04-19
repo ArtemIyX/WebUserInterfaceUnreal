@@ -105,7 +105,7 @@ void FCefWebSocketDebugCommands::HandleList(const TArray<FString>& InArgs) const
 	}
 
 	const TArray<UCefWebSocketServerBase*> servers = subsystem->GetAllServers();
-	UE_LOG(LogCefWebSocketServer, Log, TEXT("ws.list: %d server(InS)"), servers.Num());
+	UE_LOG(LogCefWebSocketServer, Log, TEXT("ws.list: %d server(s)"), servers.Num());
 	for (UCefWebSocketServerBase* server : servers)
 	{
 		if (!server)
@@ -116,12 +116,16 @@ void FCefWebSocketDebugCommands::HandleList(const TArray<FString>& InArgs) const
 		UE_LOG(
 			LogCefWebSocketServer,
 			Log,
-			TEXT("  name=%s port=%d running=%s clients=%d queue=%lld"),
+			TEXT("  name=%s port=%d running=%s format=%d clients=%d queue=%lld inbound=%lld send=%lld write=%lld"),
 			*server->GetServerNameId().ToString(),
 			server->GetBoundPort(),
 			server->IsRunning() ? TEXT("true") : TEXT("false"),
+			static_cast<int32>(server->GetPayloadFormat()),
 			stats.ActiveClients,
-			stats.QueueDepth);
+			stats.QueueDepth,
+			stats.InInboundQueueDepth,
+			stats.InSendQueueDepth,
+			stats.InWriteQueueDepth);
 	}
 }
 
@@ -206,8 +210,9 @@ void FCefWebSocketDebugCommands::HandleStats(const TArray<FString>& InArgs) cons
 	UE_LOG(
 		LogCefWebSocketServer,
 		Log,
-		TEXT("ws.stats: name=%s clients=%d rx=%lld tx=%lld rx_s=%.2f tx_s=%.2f dropped=%lld queue=%lld avg_queue=%.2f"),
+		TEXT("ws.stats: name=%s format=%d clients=%d rx=%lld tx=%lld rx_s=%.2f tx_s=%.2f dropped=%lld queue=%lld avg_queue=%.2f inbound=%lld handle=%lld send=%lld write=%lld"),
 		*nameId.ToString(),
+		static_cast<int32>(server->GetPayloadFormat()),
 		stats.ActiveClients,
 		stats.RxBytes,
 		stats.TxBytes,
@@ -215,5 +220,9 @@ void FCefWebSocketDebugCommands::HandleStats(const TArray<FString>& InArgs) cons
 		stats.TxBytesPerSec,
 		stats.DroppedMessages,
 		stats.QueueDepth,
-		stats.AvgQueueDepth);
+		stats.AvgQueueDepth,
+		stats.InInboundQueueDepth,
+		stats.InHandleQueueDepth,
+		stats.InSendQueueDepth,
+		stats.InWriteQueueDepth);
 }

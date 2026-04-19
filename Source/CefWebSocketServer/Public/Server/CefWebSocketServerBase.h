@@ -49,6 +49,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "CefWebSocket")
 	bool IsRunning() const;
 
+	UFUNCTION(BlueprintPure, Category = "CefWebSocket|Pipeline")
+	ECefWebSocketPayloadFormat GetPayloadFormat() const { return PayloadFormat; }
+
 	UFUNCTION(BlueprintCallable, Category = "CefWebSocket")
 	ECefWebSocketSendResult SendToClientString(int64 InClientId, const FString& InMessage);
 
