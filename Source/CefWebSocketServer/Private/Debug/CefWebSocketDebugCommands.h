@@ -21,6 +21,8 @@ private:
 	void HandleStop(const TArray<FString>& InArgs) const;
 	void HandleKick(const TArray<FString>& InArgs) const;
 	void HandleStats(const TArray<FString>& InArgs) const;
+	void HandleClients(const TArray<FString>& InArgs) const;
+	void HandleCVars(const TArray<FString>& InArgs) const;
 #pragma endregion
 
 private:
@@ -34,5 +36,7 @@ private:
 	IConsoleObject* CommandStop = nullptr;
 	IConsoleObject* CommandKick = nullptr;
 	IConsoleObject* CommandStats = nullptr;
+	IConsoleObject* CommandClients = nullptr;
+	IConsoleObject* CommandCVars = nullptr;
 #pragma endregion
 };

@@ -730,3 +730,19 @@ YYYY-MM-DD HH:MM
 - Broadcast requests enqueue faster and use fresher client snapshot at actual send time.
 
 ---
+## 2026-04-19 19:08
+
+### Changed
+- Subtask 8/14: expanded websocket debug command surface.
+- Added console commands:
+  - ws.clients <name> (lists connected client ids/endpoints/timestamps)
+  - ws.cvars (prints key runtime tuning variables)
+- Updated debug command startup/shutdown registration for new commands.
+
+### Why
+- Improve live diagnostics during development and performance tuning.
+
+### Impact
+- Operators can inspect client population and runtime tuning state directly from UE console.
+
+---

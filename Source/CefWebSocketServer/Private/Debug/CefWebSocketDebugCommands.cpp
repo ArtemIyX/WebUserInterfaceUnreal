@@ -1,9 +1,11 @@
 #include "Debug/CefWebSocketDebugCommands.h"
 
+#include "Config/CefWebSocketCVars.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "HAL/IConsoleManager.h"
 #include "Logging/CefWebSocketLog.h"
+#include "Server/CefWebSocketClientBase.h"
 #include "Server/CefWebSocketServerBase.h"
 #include "Subsystems/CefWebSocketSubsystem.h"
 
@@ -42,6 +44,22 @@ void FCefWebSocketDebugCommands::Startup()
 			TEXT("Print websocket server stats: ws.stats <name>."),
 			FConsoleCommandWithArgsDelegate::CreateRaw(this, &FCefWebSocketDebugCommands::HandleStats));
 	}
+
+	if (!CommandClients)
+	{
+		CommandClients = consoleManager.RegisterConsoleCommand(
+			TEXT("ws.clients"),
+			TEXT("Print websocket clients: ws.clients <server>."),
+			FConsoleCommandWithArgsDelegate::CreateRaw(this, &FCefWebSocketDebugCommands::HandleClients));
+	}
+
+	if (!CommandCVars)
+	{
+		CommandCVars = consoleManager.RegisterConsoleCommand(
+			TEXT("ws.cvars"),
+			TEXT("Print websocket runtime cvar values."),
+			FConsoleCommandWithArgsDelegate::CreateRaw(this, &FCefWebSocketDebugCommands::HandleCVars));
+	}
 }
 
 void FCefWebSocketDebugCommands::Shutdown()
@@ -67,6 +85,16 @@ void FCefWebSocketDebugCommands::Shutdown()
 	{
 		consoleManager.UnregisterConsoleObject(CommandStats);
 		CommandStats = nullptr;
+	}
+	if (CommandClients)
+	{
+		consoleManager.UnregisterConsoleObject(CommandClients);
+		CommandClients = nullptr;
+	}
+	if (CommandCVars)
+	{
+		consoleManager.UnregisterConsoleObject(CommandCVars);
+		CommandCVars = nullptr;
 	}
 }
 
@@ -225,4 +253,56 @@ void FCefWebSocketDebugCommands::HandleStats(const TArray<FString>& InArgs) cons
 		stats.InHandleQueueDepth,
 		stats.InSendQueueDepth,
 		stats.InWriteQueueDepth);
+}
+
+void FCefWebSocketDebugCommands::HandleClients(const TArray<FString>& InArgs) const
+{
+	if (InArgs.Num() < 1)
+	{
+		UE_LOG(LogCefWebSocketServer, Warning, TEXT("ws.clients usage: ws.clients <name>"));
+		return;
+	}
+
+	UCefWebSocketSubsystem* subsystem = ResolveSubsystem();
+	if (!subsystem)
+	{
+		UE_LOG(LogCefWebSocketServer, Warning, TEXT("ws.clients: subsystem not available"));
+		return;
+	}
+
+	const FName nameId(*InArgs[0]);
+	UCefWebSocketServerBase* server = subsystem->GetServer(nameId);
+	if (!server)
+	{
+		UE_LOG(LogCefWebSocketServer, Warning, TEXT("ws.clients: server not found for '%s'"), *nameId.ToString());
+		return;
+	}
+
+	const TArray<UCefWebSocketClientBase*> clients = server->GetClients();
+	UE_LOG(LogCefWebSocketServer, Log, TEXT("ws.clients: server=%s count=%d"), *nameId.ToString(), clients.Num());
+	for (const UCefWebSocketClientBase* client : clients)
+	{
+		if (!client)
+		{
+			continue;
+		}
+		UE_LOG(LogCefWebSocketServer, Log, TEXT("  client=%lld remote=%s connected=%s"),
+			client->GetClientId(), *client->GetRemoteAddress(), *client->GetConnectedAt().ToString());
+	}
+}
+
+void FCefWebSocketDebugCommands::HandleCVars(const TArray<FString>& InArgs) const
+{
+	(void)InArgs;
+	UE_LOG(LogCefWebSocketServer, Log,
+		TEXT("ws.cvars: max_msg=%d max_text=%d max_out=%d q_drop=%d in_q=%d send_q=%d write_q=%d hb=%.1f idle=%.1f"),
+		CefWebSocketCVars::GetMaxMessageBytes(),
+		CefWebSocketCVars::GetMaxTextMessageBytes(),
+		CefWebSocketCVars::GetMaxOutboundMessageBytes(),
+		CefWebSocketCVars::GetQueueDropPolicy(),
+		CefWebSocketCVars::GetMaxQueueMessagesPerClient(),
+		CefWebSocketCVars::GetWriteBatchMaxMessages(),
+		CefWebSocketCVars::GetWriteBatchMaxBytes(),
+		CefWebSocketCVars::GetHeartbeatIntervalSec(),
+		CefWebSocketCVars::GetIdleTimeoutSec());
 }
