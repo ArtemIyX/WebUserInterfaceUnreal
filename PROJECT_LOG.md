@@ -572,3 +572,24 @@ YYYY-MM-DD HH:MM
 - Downstream modules can register factories and resolve typed payloads safely.
 
 ---
+## 2026-04-19 18:32
+
+### Changed
+- Added semi-auto dispatch registration support:
+  - FCefDispatchFactoryRegistrar
+  - CEF_DISPATCH_REGISTER_FACTORY(...)
+  - CEF_DISPATCH_REGISTER_FACTORY_REPLACE(...)
+- Added deferred registration queue in module bootstrap:
+  - registrations made during static init are buffered,
+  - flushed into FCefDispatchRegistry during StartupModule().
+- Added FCefDispatchModule::RegisterDeferredFactory(...) for registrar path.
+
+### Why
+- Allow future developers to register message factories in local .cpp files without central manual wiring.
+- Keep registration safe even when static objects run before module startup.
+
+### Impact
+- MessageType -> Factory routes can now be self-registered with macros.
+- Existing registry API remains compatible with manual registration.
+
+---
