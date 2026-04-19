@@ -23,20 +23,20 @@ struct FCefPerSessionDataServer
 	bool bBinaryFrame = false;
 };
 
-static int CefNetworkingServerCallback(struct lws* Wsi, enum lws_callback_reasons Reason, void* User, void* In, size_t Len)
+static int CefNetworkingServerCallback(struct lws* InWsi, enum lws_callback_reasons InReason, void* InUser, void* In, size_t InLen)
 {
-	struct lws_context* LwsContext = lws_get_context(Wsi);
-	FCefPerSessionDataServer* BufferInfo = static_cast<FCefPerSessionDataServer*>(User);
+	struct lws_context* LwsContext = lws_get_context(InWsi);
+	FCefPerSessionDataServer* BufferInfo = static_cast<FCefPerSessionDataServer*>(InUser);
 	FCefWebSocketServerBackend* Server = static_cast<FCefWebSocketServerBackend*>(lws_context_user(LwsContext));
 
-	switch (Reason)
+	switch (InReason)
 	{
 	case LWS_CALLBACK_ESTABLISHED:
 		{
-			BufferInfo->Socket = new FCefNetWebSocket(LwsContext, Wsi);
+			BufferInfo->Socket = new FCefNetWebSocket(LwsContext, InWsi);
 			BufferInfo->FragmentationState = ECefFragmentationState::BeginFrame;
 			Server->ConnectedCallback.ExecuteIfBound(BufferInfo->Socket);
-			lws_set_timeout(Wsi, NO_PENDING_TIMEOUT, 0);
+			lws_set_timeout(InWsi, NO_PENDING_TIMEOUT, 0);
 		}
 		break;
 	case LWS_CALLBACK_RECEIVE:
@@ -46,23 +46,23 @@ static int CefNetworkingServerCallback(struct lws* Wsi, enum lws_callback_reason
 			{
 				BufferInfo->FragmentationState = ECefFragmentationState::MessageFrame;
 				BufferInfo->FrameBuffer.Reset();
-				BufferInfo->bBinaryFrame = lws_frame_is_binary(Wsi) != 0;
+				BufferInfo->bBinaryFrame = lws_frame_is_binary(InWsi) != 0;
 			}
 
-			BufferInfo->FrameBuffer.Append(static_cast<const uint8*>(In), static_cast<int32>(Len));
-			if (lws_is_final_fragment(Wsi))
+			BufferInfo->FrameBuffer.Append(static_cast<const uint8*>(In), static_cast<int32>(InLen));
+			if (lws_is_final_fragment(InWsi))
 			{
 				BufferInfo->FragmentationState = ECefFragmentationState::BeginFrame;
 				BufferInfo->Socket->OnReceive(BufferInfo->FrameBuffer.GetData(), static_cast<uint32>(BufferInfo->FrameBuffer.Num()), BufferInfo->bBinaryFrame);
 			}
 		}
-		lws_set_timeout(Wsi, NO_PENDING_TIMEOUT, 0);
+		lws_set_timeout(InWsi, NO_PENDING_TIMEOUT, 0);
 		break;
 	case LWS_CALLBACK_SERVER_WRITEABLE:
 		if (BufferInfo->Socket && BufferInfo->Socket->Context == LwsContext)
 		{
-			BufferInfo->Socket->OnRawWebSocketWritable(Wsi);
-			lws_set_timeout(Wsi, NO_PENDING_TIMEOUT, 0);
+			BufferInfo->Socket->OnRawWebSocketWritable(InWsi);
+			lws_set_timeout(InWsi, NO_PENDING_TIMEOUT, 0);
 		}
 		break;
 	case LWS_CALLBACK_CLOSED:
@@ -97,7 +97,7 @@ FCefWebSocketServerBackend::~FCefWebSocketServerBackend()
 	Protocols = nullptr;
 }
 
-bool FCefWebSocketServerBackend::Init(uint32 Port, FCefNetWebSocketClientConnectedCallback OnConnected, FCefNetWebSocketClientDisconnectedCallback OnDisconnected)
+bool FCefWebSocketServerBackend::Init(uint32 InPort, FCefNetWebSocketClientConnectedCallback InOnConnected, FCefNetWebSocketClientDisconnectedCallback InOnDisconnected)
 {
 	Protocols = new lws_protocols[2];
 	FMemory::Memzero(Protocols, sizeof(lws_protocols) * 2);
@@ -116,7 +116,7 @@ bool FCefWebSocketServerBackend::Init(uint32 Port, FCefNetWebSocketClientConnect
 
 	struct lws_context_creation_info Info;
 	FMemory::Memzero(&Info, sizeof(lws_context_creation_info));
-	Info.port = Port;
+	Info.port = InPort;
 	Info.iface = nullptr;
 	Info.protocols = Protocols;
 	Info.extensions = nullptr;
@@ -134,9 +134,9 @@ bool FCefWebSocketServerBackend::Init(uint32 Port, FCefNetWebSocketClientConnect
 		return false;
 	}
 
-	ConnectedCallback = OnConnected;
-	DisconnectedCallback = OnDisconnected;
-	ServerPort = Port;
+	ConnectedCallback = InOnConnected;
+	DisconnectedCallback = InOnDisconnected;
+	ServerPort = InPort;
 	return true;
 }
 

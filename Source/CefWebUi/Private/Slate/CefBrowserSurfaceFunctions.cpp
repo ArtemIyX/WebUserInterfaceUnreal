@@ -27,104 +27,104 @@ IMPLEMENT_GLOBAL_SHADER(FCefSlateBlitPS, "/Plugin/CefWebUi/Private/CefSlateBlit.
 
 namespace CefWebUi::BrowserSurface
 {
-uint32 BuildCefKeyModifiers(const FKeyEvent& KeyEvent)
+uint32 BuildCefKeyModifiers(const FKeyEvent& InKeyEvent)
 {
-	const FModifierKeysState& Mk = KeyEvent.GetModifierKeys();
-	uint32 Flags = 0;
+	const FModifierKeysState& Mk = InKeyEvent.GetModifierKeys();
+	uint32 flags = 0;
 	if (Mk.AreCapsLocked())
 	{
-		Flags |= CefEventFlagCapsLockOn;
+		flags |= CefEventFlagCapsLockOn;
 	}
 	if (Mk.IsShiftDown())
 	{
-		Flags |= CefEventFlagShiftDown;
+		flags |= CefEventFlagShiftDown;
 	}
 	if (Mk.IsControlDown())
 	{
-		Flags |= CefEventFlagControlDown;
+		flags |= CefEventFlagControlDown;
 	}
 	if (Mk.IsAltDown())
 	{
-		Flags |= CefEventFlagAltDown;
+		flags |= CefEventFlagAltDown;
 	}
 	if (Mk.IsCommandDown())
 	{
-		Flags |= CefEventFlagCommandDown;
+		flags |= CefEventFlagCommandDown;
 	}
 
-	const FKey Key = KeyEvent.GetKey();
-	if (Key.IsModifierKey())
+	const FKey key = InKeyEvent.GetKey();
+	if (key.IsModifierKey())
 	{
-		if (Key == EKeys::LeftShift || Key == EKeys::LeftControl || Key == EKeys::LeftAlt || Key == EKeys::LeftCommand)
+		if (key == EKeys::LeftShift || key == EKeys::LeftControl || key == EKeys::LeftAlt || key == EKeys::LeftCommand)
 		{
-			Flags |= CefEventFlagIsLeft;
+			flags |= CefEventFlagIsLeft;
 		}
-		else if (Key == EKeys::RightShift || Key == EKeys::RightControl || Key == EKeys::RightAlt || Key == EKeys::RightCommand)
+		else if (key == EKeys::RightShift || key == EKeys::RightControl || key == EKeys::RightAlt || key == EKeys::RightCommand)
 		{
-			Flags |= CefEventFlagIsRight;
+			flags |= CefEventFlagIsRight;
 		}
 	}
 
-	if (KeyEvent.IsRepeat())
+	if (InKeyEvent.IsRepeat())
 	{
-		Flags |= CefEventFlagIsRepeat;
+		flags |= CefEventFlagIsRepeat;
 	}
 
-	if (Key.IsGamepadKey())
+	if (key.IsGamepadKey())
 	{
-		return Flags;
+		return flags;
 	}
 
-	if (Key == EKeys::NumPadZero || Key == EKeys::NumPadOne || Key == EKeys::NumPadTwo ||
-		Key == EKeys::NumPadThree || Key == EKeys::NumPadFour || Key == EKeys::NumPadFive ||
-		Key == EKeys::NumPadSix || Key == EKeys::NumPadSeven || Key == EKeys::NumPadEight ||
-		Key == EKeys::NumPadNine || Key == EKeys::Multiply || Key == EKeys::Add ||
-		Key == EKeys::Subtract || Key == EKeys::Decimal || Key == EKeys::Divide)
+	if (key == EKeys::NumPadZero || key == EKeys::NumPadOne || key == EKeys::NumPadTwo ||
+		key == EKeys::NumPadThree || key == EKeys::NumPadFour || key == EKeys::NumPadFive ||
+		key == EKeys::NumPadSix || key == EKeys::NumPadSeven || key == EKeys::NumPadEight ||
+		key == EKeys::NumPadNine || key == EKeys::Multiply || key == EKeys::Add ||
+		key == EKeys::Subtract || key == EKeys::Decimal || key == EKeys::Divide)
 	{
-		Flags |= CefEventFlagIsKeyPad;
-		Flags |= CefEventFlagNumLockOn;
+		flags |= CefEventFlagIsKeyPad;
+		flags |= CefEventFlagNumLockOn;
 	}
 
-	return Flags;
+	return flags;
 }
 
-FIntRect MakeIntersection(const FIntRect& A, const FIntRect& B)
+FIntRect MakeIntersection(const FIntRect& InA, const FIntRect& InB)
 {
-	FIntRect R = A;
-	R.Clip(B);
-	return R;
+	FIntRect r = InA;
+	r.Clip(InB);
+	return r;
 }
 
 void AddCefSlateBlitPass(
-	FRDGBuilder& GraphBuilder,
+	FRDGBuilder& OutGraphBuilder,
 	FRDGTextureRef InputTexture,
 	FRDGTextureRef OutputTexture,
-	const FIntRect& DestRect,
-	const FIntRect& SrcRect,
-	const FIntPoint& SrcExtent)
+	const FIntRect& InDestRect,
+	const FIntRect& InSrcRect,
+	const FIntPoint& InSrcExtent)
 {
-	if (!InputTexture || !OutputTexture || DestRect.Width() <= 0 || DestRect.Height() <= 0 || SrcRect.Width() <= 0 || SrcRect.Height() <= 0)
+	if (!InputTexture || !OutputTexture || InDestRect.Width() <= 0 || InDestRect.Height() <= 0 || InSrcRect.Width() <= 0 || InSrcRect.Height() <= 0)
 	{
 		return;
 	}
 
-	TShaderMapRef<FCefSlateBlitPS> PixelShader(GetGlobalShaderMap(GMaxRHIFeatureLevel));
-	FCefSlateBlitPS::FParameters* PassParameters = GraphBuilder.AllocParameters<FCefSlateBlitPS::FParameters>();
-	PassParameters->InputTexture = GraphBuilder.CreateSRV(FRDGTextureSRVDesc::Create(InputTexture));
+	TShaderMapRef<FCefSlateBlitPS> pixelShader(GetGlobalShaderMap(GMaxRHIFeatureLevel));
+	FCefSlateBlitPS::FParameters* PassParameters = OutGraphBuilder.AllocParameters<FCefSlateBlitPS::FParameters>();
+	PassParameters->InputTexture = OutGraphBuilder.CreateSRV(FRDGTextureSRVDesc::Create(InputTexture));
 	PassParameters->InputSampler = TStaticSamplerState<SF_Bilinear>::GetRHI();
-	PassParameters->DestMin = FVector2f(static_cast<float>(DestRect.Min.X), static_cast<float>(DestRect.Min.Y));
-	PassParameters->DestSize = FVector2f(static_cast<float>(DestRect.Width()), static_cast<float>(DestRect.Height()));
-	PassParameters->SrcMin = FVector2f(static_cast<float>(SrcRect.Min.X), static_cast<float>(SrcRect.Min.Y));
-	PassParameters->SrcSize = FVector2f(static_cast<float>(SrcRect.Width()), static_cast<float>(SrcRect.Height()));
-	PassParameters->SrcTexSize = FVector2f(static_cast<float>(FMath::Max(1, SrcExtent.X)), static_cast<float>(FMath::Max(1, SrcExtent.Y)));
+	PassParameters->DestMin = FVector2f(static_cast<float>(InDestRect.Min.X), static_cast<float>(InDestRect.Min.Y));
+	PassParameters->DestSize = FVector2f(static_cast<float>(InDestRect.Width()), static_cast<float>(InDestRect.Height()));
+	PassParameters->SrcMin = FVector2f(static_cast<float>(InSrcRect.Min.X), static_cast<float>(InSrcRect.Min.Y));
+	PassParameters->SrcSize = FVector2f(static_cast<float>(InSrcRect.Width()), static_cast<float>(InSrcRect.Height()));
+	PassParameters->SrcTexSize = FVector2f(static_cast<float>(FMath::Max(1, InSrcExtent.X)), static_cast<float>(FMath::Max(1, InSrcExtent.Y)));
 	PassParameters->RenderTargets[0] = FRenderTargetBinding(OutputTexture, ERenderTargetLoadAction::ELoad);
 
 	FPixelShaderUtils::AddFullscreenPass(
-		GraphBuilder,
+		OutGraphBuilder,
 		GetGlobalShaderMap(GMaxRHIFeatureLevel),
 		RDG_EVENT_NAME("CefSlateBlit"),
-		PixelShader,
+		pixelShader,
 		PassParameters,
-		DestRect);
+		InDestRect);
 }
 }

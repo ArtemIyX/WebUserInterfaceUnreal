@@ -29,36 +29,36 @@ FCefNetWebSocket::~FCefNetWebSocket()
 	ReceivedCallback.Unbind();
 }
 
-void FCefNetWebSocket::SetConnectedCallBack(FCefNetWebSocketInfoCallback CallBack)
+void FCefNetWebSocket::SetConnectedCallBack(FCefNetWebSocketInfoCallback InCallBack)
 {
-	ConnectedCallBack = CallBack;
+	ConnectedCallBack = InCallBack;
 }
 
-void FCefNetWebSocket::SetConnectionErrorCallBack(FCefNetWebSocketInfoCallback CallBack)
+void FCefNetWebSocket::SetConnectionErrorCallBack(FCefNetWebSocketInfoCallback InCallBack)
 {
-	ErrorCallBack = CallBack;
+	ErrorCallBack = InCallBack;
 }
 
-void FCefNetWebSocket::SetReceiveCallBack(FCefNetWebSocketPacketReceivedCallback CallBack)
+void FCefNetWebSocket::SetReceiveCallBack(FCefNetWebSocketPacketReceivedCallback InCallBack)
 {
-	ReceivedCallback = CallBack;
+	ReceivedCallback = InCallBack;
 }
 
-void FCefNetWebSocket::SetSocketClosedCallBack(FCefNetWebSocketInfoCallback CallBack)
+void FCefNetWebSocket::SetSocketClosedCallBack(FCefNetWebSocketInfoCallback InCallBack)
 {
-	SocketClosedCallback = CallBack;
+	SocketClosedCallback = InCallBack;
 }
 
-bool FCefNetWebSocket::Send(const uint8* Data, uint32 Size, bool bPrependSize)
+bool FCefNetWebSocket::Send(const uint8* InData, uint32 InSize, bool bInPrependSize)
 {
-	if (!Data || Size == 0)
+	if (!InData || InSize == 0)
 	{
 		return false;
 	}
 
 	TArray<uint8> buffer;
 	buffer.AddDefaulted(LWS_PRE);
-	buffer.Append(Data, Size);
+	buffer.Append(InData, InSize);
 
 	{
 		FScopeLock lock(&OutgoingLock);
@@ -116,17 +116,17 @@ void FCefNetWebSocket::Close()
 	lws_callback_on_writable(Wsi);
 }
 
-FString FCefNetWebSocket::RemoteEndPoint(bool bAppendPort)
+FString FCefNetWebSocket::RemoteEndPoint(bool bInAppendPort)
 {
 	FString remote = RemoteIp;
-	if (bAppendPort)
+	if (bInAppendPort)
 	{
 		remote += FString::Printf(TEXT(":%i"), RemotePort);
 	}
 	return remote;
 }
 
-FString FCefNetWebSocket::LocalEndPoint(bool bAppendPort)
+FString FCefNetWebSocket::LocalEndPoint(bool bInAppendPort)
 {
 	const int32 sock = static_cast<int32>(lws_get_socket_fd(Wsi));
 	struct sockaddr_in localAddr;
@@ -135,16 +135,16 @@ FString FCefNetWebSocket::LocalEndPoint(bool bAppendPort)
 
 	ANSICHAR ipBuffer[INET_ADDRSTRLEN];
 	FString local(ANSI_TO_TCHAR(inet_ntop(AF_INET, &localAddr.sin_addr, ipBuffer, INET_ADDRSTRLEN)));
-	if (bAppendPort)
+	if (bInAppendPort)
 	{
 		local += FString::Printf(TEXT(":%i"), ntohs(localAddr.sin_port));
 	}
 	return local;
 }
 
-void FCefNetWebSocket::OnReceive(void* Data, uint32 Size, bool bIsBinary)
+void FCefNetWebSocket::OnReceive(void* InData, uint32 InSize, bool bInIsBinary)
 {
-	ReceivedCallback.ExecuteIfBound(Data, static_cast<int32>(Size), bIsBinary);
+	ReceivedCallback.ExecuteIfBound(InData, static_cast<int32>(InSize), bInIsBinary);
 }
 
 void FCefNetWebSocket::OnRawWebSocketWritable(CefWebSocketInternal* InWsi)

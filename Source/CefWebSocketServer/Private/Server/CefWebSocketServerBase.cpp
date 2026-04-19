@@ -7,13 +7,18 @@
 #include "Server/CefWebSocketClientBase.h"
 #include "Server/CefWebSocketServerInstance.h"
 
+UCefWebSocketServerBase::UCefWebSocketServerBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+{
+}
+
 void UCefWebSocketServerBase::BeginDestroy()
 {
 	StopServer();
 	Super::BeginDestroy();
 }
 
-bool UCefWebSocketServerBase::StartServerInternal(FName InNameId, int32 InBoundPort, TSubclassOf<UCefWebSocketClientBase> InClientClass)
+bool UCefWebSocketServerBase::StartServerInternal(FName InNameId, int32 InBoundPort,
+                                                  TSubclassOf<UCefWebSocketClientBase> InClientClass)
 {
 	NameId = InNameId;
 	BoundPort = InBoundPort;
@@ -37,121 +42,126 @@ bool UCefWebSocketServerBase::IsRunning() const
 	return Instance.IsValid() && Instance->IsRunning();
 }
 
-ECefWebSocketSendResult UCefWebSocketServerBase::SendToClientString(int64 ClientId, const FString& Message)
+ECefWebSocketSendResult UCefWebSocketServerBase::SendToClientString(int64 InClientId, const FString& InMessage)
 {
 	if (!Instance.IsValid())
 	{
 		return ECefWebSocketSendResult::InvalidServer;
 	}
-	return Instance->SendToClientString(ClientId, Message);
+	return Instance->SendToClientString(InClientId, InMessage);
 }
 
-ECefWebSocketSendResult UCefWebSocketServerBase::SendToClientBytes(int64 ClientId, const TArray<uint8>& Bytes)
+ECefWebSocketSendResult UCefWebSocketServerBase::SendToClientBytes(int64 InClientId, const TArray<uint8>& InBytes)
 {
 	if (!Instance.IsValid())
 	{
 		return ECefWebSocketSendResult::InvalidServer;
 	}
-	return Instance->SendToClientBytes(ClientId, Bytes);
+	return Instance->SendToClientBytes(InClientId, InBytes);
 }
 
-ECefWebSocketSendResult UCefWebSocketServerBase::SendToClientJson(int64 ClientId, const TSharedPtr<FJsonObject>& JsonObject, const TSharedPtr<FJsonValue>& JsonValue)
+ECefWebSocketSendResult UCefWebSocketServerBase::SendToClientJson(int64 InClientId,
+                                                                  const TSharedPtr<FJsonObject>& InJsonObject,
+                                                                  const TSharedPtr<FJsonValue>& InJsonValue)
 {
-	if (!JsonObject.IsValid() && !JsonValue.IsValid())
+	if (!InJsonObject.IsValid() && !InJsonValue.IsValid())
 	{
 		return ECefWebSocketSendResult::SerializeFailed;
 	}
 
-	FString Serialized;
-	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Serialized);
-	if (JsonObject.IsValid())
+	FString serialized;
+	TSharedRef<TJsonWriter<>> writer = TJsonWriterFactory<>::Create(&serialized);
+	if (InJsonObject.IsValid())
 	{
-		if (!FJsonSerializer::Serialize(JsonObject.ToSharedRef(), Writer))
+		if (!FJsonSerializer::Serialize(InJsonObject.ToSharedRef(), writer))
 		{
 			return ECefWebSocketSendResult::SerializeFailed;
 		}
 	}
 	else
 	{
-		if (!FJsonSerializer::Serialize(JsonValue.ToSharedRef(), TEXT(""), Writer))
+		if (!FJsonSerializer::Serialize(InJsonValue.ToSharedRef(), TEXT(""), writer))
 		{
 			return ECefWebSocketSendResult::SerializeFailed;
 		}
 	}
 
-	return SendToClientString(ClientId, Serialized);
+	return SendToClientString(InClientId, serialized);
 }
 
-ECefWebSocketSendResult UCefWebSocketServerBase::BroadcastString(const FString& Message)
+ECefWebSocketSendResult UCefWebSocketServerBase::BroadcastString(const FString& InMessage)
 {
 	if (!Instance.IsValid())
 	{
 		return ECefWebSocketSendResult::InvalidServer;
 	}
-	return Instance->BroadcastString(Message);
+	return Instance->BroadcastString(InMessage);
 }
 
-ECefWebSocketSendResult UCefWebSocketServerBase::BroadcastBytes(const TArray<uint8>& Bytes)
+ECefWebSocketSendResult UCefWebSocketServerBase::BroadcastBytes(const TArray<uint8>& InBytes)
 {
 	if (!Instance.IsValid())
 	{
 		return ECefWebSocketSendResult::InvalidServer;
 	}
-	return Instance->BroadcastBytes(Bytes);
+	return Instance->BroadcastBytes(InBytes);
 }
 
-ECefWebSocketSendResult UCefWebSocketServerBase::BroadcastJson(const TSharedPtr<FJsonObject>& JsonObject, const TSharedPtr<FJsonValue>& JsonValue)
+ECefWebSocketSendResult UCefWebSocketServerBase::BroadcastJson(const TSharedPtr<FJsonObject>& InJsonObject,
+                                                               const TSharedPtr<FJsonValue>& InJsonValue)
 {
-	if (!JsonObject.IsValid() && !JsonValue.IsValid())
+	if (!InJsonObject.IsValid() && !InJsonValue.IsValid())
 	{
 		return ECefWebSocketSendResult::SerializeFailed;
 	}
 
-	FString Serialized;
-	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Serialized);
-	if (JsonObject.IsValid())
+	FString serialized;
+	TSharedRef<TJsonWriter<>> writer = TJsonWriterFactory<>::Create(&serialized);
+	if (InJsonObject.IsValid())
 	{
-		if (!FJsonSerializer::Serialize(JsonObject.ToSharedRef(), Writer))
+		if (!FJsonSerializer::Serialize(InJsonObject.ToSharedRef(), writer))
 		{
 			return ECefWebSocketSendResult::SerializeFailed;
 		}
 	}
 	else
 	{
-		if (!FJsonSerializer::Serialize(JsonValue.ToSharedRef(), TEXT(""), Writer))
+		if (!FJsonSerializer::Serialize(InJsonValue.ToSharedRef(), TEXT(""), writer))
 		{
 			return ECefWebSocketSendResult::SerializeFailed;
 		}
 	}
 
-	return BroadcastString(Serialized);
+	return BroadcastString(serialized);
 }
 
-ECefWebSocketSendResult UCefWebSocketServerBase::BroadcastStringExcept(int64 ExcludedClientId, const FString& Message)
+ECefWebSocketSendResult UCefWebSocketServerBase::BroadcastStringExcept(int64 InExcludedClientId,
+                                                                       const FString& InMessage)
 {
 	if (!Instance.IsValid())
 	{
 		return ECefWebSocketSendResult::InvalidServer;
 	}
-	return Instance->BroadcastStringExcept(ExcludedClientId, Message);
+	return Instance->BroadcastStringExcept(InExcludedClientId, InMessage);
 }
 
-ECefWebSocketSendResult UCefWebSocketServerBase::BroadcastBytesExcept(int64 ExcludedClientId, const TArray<uint8>& Bytes)
+ECefWebSocketSendResult UCefWebSocketServerBase::BroadcastBytesExcept(int64 InExcludedClientId,
+                                                                      const TArray<uint8>& InBytes)
 {
 	if (!Instance.IsValid())
 	{
 		return ECefWebSocketSendResult::InvalidServer;
 	}
-	return Instance->BroadcastBytesExcept(ExcludedClientId, Bytes);
+	return Instance->BroadcastBytesExcept(InExcludedClientId, InBytes);
 }
 
-ECefWebSocketSendResult UCefWebSocketServerBase::DisconnectClient(int64 ClientId, ECefWebSocketCloseReason Reason)
+ECefWebSocketSendResult UCefWebSocketServerBase::DisconnectClient(int64 InClientId, ECefWebSocketCloseReason InReason)
 {
 	if (!Instance.IsValid())
 	{
 		return ECefWebSocketSendResult::InvalidServer;
 	}
-	return Instance->DisconnectClient(ClientId, Reason);
+	return Instance->DisconnectClient(InClientId, InReason);
 }
 
 void UCefWebSocketServerBase::StopServer()
@@ -166,22 +176,22 @@ void UCefWebSocketServerBase::StopServer()
 
 TArray<UCefWebSocketClientBase*> UCefWebSocketServerBase::GetClients() const
 {
-	TArray<UCefWebSocketClientBase*> OutClients;
+	TArray<UCefWebSocketClientBase*> outClients;
 	FScopeLock lock(&ClientObjectsLock);
 	for (const TPair<int64, TObjectPtr<UCefWebSocketClientBase>>& Pair : ClientObjects)
 	{
 		if (Pair.Value)
 		{
-			OutClients.Add(Pair.Value);
+			outClients.Add(Pair.Value);
 		}
 	}
-	return OutClients;
+	return outClients;
 }
 
-UCefWebSocketClientBase* UCefWebSocketServerBase::GetClient(int64 ClientId) const
+UCefWebSocketClientBase* UCefWebSocketServerBase::GetClient(int64 InClientId) const
 {
 	FScopeLock lock(&ClientObjectsLock);
-	if (const TObjectPtr<UCefWebSocketClientBase>* Found = ClientObjects.Find(ClientId))
+	if (const TObjectPtr<UCefWebSocketClientBase>* Found = ClientObjects.Find(InClientId))
 	{
 		return *Found;
 	}
@@ -197,16 +207,16 @@ FCefWebSocketServerStats UCefWebSocketServerBase::GetStats() const
 	return Instance->GetStats();
 }
 
-void UCefWebSocketServerBase::NotifyClientConnected(const FCefWebSocketClientInfo& ClientInfo)
+void UCefWebSocketServerBase::NotifyClientConnected(const FCefWebSocketClientInfo& InClientInfo)
 {
 	if (!IsInGameThread())
 	{
-		TWeakObjectPtr<UCefWebSocketServerBase> WeakThis(this);
-		AsyncTask(ENamedThreads::GameThread, [WeakThis, ClientInfo]()
+		TWeakObjectPtr<UCefWebSocketServerBase> weakThis(this);
+		AsyncTask(ENamedThreads::GameThread, [weakThis, InClientInfo]()
 		{
-			if (WeakThis.IsValid())
+			if (weakThis.IsValid())
 			{
-				WeakThis->NotifyClientConnected(ClientInfo);
+				weakThis->NotifyClientConnected(InClientInfo);
 			}
 		});
 		return;
@@ -216,28 +226,29 @@ void UCefWebSocketServerBase::NotifyClientConnected(const FCefWebSocketClientInf
 	UCefWebSocketClientBase* ClientObject = NewObject<UCefWebSocketClientBase>(this, ClientUClass);
 	if (!ClientObject)
 	{
-		NotifyClientError(ClientInfo.ClientId, ECefWebSocketErrorCode::Unknown, TEXT("Failed to create client object"));
+		NotifyClientError(InClientInfo.ClientId, ECefWebSocketErrorCode::Unknown,
+		                  TEXT("Failed to create client object"));
 		return;
 	}
 
-	ClientObject->InitializeClient(this, ClientInfo);
+	ClientObject->InitializeClient(this, InClientInfo);
 	{
 		FScopeLock lock(&ClientObjectsLock);
-		ClientObjects.Add(ClientInfo.ClientId, ClientObject);
+		ClientObjects.Add(InClientInfo.ClientId, ClientObject);
 	}
-	OnClientConnected.Broadcast(ClientInfo);
+	OnClientConnected.Broadcast(InClientInfo);
 }
 
-void UCefWebSocketServerBase::NotifyClientDisconnected(int64 ClientId, ECefWebSocketCloseReason Reason)
+void UCefWebSocketServerBase::NotifyClientDisconnected(int64 InClientId, ECefWebSocketCloseReason InReason)
 {
 	if (!IsInGameThread())
 	{
-		TWeakObjectPtr<UCefWebSocketServerBase> WeakThis(this);
-		AsyncTask(ENamedThreads::GameThread, [WeakThis, ClientId, Reason]()
+		TWeakObjectPtr<UCefWebSocketServerBase> weakThis(this);
+		AsyncTask(ENamedThreads::GameThread, [weakThis, InClientId, InReason]()
 		{
-			if (WeakThis.IsValid())
+			if (weakThis.IsValid())
 			{
-				WeakThis->NotifyClientDisconnected(ClientId, Reason);
+				weakThis->NotifyClientDisconnected(InClientId, InReason);
 			}
 		});
 		return;
@@ -245,51 +256,52 @@ void UCefWebSocketServerBase::NotifyClientDisconnected(int64 ClientId, ECefWebSo
 
 	{
 		FScopeLock lock(&ClientObjectsLock);
-		ClientObjects.Remove(ClientId);
+		ClientObjects.Remove(InClientId);
 	}
-	OnClientDisconnected.Broadcast(ClientId, Reason);
+	OnClientDisconnected.Broadcast(InClientId, InReason);
 }
 
-void UCefWebSocketServerBase::NotifyServerError(ECefWebSocketErrorCode ErrorCode, const FString& Message)
+void UCefWebSocketServerBase::NotifyServerError(ECefWebSocketErrorCode InErrorCode, const FString& InMessage)
 {
 	if (!IsInGameThread())
 	{
-		TWeakObjectPtr<UCefWebSocketServerBase> WeakThis(this);
-		AsyncTask(ENamedThreads::GameThread, [WeakThis, ErrorCode, Message]()
+		TWeakObjectPtr<UCefWebSocketServerBase> weakThis(this);
+		AsyncTask(ENamedThreads::GameThread, [weakThis, InErrorCode, InMessage]()
 		{
-			if (WeakThis.IsValid())
+			if (weakThis.IsValid())
 			{
-				WeakThis->NotifyServerError(ErrorCode, Message);
+				weakThis->NotifyServerError(InErrorCode, InMessage);
 			}
 		});
 		return;
 	}
-	OnServerError.Broadcast(NameId, ErrorCode, Message);
+	OnServerError.Broadcast(NameId, InErrorCode, InMessage);
 }
 
-void UCefWebSocketServerBase::NotifyClientError(int64 ClientId, ECefWebSocketErrorCode ErrorCode, const FString& Message)
+void UCefWebSocketServerBase::NotifyClientError(int64 InClientId, ECefWebSocketErrorCode InErrorCode,
+                                                const FString& InMessage)
 {
 	if (!IsInGameThread())
 	{
-		TWeakObjectPtr<UCefWebSocketServerBase> WeakThis(this);
-		AsyncTask(ENamedThreads::GameThread, [WeakThis, ClientId, ErrorCode, Message]()
+		TWeakObjectPtr<UCefWebSocketServerBase> weakThis(this);
+		AsyncTask(ENamedThreads::GameThread, [weakThis, InClientId, InErrorCode, InMessage]()
 		{
-			if (WeakThis.IsValid())
+			if (weakThis.IsValid())
 			{
-				WeakThis->NotifyClientError(ClientId, ErrorCode, Message);
+				weakThis->NotifyClientError(InClientId, InErrorCode, InMessage);
 			}
 		});
 		return;
 	}
-	OnClientError.Broadcast(ClientId, ErrorCode, Message);
+	OnClientError.Broadcast(InClientId, InErrorCode, InMessage);
 }
 
-void UCefWebSocketServerBase::NotifyClientMessage(int64 ClientId, const TArray<uint8>& Payload, bool bBinary)
+void UCefWebSocketServerBase::NotifyClientMessage(int64 InClientId, const TArray<uint8>& InPayload, bool bInBinary)
 {
 	UCefWebSocketClientBase* Client = nullptr;
 	{
 		FScopeLock lock(&ClientObjectsLock);
-		if (const TObjectPtr<UCefWebSocketClientBase>* Found = ClientObjects.Find(ClientId))
+		if (const TObjectPtr<UCefWebSocketClientBase>* Found = ClientObjects.Find(InClientId))
 		{
 			Client = *Found;
 		}
@@ -299,22 +311,22 @@ void UCefWebSocketServerBase::NotifyClientMessage(int64 ClientId, const TArray<u
 		return;
 	}
 
-	Client->HandleBytesFromClient(Payload);
-	HandleClientBytes(Client, Payload);
+	Client->HandleBytesFromClient(InPayload);
+	HandleClientBytes(Client, InPayload);
 
-	if (!bBinary)
+	if (!bInBinary)
 	{
-		FUTF8ToTCHAR Converter(reinterpret_cast<const ANSICHAR*>(Payload.GetData()), Payload.Num());
-		const FString Text(Converter.Length(), Converter.Get());
-		Client->HandleStringFromClient(Text);
-		HandleClientString(Client, Text);
+		FUTF8ToTCHAR converter(reinterpret_cast<const ANSICHAR*>(InPayload.GetData()), InPayload.Num());
+		const FString text(converter.Length(), converter.Get());
+		Client->HandleStringFromClient(text);
+		HandleClientString(Client, text);
 	}
 }
 
-void UCefWebSocketServerBase::HandleClientBytes(UCefWebSocketClientBase* Client, const TArray<uint8>& Data)
+void UCefWebSocketServerBase::HandleClientBytes(UCefWebSocketClientBase* InClient, const TArray<uint8>& InData)
 {
 }
 
-void UCefWebSocketServerBase::HandleClientString(UCefWebSocketClientBase* Client, const FString& Message)
+void UCefWebSocketServerBase::HandleClientString(UCefWebSocketClientBase* InClient, const FString& InMessage)
 {
 }

@@ -20,32 +20,32 @@ public:
 	void GoForward();
 	void StopLoad();
 	void Reload();
-	void SetURL(const FString& URL);
+	void SetURL(const FString& InURL);
 
-	void SetPaused(bool bPaused);
-	void SetHidden(bool bHidden);
-	void SetFocus(bool bFocus);
-	void SetZoomLevel(float Level);
-	void SetFrameRate(uint32 Rate);
-	void ScrollTo(int32 X, int32 Y);
-	void Resize(uint32 Width, uint32 Height);
+	void SetPaused(bool bInPaused);
+	void SetHidden(bool bInHidden);
+	void SetFocus(bool bInFocus);
+	void SetZoomLevel(float InLevel);
+	void SetFrameRate(uint32 InRate);
+	void ScrollTo(int32 InX, int32 InY);
+	void Resize(uint32 InWidth, uint32 InHeight);
 
-	void SetMuted(bool bMuted);
+	void SetMuted(bool bInMuted);
 
 	void OpenDevTools();
 	void CloseDevTools();
 
-	void SetInputEnabled(bool bEnabled);
+	void SetInputEnabled(bool bInEnabled);
 
-	void ExecuteJS(const FString& Script);
-	void OpenLocalFile(const FString& LocalFilePath);
-	void LoadHtmlString(const FString& Html);
+	void ExecuteJS(const FString& InScript);
+	void OpenLocalFile(const FString& InLocalFilePath);
+	void LoadHtmlString(const FString& InHtml);
 
 	void ClearCookies();
-	void SetConsumerCadenceUs(uint32 CadenceUs);
-	void SetMaxInFlightBeginFrames(uint32 MaxInFlight);
-	void SetFlushIntervalFrames(uint32 FlushIntervalFrames);
-	void SetKeyframeIntervalUs(uint32 KeyframeIntervalUs);
+	void SetConsumerCadenceUs(uint32 InCadenceUs);
+	void SetMaxInFlightBeginFrames(uint32 InMaxInFlight);
+	void SetFlushIntervalFrames(uint32 InFlushIntervalFrames);
+	void SetKeyframeIntervalUs(uint32 InKeyframeIntervalUs);
 
 #pragma endregion
 

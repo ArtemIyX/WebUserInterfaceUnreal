@@ -26,17 +26,17 @@ public:
 	void Stop();
 	bool IsRunning() const;
 
-	ECefWebSocketSendResult SendToClientString(int64 ClientId, const FString& Message);
-	ECefWebSocketSendResult SendToClientBytes(int64 ClientId, const TArray<uint8>& Bytes);
-	ECefWebSocketSendResult BroadcastString(const FString& Message);
-	ECefWebSocketSendResult BroadcastBytes(const TArray<uint8>& Bytes);
-	ECefWebSocketSendResult BroadcastStringExcept(int64 ExcludedClientId, const FString& Message);
-	ECefWebSocketSendResult BroadcastBytesExcept(int64 ExcludedClientId, const TArray<uint8>& Bytes);
-	ECefWebSocketSendResult DisconnectClient(int64 ClientId, ECefWebSocketCloseReason Reason);
+	ECefWebSocketSendResult SendToClientString(int64 InClientId, const FString& InMessage);
+	ECefWebSocketSendResult SendToClientBytes(int64 InClientId, const TArray<uint8>& InBytes);
+	ECefWebSocketSendResult BroadcastString(const FString& InMessage);
+	ECefWebSocketSendResult BroadcastBytes(const TArray<uint8>& InBytes);
+	ECefWebSocketSendResult BroadcastStringExcept(int64 InExcludedClientId, const FString& InMessage);
+	ECefWebSocketSendResult BroadcastBytesExcept(int64 InExcludedClientId, const TArray<uint8>& InBytes);
+	ECefWebSocketSendResult DisconnectClient(int64 InClientId, ECefWebSocketCloseReason InReason);
 
 	TArray<FCefWebSocketClientInfo> GetClients() const;
 	FCefWebSocketServerStats GetStats() const;
-	FCefWebSocketClientInfo FindClientInfo(int64 ClientId) const;
+	FCefWebSocketClientInfo FindClientInfo(int64 InClientId) const;
 	FName GetNameId() const { return NameId; }
 	int32 GetBoundPort() const { return BoundPort; }
 #pragma endregion
@@ -72,11 +72,11 @@ private:
 
 private:
 #pragma region InternalMethods
-	void HandleClientConnected(ICefNetWebSocket* Socket);
-	void HandleClientDisconnected(ICefNetWebSocket* Socket);
-	void HandleClientPacket(ICefNetWebSocket* Socket, const uint8* Data, int32 Count, bool bBinary);
-	ECefWebSocketSendResult EnqueueToClient(int64 ClientId, const uint8* Data, int32 Count, bool bBinary);
-	ECefWebSocketSendResult EnqueueToClients(const TArray<int64>& ClientIds, const uint8* Data, int32 Count, bool bBinary);
+	void HandleClientConnected(ICefNetWebSocket* InSocket);
+	void HandleClientDisconnected(ICefNetWebSocket* InSocket);
+	void HandleClientPacket(ICefNetWebSocket* InSocket, const uint8* InData, int32 InCount, bool bInBinary);
+	ECefWebSocketSendResult EnqueueToClient(int64 InClientId, const uint8* InData, int32 InCount, bool bInBinary);
+	ECefWebSocketSendResult EnqueueToClients(const TArray<int64>& InClientIds, const uint8* InData, int32 InCount, bool bInBinary);
 	void RecordQueueDepthSample_NoLock();
 	void UpdateRateStats_NoLock();
 	void WakeWriteThread();

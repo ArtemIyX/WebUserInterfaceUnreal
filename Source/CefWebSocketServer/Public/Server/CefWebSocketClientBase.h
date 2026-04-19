@@ -14,6 +14,8 @@ class CEFWEBSOCKETSERVER_API UCefWebSocketClientBase : public UObject
 	GENERATED_BODY()
 
 public:
+	UCefWebSocketClientBase(const FObjectInitializer& InInitializer);
+public:
 #pragma region PublicApi
 	UFUNCTION(BlueprintPure, Category = "CefWebSocket")
 	int64 GetClientId() const { return ClientInfo.ClientId; }
@@ -25,16 +27,16 @@ public:
 	FDateTime GetConnectedAt() const { return ClientInfo.ConnectedAt; }
 
 	UFUNCTION(BlueprintCallable, Category = "CefWebSocket")
-	ECefWebSocketSendResult SendString(const FString& Message);
+	ECefWebSocketSendResult SendString(const FString& InMessage);
 
 	UFUNCTION(BlueprintCallable, Category = "CefWebSocket")
-	ECefWebSocketSendResult SendBytes(const TArray<uint8>& Bytes);
+	ECefWebSocketSendResult SendBytes(const TArray<uint8>& InBytes);
 
 	UFUNCTION(BlueprintCallable, Category = "CefWebSocket")
-	ECefWebSocketSendResult Disconnect(ECefWebSocketCloseReason Reason = ECefWebSocketCloseReason::Kicked);
+	ECefWebSocketSendResult Disconnect(ECefWebSocketCloseReason InReason = ECefWebSocketCloseReason::Kicked);
 
-	virtual void HandleBytesFromClient(const TArray<uint8>& Data);
-	virtual void HandleStringFromClient(const FString& Message);
+	virtual void HandleBytesFromClient(const TArray<uint8>& InData);
+	virtual void HandleStringFromClient(const FString& InMessage);
 #pragma endregion
 
 private:

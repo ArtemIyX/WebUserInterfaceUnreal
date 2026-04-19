@@ -21,68 +21,68 @@ void UCefWebUiGameInstanceSubsystem::Deinitialize()
 }
 
 UCefWebUiBrowserSession* UCefWebUiGameInstanceSubsystem::GetOrCreateSession(
-	FName SessionId, TSubclassOf<UCefWebUiBrowserSession> SessionClass)
+	FName InSessionId, TSubclassOf<UCefWebUiBrowserSession> InSessionClass)
 {
-	const FName Key = NormalizeSessionId(SessionId);
-	if (TObjectPtr<UCefWebUiBrowserSession>* Found = Sessions.Find(Key))
+	const FName key = NormalizeSessionId(InSessionId);
+	if (TObjectPtr<UCefWebUiBrowserSession>* Found = Sessions.Find(key))
 	{
 		return Found->Get();
 	}
 
-	if (!SessionClass)
+	if (!InSessionClass)
 	{
-		SessionClass = DefaultSessionClass;
+		InSessionClass = DefaultSessionClass;
 	}
-	if (!SessionClass)
+	if (!InSessionClass)
 	{
-		SessionClass = UCefWebUiBrowserSession::StaticClass();
+		InSessionClass = UCefWebUiBrowserSession::StaticClass();
 	}
 
-	UCefWebUiBrowserSession* Session = NewObject<UCefWebUiBrowserSession>(this, SessionClass);
-	Session->Initialize(this, Key);
-	Sessions.Add(Key, Session);
+	UCefWebUiBrowserSession* Session = NewObject<UCefWebUiBrowserSession>(this, InSessionClass);
+	Session->Initialize(this, key);
+	Sessions.Add(key, Session);
 	return Session;
 }
 
-UCefWebUiBrowserSession* UCefWebUiGameInstanceSubsystem::GetSession(FName SessionId) const
+UCefWebUiBrowserSession* UCefWebUiGameInstanceSubsystem::GetSession(FName InSessionId) const
 {
-	const FName Key = NormalizeSessionId(SessionId);
-	if (const TObjectPtr<UCefWebUiBrowserSession>* Found = Sessions.Find(Key))
+	const FName key = NormalizeSessionId(InSessionId);
+	if (const TObjectPtr<UCefWebUiBrowserSession>* Found = Sessions.Find(key))
 	{
 		return Found->Get();
 	}
 	return nullptr;
 }
 
-void UCefWebUiGameInstanceSubsystem::DestroySession(FName SessionId)
+void UCefWebUiGameInstanceSubsystem::DestroySession(FName InSessionId)
 {
-	const FName Key = NormalizeSessionId(SessionId);
-	if (TObjectPtr<UCefWebUiBrowserSession>* Found = Sessions.Find(Key))
+	const FName key = NormalizeSessionId(InSessionId);
+	if (TObjectPtr<UCefWebUiBrowserSession>* Found = Sessions.Find(key))
 	{
 		if (IsValid(*Found))
 		{
 			(*Found)->Shutdown();
 		}
-		Sessions.Remove(Key);
+		Sessions.Remove(key);
 	}
 }
 
 void UCefWebUiGameInstanceSubsystem::ShowSessionInViewport(
-	FName SessionId,
-	APlayerController* PlayerController,
-	int32 ZOrder,
-	int32 BrowserWidth,
-	int32 BrowserHeight)
+	FName InSessionId,
+	APlayerController* InPlayerController,
+	int32 InZOrder,
+	int32 InBrowserWidth,
+	int32 InBrowserHeight)
 {
-	if (UCefWebUiBrowserSession* Session = GetOrCreateSession(SessionId, nullptr))
+	if (UCefWebUiBrowserSession* Session = GetOrCreateSession(InSessionId, nullptr))
 	{
-		Session->ShowInViewport(PlayerController, ZOrder, BrowserWidth, BrowserHeight);
+		Session->ShowInViewport(InPlayerController, InZOrder, InBrowserWidth, InBrowserHeight);
 	}
 }
 
-void UCefWebUiGameInstanceSubsystem::HideSessionFromViewport(FName SessionId)
+void UCefWebUiGameInstanceSubsystem::HideSessionFromViewport(FName InSessionId)
 {
-	if (UCefWebUiBrowserSession* Session = GetSession(SessionId))
+	if (UCefWebUiBrowserSession* Session = GetSession(InSessionId))
 	{
 		Session->HideFromViewport();
 	}
@@ -93,7 +93,7 @@ void UCefWebUiGameInstanceSubsystem::SetDefaultSessionClass(TSubclassOf<UCefWebU
 	DefaultSessionClass = InSessionClass;
 }
 
-FName UCefWebUiGameInstanceSubsystem::NormalizeSessionId(FName SessionId) const
+FName UCefWebUiGameInstanceSubsystem::NormalizeSessionId(FName InSessionId) const
 {
-	return SessionId.IsNone() ? FName(TEXT("Default")) : SessionId;
+	return InSessionId.IsNone() ? FName(TEXT("Default")) : InSessionId;
 }

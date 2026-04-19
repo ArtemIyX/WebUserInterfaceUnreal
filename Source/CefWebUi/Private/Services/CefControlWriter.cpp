@@ -172,79 +172,79 @@ void FCefControlWriter::Reload()
 	WriteEvent(evt);
 }
 
-void FCefControlWriter::SetURL(const FString& URL)
+void FCefControlWriter::SetURL(const FString& InURL)
 {
 	FCefControlEvent evt{};
 	evt.Type = ECefControlEventType::SetURL;
 	FMemory::Memzero(evt.String.Text, sizeof(evt.String.Text));
-	FCString::Strncpy(reinterpret_cast<TCHAR*>(evt.String.Text), *URL,
-	                  FMath::Min(URL.Len() + 1, static_cast<int32>(CONTROL_STRING_MAX)));
+	FCString::Strncpy(reinterpret_cast<TCHAR*>(evt.String.Text), *InURL,
+	                  FMath::Min(InURL.Len() + 1, static_cast<int32>(CONTROL_STRING_MAX)));
 	WriteEvent(evt);
 }
 
-void FCefControlWriter::SetPaused(bool bPaused)
+void FCefControlWriter::SetPaused(bool bInPaused)
 {
 	FCefControlEvent evt{};
 	evt.Type = ECefControlEventType::SetPaused;
-	evt.Flag.Value = bPaused;
+	evt.Flag.Value = bInPaused;
 	WriteEvent(evt);
 }
 
-void FCefControlWriter::SetHidden(bool bHidden)
+void FCefControlWriter::SetHidden(bool bInHidden)
 {
 	FCefControlEvent evt{};
 	evt.Type = ECefControlEventType::SetHidden;
-	evt.Flag.Value = bHidden;
+	evt.Flag.Value = bInHidden;
 	WriteEvent(evt);
 }
 
-void FCefControlWriter::SetFocus(bool bFocus)
+void FCefControlWriter::SetFocus(bool bInFocus)
 {
 	FCefControlEvent evt{};
 	evt.Type = ECefControlEventType::SetFocus;
-	evt.Flag.Value = bFocus;
+	evt.Flag.Value = bInFocus;
 	WriteEvent(evt);
 }
 
-void FCefControlWriter::SetZoomLevel(float Level)
+void FCefControlWriter::SetZoomLevel(float InLevel)
 {
 	FCefControlEvent evt{};
 	evt.Type = ECefControlEventType::SetZoomLevel;
-	evt.Zoom.Value = Level;
+	evt.Zoom.Value = InLevel;
 	WriteEvent(evt);
 }
 
-void FCefControlWriter::SetFrameRate(uint32 Rate)
+void FCefControlWriter::SetFrameRate(uint32 InRate)
 {
 	FCefControlEvent evt{};
 	evt.Type = ECefControlEventType::SetFrameRate;
-	evt.FrameRate.Value = Rate;
+	evt.FrameRate.Value = InRate;
 	WriteEvent(evt);
 }
 
-void FCefControlWriter::ScrollTo(int32 X, int32 Y)
+void FCefControlWriter::ScrollTo(int32 InX, int32 InY)
 {
 	FCefControlEvent evt{};
 	evt.Type = ECefControlEventType::ScrollTo;
-	evt.Scroll.X = X;
-	evt.Scroll.Y = Y;
+	evt.Scroll.X = InX;
+	evt.Scroll.Y = InY;
 	WriteEvent(evt);
 }
 
-void FCefControlWriter::Resize(uint32 Width, uint32 Height)
+void FCefControlWriter::Resize(uint32 InWidth, uint32 InHeight)
 {
 	FCefControlEvent evt{};
 	evt.Type = ECefControlEventType::Resize;
-	evt.Resize.Width = Width;
-	evt.Resize.Height = Height;
+	evt.Resize.Width = InWidth;
+	evt.Resize.Height = InHeight;
 	WriteEvent(evt);
 }
 
-void FCefControlWriter::SetMuted(bool bMuted)
+void FCefControlWriter::SetMuted(bool bInMuted)
 {
 	FCefControlEvent evt{};
 	evt.Type = ECefControlEventType::SetMuted;
-	evt.Flag.Value = bMuted;
+	evt.Flag.Value = bInMuted;
 	WriteEvent(evt);
 }
 
@@ -262,21 +262,21 @@ void FCefControlWriter::CloseDevTools()
 	WriteEvent(evt);
 }
 
-void FCefControlWriter::SetInputEnabled(bool bEnabled)
+void FCefControlWriter::SetInputEnabled(bool bInEnabled)
 {
 	FCefControlEvent evt{};
 	evt.Type = ECefControlEventType::SetInputEnabled;
-	evt.Flag.Value = bEnabled;
+	evt.Flag.Value = bInEnabled;
 	WriteEvent(evt);
 }
 
-void FCefControlWriter::ExecuteJS(const FString& Script)
+void FCefControlWriter::ExecuteJS(const FString& InScript)
 {
 	FCefControlEvent evt{};
 	evt.Type = ECefControlEventType::ExecuteJS;
 	FMemory::Memzero(evt.String.Text, sizeof(evt.String.Text));
-	FCString::Strncpy(reinterpret_cast<TCHAR*>(evt.String.Text), *Script,
-	                  FMath::Min(Script.Len() + 1, (int32)CONTROL_STRING_MAX));
+	FCString::Strncpy(reinterpret_cast<TCHAR*>(evt.String.Text), *InScript,
+	                  FMath::Min(InScript.Len() + 1, (int32)CONTROL_STRING_MAX));
 	WriteEvent(evt);
 }
 
@@ -287,55 +287,55 @@ void FCefControlWriter::ClearCookies()
 	WriteEvent(evt);
 }
 
-void FCefControlWriter::OpenLocalFile(const FString& LocalFilePath)
+void FCefControlWriter::OpenLocalFile(const FString& InLocalFilePath)
 {
 	FCefControlEvent evt{};
 	evt.Type = ECefControlEventType::OpenLocalFile;
 	FMemory::Memzero(evt.String.Text, sizeof(evt.String.Text));
-	FCString::Strncpy(reinterpret_cast<TCHAR*>(evt.String.Text), *LocalFilePath,
-	                  FMath::Min(LocalFilePath.Len() + 1, (int32)CONTROL_STRING_MAX));
+	FCString::Strncpy(reinterpret_cast<TCHAR*>(evt.String.Text), *InLocalFilePath,
+	                  FMath::Min(InLocalFilePath.Len() + 1, (int32)CONTROL_STRING_MAX));
 	WriteEvent(evt);
 }
 
-void FCefControlWriter::LoadHtmlString(const FString& Html)
+void FCefControlWriter::LoadHtmlString(const FString& InHtml)
 {
 	FCefControlEvent evt{};
 	evt.Type = ECefControlEventType::LoadHtmlString;
 	FMemory::Memzero(evt.String.Text, sizeof(evt.String.Text));
-	FCString::Strncpy(reinterpret_cast<TCHAR*>(evt.String.Text), *Html,
-	                  FMath::Min(Html.Len() + 1, (int32)CONTROL_STRING_MAX));
+	FCString::Strncpy(reinterpret_cast<TCHAR*>(evt.String.Text), *InHtml,
+	                  FMath::Min(InHtml.Len() + 1, (int32)CONTROL_STRING_MAX));
 	WriteEvent(evt);
 }
 
-void FCefControlWriter::SetConsumerCadenceUs(uint32 CadenceUs)
+void FCefControlWriter::SetConsumerCadenceUs(uint32 InCadenceUs)
 {
 	FCefControlEvent evt{};
 	evt.Type = ECefControlEventType::SetConsumerCadenceUs;
-	evt.CadenceUs.Value = CadenceUs;
+	evt.CadenceUs.Value = InCadenceUs;
 	WriteEvent(evt);
 }
 
-void FCefControlWriter::SetMaxInFlightBeginFrames(uint32 MaxInFlight)
+void FCefControlWriter::SetMaxInFlightBeginFrames(uint32 InMaxInFlight)
 {
 	FCefControlEvent evt{};
 	evt.Type = ECefControlEventType::SetMaxInFlightBeginFrames;
-	evt.FrameRate.Value = MaxInFlight;
+	evt.FrameRate.Value = InMaxInFlight;
 	WriteEvent(evt);
 }
 
-void FCefControlWriter::SetFlushIntervalFrames(uint32 FlushIntervalFrames)
+void FCefControlWriter::SetFlushIntervalFrames(uint32 InFlushIntervalFrames)
 {
 	FCefControlEvent evt{};
 	evt.Type = ECefControlEventType::SetFlushIntervalFrames;
-	evt.FrameRate.Value = FlushIntervalFrames;
+	evt.FrameRate.Value = InFlushIntervalFrames;
 	WriteEvent(evt);
 }
 
-void FCefControlWriter::SetKeyframeIntervalUs(uint32 KeyframeIntervalUs)
+void FCefControlWriter::SetKeyframeIntervalUs(uint32 InKeyframeIntervalUs)
 {
 	FCefControlEvent evt{};
 	evt.Type = ECefControlEventType::SetKeyframeIntervalUs;
-	evt.CadenceUs.Value = KeyframeIntervalUs;
+	evt.CadenceUs.Value = InKeyframeIntervalUs;
 	WriteEvent(evt);
 }
 

@@ -84,7 +84,7 @@ public:
 	uint32 ConsumeDroppedPendingFrames();
 	ECefLoadState GetLastKnownLoadState() const;
 
-	static EMouseCursor::Type MapCefCursor(ECefCustomCursorType Type);
+	static EMouseCursor::Type MapCefCursor(ECefCustomCursorType InType);
 
 public:
 	FOnCefLoadStateChanged OnLoadStateChanged;

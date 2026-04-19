@@ -14,11 +14,11 @@ class CEFWEBUI_API ARenderTestActor : public AActor
 	GENERATED_BODY()
 
 public:
-	ARenderTestActor(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+	ARenderTestActor(const FObjectInitializer& InObjectInitializer = FObjectInitializer::Get());
 
 	virtual void BeginPlay() override;
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-	virtual void Tick(float DeltaTime) override;
+	virtual void EndPlay(const EEndPlayReason::Type InEndPlayReason) override;
+	virtual void Tick(float InDeltaTime) override;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="Config")

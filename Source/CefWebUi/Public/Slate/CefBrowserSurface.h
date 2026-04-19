@@ -42,47 +42,47 @@ public:
 
 #pragma region SWidget
 	virtual int32 OnPaint(
-		const FPaintArgs& Args,
-		const FGeometry& AllottedGeometry,
-		const FSlateRect& MyCullingRect,
+		const FPaintArgs& InArgs,
+		const FGeometry& InAllottedGeometry,
+		const FSlateRect& InMyCullingRect,
 		FSlateWindowElementList& OutDrawElements,
-		int32 LayerId,
+		int32 InLayerId,
 		const FWidgetStyle& InWidgetStyle,
-		bool bParentEnabled) const override;
-	virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
+		bool bInParentEnabled) const override;
+	virtual void Tick(const FGeometry& InAllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 
-	virtual FVector2D ComputeDesiredSize(float LayoutScaleMultiplier) const override;
+	virtual FVector2D ComputeDesiredSize(float InLayoutScaleMultiplier) const override;
 	virtual bool ComputeVolatility() const override { return true; }
 	virtual bool SupportsKeyboardFocus() const override { return true; }
 
-	virtual FReply OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
-	virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
-	virtual FReply OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
-	virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
-	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& KeyEvent) override;
-	virtual FReply OnKeyUp(const FGeometry& MyGeometry, const FKeyEvent& KeyEvent) override;
-	virtual FReply OnKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& CharacterEvent) override;
+	virtual FReply OnMouseMove(const FGeometry& InMyGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual FReply OnMouseButtonDown(const FGeometry& InMyGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual FReply OnMouseButtonUp(const FGeometry& InMyGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual FReply OnMouseWheel(const FGeometry& InMyGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual FReply OnKeyDown(const FGeometry& InMyGeometry, const FKeyEvent& InKeyEvent) override;
+	virtual FReply OnKeyUp(const FGeometry& InMyGeometry, const FKeyEvent& InKeyEvent) override;
+	virtual FReply OnKeyChar(const FGeometry& InMyGeometry, const FCharacterEvent& InCharacterEvent) override;
 #pragma endregion
 
 private:
 #pragma region InternalMethods
-	EActiveTimerReturnType HandleActiveTimer(double CurrentTime, float DeltaTime);
+	EActiveTimerReturnType HandleActiveTimer(double InCurrentTime, float InDeltaTime);
 	void HandleFrameReady();
 	void UnbindFrameReaderDelegate();
 	bool TryGetFrameReader(TSharedPtr<FCefFrameReader>& OutFrameReader) const;
 	bool TryGetInputWriter(TSharedPtr<FCefInputWriter>& OutInputWriter) const;
 	bool TryGetControlWriter(TSharedPtr<FCefControlWriter>& OutControlWriter) const;
 	void PollLatestFrame() const;
-	void MaybePushHostTuning(double NowSec) const;
-	void MaybeUpdateCadenceFeedback(double NowSec) const;
-	void UpdateFrameTelemetry(const FCefSharedFrame& Frame) const;
-	void MaybeUpdateCursor(const FCefSharedFrame& Frame, double NowSec) const;
-	void MaybeLogAndResetTelemetry(double NowSec) const;
+	void MaybePushHostTuning(double InNowSec) const;
+	void MaybeUpdateCadenceFeedback(double InNowSec) const;
+	void UpdateFrameTelemetry(const FCefSharedFrame& InFrame) const;
+	void MaybeUpdateCursor(const FCefSharedFrame& InFrame, double InNowSec) const;
+	void MaybeLogAndResetTelemetry(double InNowSec) const;
 	void MarkInputEvent();
 	void EnsureSharedRhi() const;
 	bool EnsurePopupPlaneRhi() const;
 	bool EnsureSharedGpuFence() const;
-	bool IsFrameGpuReady(const FCefSharedFrame& Frame) const;
+	bool IsFrameGpuReady(const FCefSharedFrame& InFrame) const;
 	void ReleaseResources();
 	void GetBrowserCoords(const FGeometry& InGeometry, const FVector2D& InScreenPosition, int32& OutX, int32& OutY) const;
 	static bool SlateButtonToCef(const FKey& InKey, ECefMouseButton& OutButton);

@@ -30,7 +30,7 @@ public:
 
 private:
 	void CloseHandles();
-	void DispatchEvent(ECefConsoleLogLevel level, const FString& message, const FString& source, int32 line);
+	void DispatchEvent(ECefConsoleLogLevel InLevel, const FString& InMessage, const FString& InSource, int32 InLine);
 
 private:
 	Windows::HANDLE HMap = nullptr;

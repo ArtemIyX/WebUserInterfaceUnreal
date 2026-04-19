@@ -38,12 +38,12 @@ public:
 	}
 
 	void ShowSessionInViewport(
-		APlayerController* PlayerController = nullptr,
-		int32 ZOrder = 0,
-		int32 BrowserWidth = 1920,
-		int32 BrowserHeight = 1080)
+		APlayerController* InPlayerController = nullptr,
+		int32 InZOrder = 0,
+		int32 InBrowserWidth = 1920,
+		int32 InBrowserHeight = 1080)
 	{
-		ShowSessionInViewport(NAME_None, PlayerController, ZOrder, BrowserWidth, BrowserHeight);
+		ShowSessionInViewport(NAME_None, InPlayerController, InZOrder, InBrowserWidth, InBrowserHeight);
 	}
 
 	void HideSessionFromViewport()
@@ -55,25 +55,25 @@ public:
 #pragma region Session API
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
 	UCefWebUiBrowserSession* GetOrCreateSession(
-		FName SessionId,
-		TSubclassOf<UCefWebUiBrowserSession> SessionClass = nullptr);
+		FName InSessionId,
+		TSubclassOf<UCefWebUiBrowserSession> InSessionClass = nullptr);
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
-	UCefWebUiBrowserSession* GetSession(FName SessionId) const;
+	UCefWebUiBrowserSession* GetSession(FName InSessionId) const;
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
-	void DestroySession(FName SessionId);
+	void DestroySession(FName InSessionId);
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
 	void ShowSessionInViewport(
-		FName SessionId,
-		APlayerController* PlayerController,
-		int32 ZOrder,
-		int32 BrowserWidth,
-		int32 BrowserHeight);
+		FName InSessionId,
+		APlayerController* InPlayerController,
+		int32 InZOrder,
+		int32 InBrowserWidth,
+		int32 InBrowserHeight);
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
-	void HideSessionFromViewport(FName SessionId);
+	void HideSessionFromViewport(FName InSessionId);
 #pragma endregion
 
 #pragma region Settings
@@ -85,7 +85,7 @@ public:
 #pragma endregion
 
 private:
-	FName NormalizeSessionId(FName SessionId) const;
+	FName NormalizeSessionId(FName InSessionId) const;
 
 private:
 #pragma region State

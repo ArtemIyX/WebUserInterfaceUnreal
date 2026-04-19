@@ -15,8 +15,8 @@
 
 #pragma region Lifecycle
 
-UCefWebUiBrowserSession::UCefWebUiBrowserSession(const FObjectInitializer& objectInitializer)
-	: Super(objectInitializer)
+UCefWebUiBrowserSession::UCefWebUiBrowserSession(const FObjectInitializer& InObjectInitializer)
+	: Super(InObjectInitializer)
 {
 }
 
@@ -26,10 +26,10 @@ void UCefWebUiBrowserSession::BeginDestroy()
 	Super::BeginDestroy();
 }
 
-void UCefWebUiBrowserSession::Initialize(UCefWebUiGameInstanceSubsystem* inOwnerSubsystem, FName inSessionId)
+void UCefWebUiBrowserSession::Initialize(UCefWebUiGameInstanceSubsystem* InInOwnerSubsystem, FName InInSessionId)
 {
-	OwnerSubsystem = inOwnerSubsystem;
-	SessionId = inSessionId;
+	OwnerSubsystem = InInOwnerSubsystem;
+	SessionId = InInSessionId;
 	EnsureRuntimeStarted();
 }
 
@@ -38,10 +38,10 @@ void UCefWebUiBrowserSession::Initialize(UCefWebUiGameInstanceSubsystem* inOwner
 #pragma region Widget
 
 void UCefWebUiBrowserSession::ShowInViewport(
-	APlayerController* playerController,
-	int32 zOrder,
-	int32 browserWidth,
-	int32 browserHeight)
+	APlayerController* InPlayerController,
+	int32 InZOrder,
+	int32 InBrowserWidth,
+	int32 InBrowserHeight)
 {
 	UGameViewportClient* gameViewportClient = GetGameViewportClient();
 	if (!gameViewportClient)
@@ -54,13 +54,13 @@ void UCefWebUiBrowserSession::ShowInViewport(
 	{
 		SAssignNew(BrowserSurfaceWidget, SCefBrowserSurface)
 			.BrowserSession(this)
-			.BrowserWidth(FMath::Max(1, browserWidth))
-			.BrowserHeight(FMath::Max(1, browserHeight));
+			.BrowserWidth(FMath::Max(1, InBrowserWidth))
+			.BrowserHeight(FMath::Max(1, InBrowserHeight));
 	}
 	else
 	{
 		BrowserSurfaceWidget->SetBrowserSession(this);
-		BrowserSurfaceWidget->SetBrowserSize(FMath::Max(1, browserWidth), FMath::Max(1, browserHeight));
+		BrowserSurfaceWidget->SetBrowserSize(FMath::Max(1, InBrowserWidth), FMath::Max(1, InBrowserHeight));
 	}
 
 	if (ViewportWidgetHost.IsValid())
@@ -69,20 +69,20 @@ void UCefWebUiBrowserSession::ShowInViewport(
 		ViewportWidgetHost.Reset();
 	}
 
-	if (!playerController)
+	if (!InPlayerController)
 	{
 		if (UCefWebUiGameInstanceSubsystem* subsystem = OwnerSubsystem.Get())
 		{
 			if (UGameInstance* gameInstance = subsystem->GetGameInstance())
 			{
-				playerController = gameInstance->GetFirstLocalPlayerController();
+				InPlayerController = gameInstance->GetFirstLocalPlayerController();
 			}
 		}
 	}
 
 	SAssignNew(ViewportWidgetHost, SWeakWidget)
 		.PossiblyNullContent(BrowserSurfaceWidget.ToSharedRef());
-	gameViewportClient->AddViewportWidgetContent(ViewportWidgetHost.ToSharedRef(), zOrder);
+	gameViewportClient->AddViewportWidgetContent(ViewportWidgetHost.ToSharedRef(), InZOrder);
 }
 
 void UCefWebUiBrowserSession::HideFromViewport()
@@ -164,11 +164,11 @@ void UCefWebUiBrowserSession::Reload()
 	}
 }
 
-void UCefWebUiBrowserSession::SetUrl(const FString& inUrl)
+void UCefWebUiBrowserSession::SetUrl(const FString& InInUrl)
 {
 	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
 	{
-		controlWriter->SetURL(inUrl);
+		controlWriter->SetURL(InInUrl);
 	}
 }
 
@@ -196,35 +196,35 @@ void UCefWebUiBrowserSession::SetFocus(bool bInFocus)
 	}
 }
 
-void UCefWebUiBrowserSession::SetZoomLevel(float inLevel)
+void UCefWebUiBrowserSession::SetZoomLevel(float InInLevel)
 {
 	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
 	{
-		controlWriter->SetZoomLevel(inLevel);
+		controlWriter->SetZoomLevel(InInLevel);
 	}
 }
 
-void UCefWebUiBrowserSession::SetFrameRate(int32 inRate)
+void UCefWebUiBrowserSession::SetFrameRate(int32 InInRate)
 {
 	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
 	{
-		controlWriter->SetFrameRate(static_cast<uint32>(FMath::Max(0, inRate)));
+		controlWriter->SetFrameRate(static_cast<uint32>(FMath::Max(0, InInRate)));
 	}
 }
 
-void UCefWebUiBrowserSession::ScrollTo(int32 inX, int32 inY)
+void UCefWebUiBrowserSession::ScrollTo(int32 InInX, int32 InInY)
 {
 	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
 	{
-		controlWriter->ScrollTo(inX, inY);
+		controlWriter->ScrollTo(InInX, InInY);
 	}
 }
 
-void UCefWebUiBrowserSession::Resize(int32 inWidth, int32 inHeight)
+void UCefWebUiBrowserSession::Resize(int32 InInWidth, int32 InInHeight)
 {
 	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
 	{
-		controlWriter->Resize(static_cast<uint32>(FMath::Max(1, inWidth)), static_cast<uint32>(FMath::Max(1, inHeight)));
+		controlWriter->Resize(static_cast<uint32>(FMath::Max(1, InInWidth)), static_cast<uint32>(FMath::Max(1, InInHeight)));
 	}
 }
 
@@ -260,27 +260,27 @@ void UCefWebUiBrowserSession::SetInputEnabled(bool bInEnabled)
 	}
 }
 
-void UCefWebUiBrowserSession::ExecuteJs(const FString& inScript)
+void UCefWebUiBrowserSession::ExecuteJs(const FString& InInScript)
 {
 	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
 	{
-		controlWriter->ExecuteJS(inScript);
+		controlWriter->ExecuteJS(InInScript);
 	}
 }
 
-void UCefWebUiBrowserSession::OpenLocalFile(const FString& inLocalFilePath)
+void UCefWebUiBrowserSession::OpenLocalFile(const FString& InInLocalFilePath)
 {
 	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
 	{
-		controlWriter->OpenLocalFile(inLocalFilePath);
+		controlWriter->OpenLocalFile(InInLocalFilePath);
 	}
 }
 
-void UCefWebUiBrowserSession::LoadHtmlString(const FString& inHtml)
+void UCefWebUiBrowserSession::LoadHtmlString(const FString& InInHtml)
 {
 	if (TSharedPtr<FCefControlWriter> controlWriter = GetOrOpenControlWriter())
 	{
-		controlWriter->LoadHtmlString(inHtml);
+		controlWriter->LoadHtmlString(InInHtml);
 	}
 }
 
@@ -296,9 +296,9 @@ void UCefWebUiBrowserSession::ClearCookies()
 
 #pragma region Loading
 
-void UCefWebUiBrowserSession::BindWhenFinishedLoading(const FCefWebUiWhenFinishedLoadingDelegate& callback)
+void UCefWebUiBrowserSession::BindWhenFinishedLoading(const FCefWebUiWhenFinishedLoadingDelegate& InCallback)
 {
-	if (!callback.IsBound())
+	if (!InCallback.IsBound())
 	{
 		return;
 	}
@@ -311,19 +311,19 @@ void UCefWebUiBrowserSession::BindWhenFinishedLoading(const FCefWebUiWhenFinishe
 
 	if (bInitialLoadingFinished)
 	{
-		FCefWebUiWhenFinishedLoadingDelegate callbackCopy = callback;
+		FCefWebUiWhenFinishedLoadingDelegate callbackCopy = InCallback;
 		callbackCopy.Execute(this);
 		return;
 	}
 
-	PendingFinishedLoadingCallbacks.Add(callback);
+	PendingFinishedLoadingCallbacks.Add(InCallback);
 }
 
-void UCefWebUiBrowserSession::HandleWidgetLoadStateChanged(uint8 inState)
+void UCefWebUiBrowserSession::HandleWidgetLoadStateChanged(uint8 InInState)
 {
 	UE_LOG(LogCefWebUi, Log, TEXT("[%s] Load state event: %u"),
 		*SessionId.ToString(),
-		static_cast<uint32>(inState));
+		static_cast<uint32>(InInState));
 
 	if (bInitialLoadingFinished)
 	{
@@ -331,7 +331,7 @@ void UCefWebUiBrowserSession::HandleWidgetLoadStateChanged(uint8 inState)
 	}
 	const uint8 readyState = static_cast<uint8>(ECefLoadState::Ready);
 	const uint8 errorState = static_cast<uint8>(ECefLoadState::Error);
-	if (inState != readyState && inState != errorState)
+	if (InInState != readyState && InInState != errorState)
 	{
 		return;
 	}
@@ -339,7 +339,7 @@ void UCefWebUiBrowserSession::HandleWidgetLoadStateChanged(uint8 inState)
 	bInitialLoadingFinished = true;
 	UE_LOG(LogCefWebUi, Log, TEXT("[%s] Initial loading finished (state=%u). callbacks=%d"),
 		*SessionId.ToString(),
-		static_cast<uint32>(inState),
+		static_cast<uint32>(InInState),
 		PendingFinishedLoadingCallbacks.Num());
 	OnFinishedLoading.Broadcast(this);
 
@@ -355,13 +355,13 @@ void UCefWebUiBrowserSession::HandleWidgetLoadStateChanged(uint8 inState)
 }
 
 void UCefWebUiBrowserSession::HandleConsoleLogMessage(
-	ECefConsoleLogLevel inLevel,
-	const FString& inMessage,
-	const FString& inSource,
-	int32 inLine)
+	ECefConsoleLogLevel InInLevel,
+	const FString& InInMessage,
+	const FString& InInSource,
+	int32 InInLine)
 {
 	const TCHAR* levelText = TEXT("Log");
-	switch (inLevel)
+	switch (InInLevel)
 	{
 	case ECefConsoleLogLevel::Warning:
 		levelText = TEXT("Warning");
@@ -373,38 +373,38 @@ void UCefWebUiBrowserSession::HandleConsoleLogMessage(
 		break;
 	}
 
-	switch (inLevel)
+	switch (InInLevel)
 	{
 	case ECefConsoleLogLevel::Warning:
 		UE_LOG(LogCefWebUiJsConsole, Warning,
 			TEXT("[%s][%s] %s (%s:%d)"),
 			*SessionId.ToString(),
 			levelText,
-			*inMessage,
-			*inSource,
-			inLine);
+			*InInMessage,
+			*InInSource,
+			InInLine);
 		break;
 	case ECefConsoleLogLevel::Error:
 		UE_LOG(LogCefWebUiJsConsole, Error,
 			TEXT("[%s][%s] %s (%s:%d)"),
 			*SessionId.ToString(),
 			levelText,
-			*inMessage,
-			*inSource,
-			inLine);
+			*InInMessage,
+			*InInSource,
+			InInLine);
 		break;
 	default:
 		UE_LOG(LogCefWebUiJsConsole, Log,
 			TEXT("[%s][%s] %s (%s:%d)"),
 			*SessionId.ToString(),
 			levelText,
-			*inMessage,
-			*inSource,
-			inLine);
+			*InInMessage,
+			*InInSource,
+			InInLine);
 		break;
 	}
 
-	OnConsoleMessage.Broadcast(inLevel, inMessage, inSource, inLine);
+	OnConsoleMessage.Broadcast(InInLevel, InInMessage, InInSource, InInLine);
 }
 
 #pragma endregion

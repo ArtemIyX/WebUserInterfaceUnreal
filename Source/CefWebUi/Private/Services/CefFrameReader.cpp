@@ -16,22 +16,22 @@ namespace
 constexpr bool kEnableThreadTuning = true;
 constexpr int32 kPendingQueueSize = 8;
 
-ULONG_PTR SelectAffinityMask(ULONG_PTR processMask, uint32 logicalIndex)
+ULONG_PTR SelectAffinityMask(ULONG_PTR InProcessMask, uint32 InLogicalIndex)
 {
-	if (processMask == 0) return 0;
+	if (InProcessMask == 0) return 0;
 	uint32 count = 0;
 	for (uint32 i = 0; i < sizeof(ULONG_PTR) * 8; ++i)
 	{
-		if (processMask & (static_cast<ULONG_PTR>(1) << i))
+		if (InProcessMask & (static_cast<ULONG_PTR>(1) << i))
 			++count;
 	}
 	if (count == 0) return 0;
-	const uint32 target = logicalIndex % count;
+	const uint32 target = InLogicalIndex % count;
 	uint32 seen = 0;
 	for (uint32 i = 0; i < sizeof(ULONG_PTR) * 8; ++i)
 	{
 		const ULONG_PTR bit = static_cast<ULONG_PTR>(1) << i;
-		if ((processMask & bit) == 0) continue;
+		if ((InProcessMask & bit) == 0) continue;
 		if (seen == target) return bit;
 		++seen;
 	}
@@ -159,7 +159,7 @@ void FCefFrameReader::Stop()
 		delete ThreadToDelete;
 	}
 	{
-		FScopeLock Lock(&PendingFrameLock);
+		FScopeLock lock(&PendingFrameLock);
 		PendingFrames.Reset();
 		PendingFrameCount.store(0, std::memory_order_relaxed);
 	}
@@ -225,7 +225,7 @@ uint32 FCefFrameReader::Run()
 		LastFrameId = headerSnapshot.frame_id;
 
 		{
-			FScopeLock Lock(&PendingFrameLock);
+			FScopeLock lock(&PendingFrameLock);
 			if (PendingFrames.Num() >= kPendingQueueSize)
 			{
 				PendingFrames.RemoveAt(0, 1, EAllowShrinking::No);
@@ -274,15 +274,15 @@ uint32 FCefFrameReader::Run()
 		});
 
 		// Fire load state delegate on game thread if changed
-		ECefLoadState CurrentLoad = static_cast<ECefLoadState>(headerSnapshot.load_state);
-		if (CurrentLoad != LastLoadState)
+		ECefLoadState currentLoad = static_cast<ECefLoadState>(headerSnapshot.load_state);
+		if (currentLoad != LastLoadState)
 		{
-			LastLoadState = CurrentLoad;
-			AsyncTask(ENamedThreads::GameThread, [this, CurrentLoad]()
+			LastLoadState = currentLoad;
+			AsyncTask(ENamedThreads::GameThread, [this, currentLoad]()
 			{
 				UE_LOG(LogCefWebUi, Log, TEXT("FCefFrameReader: Load state changed to %d"),
-				       static_cast<uint8>(CurrentLoad));
-				OnLoadStateChanged.Broadcast(static_cast<uint8>(CurrentLoad));
+				       static_cast<uint8>(currentLoad));
+				OnLoadStateChanged.Broadcast(static_cast<uint8>(currentLoad));
 			});
 		}
 	}
@@ -295,7 +295,7 @@ bool FCefFrameReader::PollSharedTexture(FCefSharedFrame& OutFrame)
 	if (PendingFrameCount.load(std::memory_order_relaxed) == 0)
 		return false;
 
-	FScopeLock Lock(&PendingFrameLock);
+	FScopeLock lock(&PendingFrameLock);
 	if (PendingFrames.Num() == 0)
 	{
 		PendingFrameCount.store(0, std::memory_order_relaxed);
@@ -334,9 +334,9 @@ ECefLoadState FCefFrameReader::GetLastKnownLoadState() const
 	return static_cast<ECefLoadState>(LastKnownLoadStateRaw.load(std::memory_order_relaxed));
 }
 
-EMouseCursor::Type FCefFrameReader::MapCefCursor(ECefCustomCursorType Type)
+EMouseCursor::Type FCefFrameReader::MapCefCursor(ECefCustomCursorType InType)
 {
-	switch (Type)
+	switch (InType)
 	{
 	case ECefCustomCursorType::CT_POINTER: return EMouseCursor::Default;
 	case ECefCustomCursorType::CT_CROSS: return EMouseCursor::Crosshairs;

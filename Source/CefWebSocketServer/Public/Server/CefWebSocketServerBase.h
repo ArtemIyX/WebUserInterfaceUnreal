@@ -16,6 +16,8 @@ class CEFWEBSOCKETSERVER_API UCefWebSocketServerBase : public UObject
 	GENERATED_BODY()
 
 public:
+	UCefWebSocketServerBase(const FObjectInitializer& ObjectInitializer);
+public:
 #pragma region Lifecycle
 	virtual void BeginDestroy() override;
 #pragma endregion
@@ -47,29 +49,29 @@ public:
 	bool IsRunning() const;
 
 	UFUNCTION(BlueprintCallable, Category = "CefWebSocket")
-	ECefWebSocketSendResult SendToClientString(int64 ClientId, const FString& Message);
+	ECefWebSocketSendResult SendToClientString(int64 InClientId, const FString& InMessage);
 
 	UFUNCTION(BlueprintCallable, Category = "CefWebSocket")
-	ECefWebSocketSendResult SendToClientBytes(int64 ClientId, const TArray<uint8>& Bytes);
+	ECefWebSocketSendResult SendToClientBytes(int64 InClientId, const TArray<uint8>& InBytes);
 
-	ECefWebSocketSendResult SendToClientJson(int64 ClientId, const TSharedPtr<FJsonObject>& JsonObject, const TSharedPtr<FJsonValue>& JsonValue = nullptr);
-
-	UFUNCTION(BlueprintCallable, Category = "CefWebSocket")
-	ECefWebSocketSendResult BroadcastString(const FString& Message);
+	ECefWebSocketSendResult SendToClientJson(int64 InClientId, const TSharedPtr<FJsonObject>& InJsonObject, const TSharedPtr<FJsonValue>& InJsonValue = nullptr);
 
 	UFUNCTION(BlueprintCallable, Category = "CefWebSocket")
-	ECefWebSocketSendResult BroadcastBytes(const TArray<uint8>& Bytes);
-
-	ECefWebSocketSendResult BroadcastJson(const TSharedPtr<FJsonObject>& JsonObject, const TSharedPtr<FJsonValue>& JsonValue = nullptr);
+	ECefWebSocketSendResult BroadcastString(const FString& InMessage);
 
 	UFUNCTION(BlueprintCallable, Category = "CefWebSocket")
-	ECefWebSocketSendResult BroadcastStringExcept(int64 ExcludedClientId, const FString& Message);
+	ECefWebSocketSendResult BroadcastBytes(const TArray<uint8>& InBytes);
+
+	ECefWebSocketSendResult BroadcastJson(const TSharedPtr<FJsonObject>& InJsonObject, const TSharedPtr<FJsonValue>& InJsonValue = nullptr);
 
 	UFUNCTION(BlueprintCallable, Category = "CefWebSocket")
-	ECefWebSocketSendResult BroadcastBytesExcept(int64 ExcludedClientId, const TArray<uint8>& Bytes);
+	ECefWebSocketSendResult BroadcastStringExcept(int64 InExcludedClientId, const FString& InMessage);
 
 	UFUNCTION(BlueprintCallable, Category = "CefWebSocket")
-	ECefWebSocketSendResult DisconnectClient(int64 ClientId, ECefWebSocketCloseReason Reason = ECefWebSocketCloseReason::Kicked);
+	ECefWebSocketSendResult BroadcastBytesExcept(int64 InExcludedClientId, const TArray<uint8>& InBytes);
+
+	UFUNCTION(BlueprintCallable, Category = "CefWebSocket")
+	ECefWebSocketSendResult DisconnectClient(int64 InClientId, ECefWebSocketCloseReason InReason = ECefWebSocketCloseReason::Kicked);
 
 	UFUNCTION(BlueprintCallable, Category = "CefWebSocket")
 	void StopServer();
@@ -78,13 +80,13 @@ public:
 	TArray<UCefWebSocketClientBase*> GetClients() const;
 
 	UFUNCTION(BlueprintPure, Category = "CefWebSocket")
-	UCefWebSocketClientBase* GetClient(int64 ClientId) const;
+	UCefWebSocketClientBase* GetClient(int64 InClientId) const;
 
 	UFUNCTION(BlueprintPure, Category = "CefWebSocket")
 	FCefWebSocketServerStats GetStats() const;
 
-	virtual void HandleClientBytes(UCefWebSocketClientBase* Client, const TArray<uint8>& Data);
-	virtual void HandleClientString(UCefWebSocketClientBase* Client, const FString& Message);
+	virtual void HandleClientBytes(UCefWebSocketClientBase* InClient, const TArray<uint8>& InData);
+	virtual void HandleClientString(UCefWebSocketClientBase* InClient, const FString& InMessage);
 #pragma endregion
 
 protected:
@@ -93,11 +95,11 @@ protected:
 	friend class FCefWebSocketServerInstance;
 	bool StartServerInternal(FName InNameId, int32 InBoundPort, TSubclassOf<UCefWebSocketClientBase> InClientClass);
 	void AttachInstance(TSharedPtr<FCefWebSocketServerInstance> InInstance);
-	void NotifyClientConnected(const FCefWebSocketClientInfo& ClientInfo);
-	void NotifyClientDisconnected(int64 ClientId, ECefWebSocketCloseReason Reason);
-	void NotifyServerError(ECefWebSocketErrorCode ErrorCode, const FString& Message);
-	void NotifyClientError(int64 ClientId, ECefWebSocketErrorCode ErrorCode, const FString& Message);
-	void NotifyClientMessage(int64 ClientId, const TArray<uint8>& Payload, bool bBinary);
+	void NotifyClientConnected(const FCefWebSocketClientInfo& InClientInfo);
+	void NotifyClientDisconnected(int64 InClientId, ECefWebSocketCloseReason InReason);
+	void NotifyServerError(ECefWebSocketErrorCode InErrorCode, const FString& InMessage);
+	void NotifyClientError(int64 InClientId, ECefWebSocketErrorCode InErrorCode, const FString& InMessage);
+	void NotifyClientMessage(int64 InClientId, const TArray<uint8>& InPayload, bool bInBinary);
 #pragma endregion
 
 private:

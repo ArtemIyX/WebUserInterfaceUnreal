@@ -28,36 +28,36 @@ public:
 
 #pragma region Subsystem
 	UFUNCTION(BlueprintCallable, Category="CefWebUi", meta=(WorldContext="WorldContextObject"))
-	static UCefWebUiGameInstanceSubsystem* GetCefWebUiSubsystem(const UObject* WorldContextObject);
+	static UCefWebUiGameInstanceSubsystem* GetCefWebUiSubsystem(const UObject* InWorldContextObject);
 #pragma endregion
 
 #pragma region Session
 	UFUNCTION(BlueprintCallable, Category="CefWebUi", meta=(WorldContext="WorldContextObject"))
 	static UCefWebUiBrowserSession* GetOrCreateBrowserSession(
-		const UObject* WorldContextObject,
-		FName SessionId,
-		TSubclassOf<UCefWebUiBrowserSession> SessionClass = nullptr);
+		const UObject* InWorldContextObject,
+		FName InSessionId,
+		TSubclassOf<UCefWebUiBrowserSession> InSessionClass = nullptr);
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi", meta=(WorldContext="WorldContextObject"))
 	static void DestroyBrowserSession(
-		const UObject* WorldContextObject,
-		FName SessionId);
+		const UObject* InWorldContextObject,
+		FName InSessionId);
 #pragma endregion
 
 #pragma region Viewport
 	UFUNCTION(BlueprintCallable, Category="CefWebUi", meta=(WorldContext="WorldContextObject"))
 	static UCefWebUiBrowserSession* ShowBrowserSessionInViewport(
-		const UObject* WorldContextObject,
-		FName SessionId,
-		TSubclassOf<UCefWebUiBrowserSession> SessionClass = nullptr,
-		APlayerController* PlayerController = nullptr,
-		int32 ZOrder = 0,
-		int32 BrowserWidth = 1920,
-		int32 BrowserHeight = 1080);
+		const UObject* InWorldContextObject,
+		FName InSessionId,
+		TSubclassOf<UCefWebUiBrowserSession> InSessionClass = nullptr,
+		APlayerController* InPlayerController = nullptr,
+		int32 InZOrder = 0,
+		int32 InBrowserWidth = 1920,
+		int32 InBrowserHeight = 1080);
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi", meta=(WorldContext="WorldContextObject"))
 	static void HideBrowserSessionFromViewport(
-		const UObject* WorldContextObject,
-		FName SessionId);
+		const UObject* InWorldContextObject,
+		FName InSessionId);
 #pragma endregion
 };

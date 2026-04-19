@@ -2,43 +2,50 @@
 
 #include "Server/CefWebSocketServerBase.h"
 
+UCefWebSocketClientBase::UCefWebSocketClientBase(const FObjectInitializer& InInitializer) : Super(InInitializer)
+{
+	
+}
+
 void UCefWebSocketClientBase::InitializeClient(TWeakObjectPtr<UCefWebSocketServerBase> InOwnerServer, const FCefWebSocketClientInfo& InInfo)
 {
 	OwnerServer = InOwnerServer;
 	ClientInfo = InInfo;
 }
 
-ECefWebSocketSendResult UCefWebSocketClientBase::SendString(const FString& Message)
+
+
+ECefWebSocketSendResult UCefWebSocketClientBase::SendString(const FString& InMessage)
 {
 	if (!OwnerServer.IsValid())
 	{
 		return ECefWebSocketSendResult::InvalidServer;
 	}
-	return OwnerServer->SendToClientString(ClientInfo.ClientId, Message);
+	return OwnerServer->SendToClientString(ClientInfo.ClientId, InMessage);
 }
 
-ECefWebSocketSendResult UCefWebSocketClientBase::SendBytes(const TArray<uint8>& Bytes)
+ECefWebSocketSendResult UCefWebSocketClientBase::SendBytes(const TArray<uint8>& InBytes)
 {
 	if (!OwnerServer.IsValid())
 	{
 		return ECefWebSocketSendResult::InvalidServer;
 	}
-	return OwnerServer->SendToClientBytes(ClientInfo.ClientId, Bytes);
+	return OwnerServer->SendToClientBytes(ClientInfo.ClientId, InBytes);
 }
 
-ECefWebSocketSendResult UCefWebSocketClientBase::Disconnect(ECefWebSocketCloseReason Reason)
+ECefWebSocketSendResult UCefWebSocketClientBase::Disconnect(ECefWebSocketCloseReason InReason)
 {
 	if (!OwnerServer.IsValid())
 	{
 		return ECefWebSocketSendResult::InvalidServer;
 	}
-	return OwnerServer->DisconnectClient(ClientInfo.ClientId, Reason);
+	return OwnerServer->DisconnectClient(ClientInfo.ClientId, InReason);
 }
 
-void UCefWebSocketClientBase::HandleBytesFromClient(const TArray<uint8>& Data)
+void UCefWebSocketClientBase::HandleBytesFromClient(const TArray<uint8>& InData)
 {
 }
 
-void UCefWebSocketClientBase::HandleStringFromClient(const FString& Message)
+void UCefWebSocketClientBase::HandleStringFromClient(const FString& InMessage)
 {
 }

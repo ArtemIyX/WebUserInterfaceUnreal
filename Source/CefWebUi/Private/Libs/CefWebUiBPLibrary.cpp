@@ -24,12 +24,12 @@ FString UCefWebUiBPLibrary::GetHostExePath()
 #endif
 }
 
-UCefWebUiGameInstanceSubsystem* UCefWebUiBPLibrary::GetCefWebUiSubsystem(const UObject* WorldContextObject)
+UCefWebUiGameInstanceSubsystem* UCefWebUiBPLibrary::GetCefWebUiSubsystem(const UObject* InWorldContextObject)
 {
-	if (!IsValid(WorldContextObject))
+	if (!IsValid(InWorldContextObject))
 		return nullptr;
 
-	UWorld* World = WorldContextObject->GetWorld();
+	UWorld* World = InWorldContextObject->GetWorld();
 	if (!World)
 		return nullptr;
 
@@ -41,63 +41,63 @@ UCefWebUiGameInstanceSubsystem* UCefWebUiBPLibrary::GetCefWebUiSubsystem(const U
 }
 
 UCefWebUiBrowserSession* UCefWebUiBPLibrary::GetOrCreateBrowserSession(
-	const UObject* WorldContextObject,
-	FName SessionId,
-	TSubclassOf<UCefWebUiBrowserSession> SessionClass)
+	const UObject* InWorldContextObject,
+	FName InSessionId,
+	TSubclassOf<UCefWebUiBrowserSession> InSessionClass)
 {
-	if (UCefWebUiGameInstanceSubsystem* Subsystem = GetCefWebUiSubsystem(WorldContextObject))
+	if (UCefWebUiGameInstanceSubsystem* Subsystem = GetCefWebUiSubsystem(InWorldContextObject))
 	{
-		return Subsystem->GetOrCreateSession(SessionId, SessionClass);
+		return Subsystem->GetOrCreateSession(InSessionId, InSessionClass);
 	}
 	return nullptr;
 }
 
 void UCefWebUiBPLibrary::DestroyBrowserSession(
-	const UObject* WorldContextObject,
-	FName SessionId)
+	const UObject* InWorldContextObject,
+	FName InSessionId)
 {
-	if (UCefWebUiGameInstanceSubsystem* Subsystem = GetCefWebUiSubsystem(WorldContextObject))
+	if (UCefWebUiGameInstanceSubsystem* Subsystem = GetCefWebUiSubsystem(InWorldContextObject))
 	{
-		Subsystem->DestroySession(SessionId);
+		Subsystem->DestroySession(InSessionId);
 	}
 }
 
 UCefWebUiBrowserSession* UCefWebUiBPLibrary::ShowBrowserSessionInViewport(
-	const UObject* WorldContextObject,
-	FName SessionId,
-	TSubclassOf<UCefWebUiBrowserSession> SessionClass,
-	APlayerController* PlayerController,
-	int32 ZOrder,
-	int32 BrowserWidth,
-	int32 BrowserHeight)
+	const UObject* InWorldContextObject,
+	FName InSessionId,
+	TSubclassOf<UCefWebUiBrowserSession> InSessionClass,
+	APlayerController* InPlayerController,
+	int32 InZOrder,
+	int32 InBrowserWidth,
+	int32 InBrowserHeight)
 {
-	UCefWebUiBrowserSession* session = GetOrCreateBrowserSession(WorldContextObject, SessionId, SessionClass);
+	UCefWebUiBrowserSession* session = GetOrCreateBrowserSession(InWorldContextObject, InSessionId, InSessionClass);
 	if (!session)
 	{
 		return nullptr;
 	}
 
-	if (!PlayerController)
+	if (!InPlayerController)
 	{
-		if (UWorld* world = WorldContextObject ? WorldContextObject->GetWorld() : nullptr)
+		if (UWorld* world = InWorldContextObject ? InWorldContextObject->GetWorld() : nullptr)
 		{
 			if (UGameInstance* gameInstance = world->GetGameInstance())
 			{
-				PlayerController = gameInstance->GetFirstLocalPlayerController();
+				InPlayerController = gameInstance->GetFirstLocalPlayerController();
 			}
 		}
 	}
 
-	session->ShowInViewport(PlayerController, ZOrder, BrowserWidth, BrowserHeight);
+	session->ShowInViewport(InPlayerController, InZOrder, InBrowserWidth, InBrowserHeight);
 	return session;
 }
 
 void UCefWebUiBPLibrary::HideBrowserSessionFromViewport(
-	const UObject* WorldContextObject,
-	FName SessionId)
+	const UObject* InWorldContextObject,
+	FName InSessionId)
 {
-	if (UCefWebUiGameInstanceSubsystem* subsystem = GetCefWebUiSubsystem(WorldContextObject))
+	if (UCefWebUiGameInstanceSubsystem* subsystem = GetCefWebUiSubsystem(InWorldContextObject))
 	{
-		subsystem->HideSessionFromViewport(SessionId);
+		subsystem->HideSessionFromViewport(InSessionId);
 	}
 }

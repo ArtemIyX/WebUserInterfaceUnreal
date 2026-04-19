@@ -11,8 +11,8 @@
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 
-ARenderTestActor::ARenderTestActor(const FObjectInitializer& ObjectInitializer)
-    : Super(ObjectInitializer)
+ARenderTestActor::ARenderTestActor(const FObjectInitializer& InObjectInitializer)
+    : Super(InObjectInitializer)
 {
     PrimaryActorTick.bCanEverTick = true;
 }
@@ -38,7 +38,7 @@ void ARenderTestActor::BeginPlay()
     Widget->AddToViewport();
 }
 
-void ARenderTestActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
+void ARenderTestActor::EndPlay(const EEndPlayReason::Type InEndPlayReason)
 {
     if (Widget)
     {
@@ -46,7 +46,7 @@ void ARenderTestActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
         Widget = nullptr;
     }
 
-    Super::EndPlay(EndPlayReason);
+    Super::EndPlay(InEndPlayReason);
 }
 
 void ARenderTestActor::Tick(float InDeltaTime)

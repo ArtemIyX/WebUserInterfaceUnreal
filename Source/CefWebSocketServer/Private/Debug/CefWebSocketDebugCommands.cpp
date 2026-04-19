@@ -105,7 +105,7 @@ void FCefWebSocketDebugCommands::HandleList(const TArray<FString>& InArgs) const
 	}
 
 	const TArray<UCefWebSocketServerBase*> servers = subsystem->GetAllServers();
-	UE_LOG(LogCefWebSocketServer, Log, TEXT("ws.list: %d server(s)"), servers.Num());
+	UE_LOG(LogCefWebSocketServer, Log, TEXT("ws.list: %d server(InS)"), servers.Num());
 	for (UCefWebSocketServerBase* server : servers)
 	{
 		if (!server)

@@ -18,8 +18,8 @@ uint32 FCefWebSocketWriteRunnable::Run()
 		const bool bDidWork = Owner ? Owner->PumpOutgoingOnWriteThread() : false;
 		if (!bDidWork && WakeEvent)
 		{
-			const uint32 WaitMs = static_cast<uint32>(FMath::Max(1, CefWebSocketCVars::GetWriteIdleSleepMs()));
-			WakeEvent->Wait(WaitMs);
+			const uint32 waitMs = static_cast<uint32>(FMath::Max(1, CefWebSocketCVars::GetWriteIdleSleepMs()));
+			WakeEvent->Wait(waitMs);
 		}
 	}
 	return 0;

@@ -10,7 +10,7 @@ public:
 	FCefWebSocketServerBackend() = default;
 	virtual ~FCefWebSocketServerBackend() override;
 
-	virtual bool Init(uint32 Port, FCefNetWebSocketClientConnectedCallback OnConnected, FCefNetWebSocketClientDisconnectedCallback OnDisconnected) override;
+	virtual bool Init(uint32 InPort, FCefNetWebSocketClientConnectedCallback InOnConnected, FCefNetWebSocketClientDisconnectedCallback InOnDisconnected) override;
 	virtual void Tick() override;
 	virtual FString Info() const override;
 	virtual uint32 GetServerPort() const override { return ServerPort; }

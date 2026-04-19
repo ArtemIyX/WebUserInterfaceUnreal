@@ -316,3 +316,23 @@ YYYY-MM-DD HH:MM
 
 ### Impact
 - Team can onboard and test websocket server flow without reading implementation files first.
+
+## 2026-04-19 10:38
+
+### Changed
+- Ran a full plugin style sweep across `Source` C++ headers/sources.
+- Standardized function parameter naming to `In*`/`Out*` (including bool params as `bIn*`/`bOut*`) on touched APIs and implementations.
+- Normalized function-scope local variables to lower camel case in touched files.
+- Fixed rename fallout introduced during bulk pass (restored invalid member/lock names and event field accesses).
+- Restored `CefWebUi/Private/Slate/CefBrowserSurface.cpp` from git to avoid bad token-level auto-renames.
+
+### Why
+- Enforce requested plugin-wide naming conventions.
+- Reduce style drift and keep signatures/implementations consistent.
+
+### Impact
+- Plugin source is now aligned with requested param/local naming rules across the swept files.
+- Known bulk-rename regressions were corrected before commit.
+- `CefBrowserSurface.cpp` remained functionally unchanged in this commit due to explicit restore.
+
+---

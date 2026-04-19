@@ -6,13 +6,13 @@
 
 namespace CefWebUi::BrowserSurface
 {
-uint32 BuildCefKeyModifiers(const FKeyEvent& KeyEvent);
-FIntRect MakeIntersection(const FIntRect& A, const FIntRect& B);
+uint32 BuildCefKeyModifiers(const FKeyEvent& InKeyEvent);
+FIntRect MakeIntersection(const FIntRect& InA, const FIntRect& InB);
 void AddCefSlateBlitPass(
-	FRDGBuilder& GraphBuilder,
+	FRDGBuilder& OutGraphBuilder,
 	FRDGTextureRef InputTexture,
 	FRDGTextureRef OutputTexture,
-	const FIntRect& DestRect,
-	const FIntRect& SrcRect,
-	const FIntPoint& SrcExtent);
+	const FIntRect& InDestRect,
+	const FIntRect& InSrcRect,
+	const FIntPoint& InSrcExtent);
 }

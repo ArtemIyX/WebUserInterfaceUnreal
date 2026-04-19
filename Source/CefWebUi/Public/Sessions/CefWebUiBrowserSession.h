@@ -36,7 +36,7 @@ class CEFWEBUI_API UCefWebUiBrowserSession : public UObject
 
 public:
 #pragma region Lifecycle
-	UCefWebUiBrowserSession(const FObjectInitializer& ObjectInitializer);
+	UCefWebUiBrowserSession(const FObjectInitializer& InObjectInitializer);
 	virtual void BeginDestroy() override;
 	void Initialize(UCefWebUiGameInstanceSubsystem* InOwnerSubsystem, FName InSessionId);
 #pragma endregion
@@ -47,10 +47,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
 	void ShowInViewport(
-		APlayerController* PlayerController,
-		int32 ZOrder,
-		int32 BrowserWidth = 1920,
-		int32 BrowserHeight = 1080);
+		APlayerController* InPlayerController,
+		int32 InZOrder,
+		int32 InBrowserWidth = 1920,
+		int32 InBrowserHeight = 1080);
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
 	void HideFromViewport();
@@ -136,7 +136,7 @@ public:
 
 public:
 	UFUNCTION(BlueprintCallable, Category="CefWebUi", meta=(AutoCreateRefTerm="Callback"))
-	void BindWhenFinishedLoading(const FCefWebUiWhenFinishedLoadingDelegate& Callback);
+	void BindWhenFinishedLoading(const FCefWebUiWhenFinishedLoadingDelegate& InCallback);
 
 	UFUNCTION(BlueprintPure, Category="CefWebUi")
 	bool IsInitialLoadingFinished() const { return bInitialLoadingFinished; }

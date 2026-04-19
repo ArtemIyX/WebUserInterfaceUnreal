@@ -74,7 +74,7 @@ void FCefWebUiRuntime::Shutdown()
 	bConsoleLogReaderStarted = false;
 }
 
-bool FCefWebUiRuntime::TickStartRetry(float)
+bool FCefWebUiRuntime::TickStartRetry(float InDeltaSeconds)
 {
 	if (!bStarted)
 		return false;

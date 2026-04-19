@@ -24,16 +24,16 @@ public:
 #pragma region PublicApi
 	UFUNCTION(BlueprintCallable, Category = "CefWebSocket")
 	FCefWebSocketServerCreateResult CreateOrGetServer(
-		const FCefWebSocketServerCreateOptions& Options,
-		TSubclassOf<UCefWebSocketServerBase> ServerClass,
-		TSubclassOf<UCefWebSocketClientBase> ClientClass,
+		const FCefWebSocketServerCreateOptions& InOptions,
+		TSubclassOf<UCefWebSocketServerBase> InServerClass,
+		TSubclassOf<UCefWebSocketClientBase> InClientClass,
 		UCefWebSocketServerBase*& OutServer);
 
 	UFUNCTION(BlueprintPure, Category = "CefWebSocket")
-	UCefWebSocketServerBase* GetServer(FName NameId) const;
+	UCefWebSocketServerBase* GetServer(FName InNameId) const;
 
 	UFUNCTION(BlueprintCallable, Category = "CefWebSocket")
-	bool StopServer(FName NameId);
+	bool StopServer(FName InNameId);
 
 	UFUNCTION(BlueprintCallable, Category = "CefWebSocket")
 	void StopAllServers();
@@ -44,7 +44,7 @@ public:
 
 private:
 #pragma region Internal
-	bool TryResolvePort(int32 RequestedPort, int32& OutResolvedPort, bool& bOutAdjusted) const;
+	bool TryResolvePort(int32 InRequestedPort, int32& OutResolvedPort, bool& bOutAdjusted) const;
 
 	UPROPERTY(Transient)
 	TMap<FName, TObjectPtr<UCefWebSocketServerBase>> Servers;

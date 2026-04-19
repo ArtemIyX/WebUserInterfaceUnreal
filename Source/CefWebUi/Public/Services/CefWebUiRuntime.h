@@ -30,7 +30,7 @@ public:
 	TWeakPtr<FCefConsoleLogReader> GetConsoleLogReaderPtr() const;
 
 private:
-	bool TickStartRetry(float DeltaSeconds);
+	bool TickStartRetry(float InDeltaSeconds);
 	void LaunchHostProcess();
 	void KillHostProcess();
 

@@ -143,11 +143,11 @@ uint32 FCefConsoleLogReader::Run()
 	return 0;
 }
 
-void FCefConsoleLogReader::DispatchEvent(ECefConsoleLogLevel level, const FString& message, const FString& source, int32 line)
+void FCefConsoleLogReader::DispatchEvent(ECefConsoleLogLevel InLevel, const FString& InMessage, const FString& InSource, int32 InLine)
 {
-	AsyncTask(ENamedThreads::GameThread, [this, level, message, source, line]()
+	AsyncTask(ENamedThreads::GameThread, [this, InLevel, InMessage, InSource, InLine]()
 	{
-		OnConsoleLogMessage.Broadcast(level, message, source, line);
+		OnConsoleLogMessage.Broadcast(InLevel, InMessage, InSource, InLine);
 	});
 }
 
