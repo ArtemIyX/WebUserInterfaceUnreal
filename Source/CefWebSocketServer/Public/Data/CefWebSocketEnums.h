@@ -50,3 +50,13 @@ enum class ECefWebSocketCloseReason : uint8
 	Timeout = 3,
 	Error = 4
 };
+
+UENUM(BlueprintType)
+enum class ECefWebSocketPayloadFormat : uint8
+{
+	Binary = 0,
+	Utf8String = 1,
+	JsonString = 2,
+	XmlString = 3,
+	Custom = 4
+};

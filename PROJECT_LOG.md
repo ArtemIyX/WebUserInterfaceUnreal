@@ -405,3 +405,29 @@ YYYY-MM-DD HH:MM
 - Future protobuf message support can plug into envelope `Payload` using message-type dispatch.
 
 ---
+
+## 2026-04-19 14:22
+
+### Changed
+- Added websocket pipeline payload format enum:
+  - `ECefWebSocketPayloadFormat` (`Binary`, `Utf8String`, `JsonString`, `XmlString`, `Custom`).
+- Added pipeline-oriented data/config fields:
+  - `FCefWebSocketServerCreateOptions::InDefaultPayloadFormat`
+  - `FCefWebSocketPipelineConfig`
+  - stage queue depth stats fields in `FCefWebSocketServerStats`.
+- Added pipeline contracts:
+  - `Public/Pipeline/CefWebSocketPipelineTypes.h`
+  - `Public/Pipeline/ICefWebSocketPacketCodec.h`
+- Added default codecs:
+  - `Public/Pipeline/CefWebSocketDefaultCodecs.h`
+  - `Private/Pipeline/CefWebSocketDefaultCodecs.cpp`
+
+### Why
+- Define explicit extension points for developer-controlled encoding/decoding.
+- Prepare transport pipeline types before splitting runtime into 4 threads.
+
+### Impact
+- Plugin now has codec interfaces and payload-format abstraction for future custom protocols.
+- Runtime refactor can consume these contracts without changing public API later.
+
+---

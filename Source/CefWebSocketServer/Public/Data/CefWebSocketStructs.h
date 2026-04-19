@@ -14,6 +14,9 @@ struct CEFWEBSOCKETSERVER_API FCefWebSocketServerCreateOptions
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CefWebSocket")
 	int32 RequestedPort = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CefWebSocket|Pipeline")
+	ECefWebSocketPayloadFormat InDefaultPayloadFormat = ECefWebSocketPayloadFormat::Binary;
 };
 
 USTRUCT(BlueprintType)
@@ -71,4 +74,34 @@ struct CEFWEBSOCKETSERVER_API FCefWebSocketServerStats
 
 	UPROPERTY(BlueprintReadOnly, Category = "CefWebSocket|Stats")
 	float AvgQueueDepth = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "CefWebSocket|Stats")
+	int64 InInboundQueueDepth = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "CefWebSocket|Stats")
+	int64 InHandleQueueDepth = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "CefWebSocket|Stats")
+	int64 InSendQueueDepth = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "CefWebSocket|Stats")
+	int64 InWriteQueueDepth = 0;
+};
+
+USTRUCT(BlueprintType)
+struct CEFWEBSOCKETSERVER_API FCefWebSocketPipelineConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CefWebSocket|Pipeline")
+	int32 InInboundQueueMax = 2048;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CefWebSocket|Pipeline")
+	int32 InSendQueueMax = 2048;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CefWebSocket|Pipeline")
+	int32 InWriteQueueMaxPerClient = 1024;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CefWebSocket|Pipeline")
+	ECefWebSocketPayloadFormat InPayloadFormat = ECefWebSocketPayloadFormat::Binary;
 };
