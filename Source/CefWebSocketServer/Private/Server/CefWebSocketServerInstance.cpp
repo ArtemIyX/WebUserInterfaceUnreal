@@ -418,12 +418,41 @@ bool FCefWebSocketServerInstance::PumpOutgoingOnWriteThread()
 	}
 
 	int64 sentBytes = 0;
+	const int32 maxTxBytesPerSec = CefWebSocketCVars::GetMaxTxBytesPerSecPerClient();
 	for (const FSendWork& item : workItems)
 	{
 		if (!item.Socket || item.Message.Payload.Num() == 0)
 		{
 			continue;
 		}
+
+		bool bTxLimited = false;
+		{
+			FScopeLock lock(&ClientLock);
+			if (FCefClientState* state = Clients.Find(item.ClientId))
+			{
+				const double nowSec = FPlatformTime::Seconds();
+				if (state->TxWindowStartSec <= 0.0 || nowSec - state->TxWindowStartSec >= 1.0)
+				{
+					state->TxWindowStartSec = nowSec;
+					state->TxBytesInWindow = 0;
+				}
+				if (maxTxBytesPerSec > 0 && state->TxBytesInWindow + item.Message.Payload.Num() > maxTxBytesPerSec)
+				{
+					bTxLimited = true;
+				}
+				else
+				{
+					state->TxBytesInWindow += item.Message.Payload.Num();
+				}
+			}
+		}
+		if (bTxLimited)
+		{
+			Stats.DroppedMessages += 1;
+			continue;
+		}
+
 		if (!item.Socket->Send(item.Message.Payload.GetData(), static_cast<uint32>(item.Message.Payload.Num()), false))
 		{
 			if (OwnerServer.IsValid())
@@ -479,6 +508,10 @@ void FCefWebSocketServerInstance::HandleClientConnected(ICefNetWebSocket* InSock
 		state.Socket = InSocket;
 		state.LastActivityTimeSec = nowSec;
 		state.LastHeartbeatSentTimeSec = 0.0;
+		state.RxWindowStartSec = nowSec;
+		state.TxWindowStartSec = nowSec;
+		state.RxBytesInWindow = 0;
+		state.TxBytesInWindow = 0;
 		ClientIdsBySocket.Add(InSocket, info.ClientId);
 		Stats.ActiveClients = Clients.Num();
 		RecordQueueDepthSample_NoLock();
@@ -565,23 +598,44 @@ void FCefWebSocketServerInstance::HandleClientPacket(ICefNetWebSocket* InSocket,
 	}
 
 	int64 clientId = 0;
+	bool bRxLimited = false;
+	const int32 maxRxBytesPerSec = CefWebSocketCVars::GetMaxRxBytesPerSecPerClient();
 	{
 		FScopeLock lock(&ClientLock);
 		if (int64* found = ClientIdsBySocket.Find(InSocket))
 		{
 			clientId = *found;
-			Stats.RxBytes += InCount;
 			if (FCefClientState* state = Clients.Find(clientId))
 			{
-				state->LastActivityTimeSec = FPlatformTime::Seconds();
+				const double nowSec = FPlatformTime::Seconds();
+				if (state->RxWindowStartSec <= 0.0 || nowSec - state->RxWindowStartSec >= 1.0)
+				{
+					state->RxWindowStartSec = nowSec;
+					state->RxBytesInWindow = 0;
+				}
+				if (maxRxBytesPerSec > 0 && state->RxBytesInWindow + InCount > maxRxBytesPerSec)
+				{
+					bRxLimited = true;
+				}
+				else
+				{
+					state->RxBytesInWindow += InCount;
+					state->LastActivityTimeSec = nowSec;
+					Stats.RxBytes += InCount;
+					UpdateRateStats_NoLock();
+				}
 			}
-			UpdateRateStats_NoLock();
 		}
 	}
 	bReadActivity.Store(true);
 
-	if (clientId == 0)
+	if (clientId == 0 || bRxLimited)
 	{
+		if (bRxLimited && OwnerServer.IsValid())
+		{
+			OwnerServer->NotifyClientError(clientId, ECefWebSocketErrorCode::QueueOverflow,
+			                               TEXT("Inbound bandwidth cap exceeded"));
+		}
 		return;
 	}
 

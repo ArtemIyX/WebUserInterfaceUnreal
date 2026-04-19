@@ -79,6 +79,10 @@ private:
 		int32 QueueMessages = 0;
 		double LastActivityTimeSec = 0.0;
 		double LastHeartbeatSentTimeSec = 0.0;
+		double RxWindowStartSec = 0.0;
+		double TxWindowStartSec = 0.0;
+		int64 RxBytesInWindow = 0;
+		int64 TxBytesInWindow = 0;
 	};
 #pragma endregion
 

@@ -766,3 +766,21 @@ YYYY-MM-DD HH:MM
 - Insights/stat captures now expose per-stage execution and queue depth trends.
 
 ---
+## 2026-04-19 19:10
+
+### Changed
+- Subtask 10/14: added per-client bandwidth caps.
+- Added CVars:
+  - cefws.max_rx_bytes_per_sec_per_client
+  - cefws.max_tx_bytes_per_sec_per_client
+- Added per-client RX/TX 1-second window counters in client state.
+- Inbound packet path now drops payloads when per-client RX cap is exceeded.
+- Write path now drops sends when per-client TX cap is exceeded.
+
+### Why
+- Prevent single clients from saturating local websocket throughput and destabilizing queues.
+
+### Impact
+- Bandwidth governance is now enforceable per client at runtime.
+
+---
