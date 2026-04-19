@@ -716,3 +716,17 @@ YYYY-MM-DD HH:MM
 - Stop path now supports short controlled drain window before full teardown.
 
 ---
+## 2026-04-19 19:07
+
+### Changed
+- Subtask 7/14: optimized broadcast fan-out path.
+- Broadcast APIs no longer enumerate target clients on caller thread.
+- Send thread now resolves broadcast target list lazily just before encode.
+
+### Why
+- Reduce caller-thread lock work and centralize fan-out target resolution in pipeline send stage.
+
+### Impact
+- Broadcast requests enqueue faster and use fresher client snapshot at actual send time.
+
+---

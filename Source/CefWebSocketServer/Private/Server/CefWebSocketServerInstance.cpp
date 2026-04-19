@@ -315,6 +315,12 @@ bool FCefWebSocketServerInstance::PumpOutgoingOnSendThread()
 		bDidWork = true;
 		SendQueueDepth.Store(FMath::Max<int64>(0, SendQueueDepth.Load() - 1));
 
+		if (sendRequest.bBroadcast && sendRequest.TargetClientIds.Num() == 0)
+		{
+			FScopeLock lock(&ClientLock);
+			Clients.GetKeys(sendRequest.TargetClientIds);
+		}
+
 		TSharedPtr<ICefWebSocketPacketCodec> codec = ResolveCodec(sendRequest.PayloadFormat);
 		if (!codec.IsValid())
 		{
@@ -770,10 +776,6 @@ ECefWebSocketSendResult FCefWebSocketServerInstance::BroadcastString(const FStri
 	request.bBroadcast = true;
 	request.PayloadFormat = PayloadFormat;
 	request.TextPayload = InMessage;
-	{
-		FScopeLock lock(&ClientLock);
-		Clients.GetKeys(request.TargetClientIds);
-	}
 	return QueueSendRequest(MoveTemp(request));
 }
 
@@ -788,10 +790,6 @@ ECefWebSocketSendResult FCefWebSocketServerInstance::BroadcastBytes(const TArray
 	request.bBroadcast = true;
 	request.PayloadFormat = ECefWebSocketPayloadFormat::Binary;
 	request.BytesPayload = InBytes;
-	{
-		FScopeLock lock(&ClientLock);
-		Clients.GetKeys(request.TargetClientIds);
-	}
 	return QueueSendRequest(MoveTemp(request));
 }
 
@@ -802,10 +800,6 @@ ECefWebSocketSendResult FCefWebSocketServerInstance::BroadcastStringExcept(int64
 	request.ExcludedClientId = InExcludedClientId;
 	request.PayloadFormat = PayloadFormat;
 	request.TextPayload = InMessage;
-	{
-		FScopeLock lock(&ClientLock);
-		Clients.GetKeys(request.TargetClientIds);
-	}
 	return QueueSendRequest(MoveTemp(request));
 }
 
@@ -821,10 +815,6 @@ ECefWebSocketSendResult FCefWebSocketServerInstance::BroadcastBytesExcept(int64 
 	request.ExcludedClientId = InExcludedClientId;
 	request.PayloadFormat = ECefWebSocketPayloadFormat::Binary;
 	request.BytesPayload = InBytes;
-	{
-		FScopeLock lock(&ClientLock);
-		Clients.GetKeys(request.TargetClientIds);
-	}
 	return QueueSendRequest(MoveTemp(request));
 }
 
