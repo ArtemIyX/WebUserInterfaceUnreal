@@ -38,6 +38,7 @@ public:
 	ECefWebSocketSendResult BroadcastBytesExcept(int64 InExcludedClientId, const TArray<uint8>& InBytes);
 	ECefWebSocketSendResult DisconnectClient(int64 InClientId, ECefWebSocketCloseReason InReason);
 
+	void SetPipelineConfig(const FCefWebSocketPipelineConfig& InConfig);
 	void SetPayloadFormat(ECefWebSocketPayloadFormat InPayloadFormat);
 	void SetPacketCodec(const TSharedPtr<ICefWebSocketPacketCodec>& InCodec);
 
@@ -119,8 +120,7 @@ private:
 	TQueue<FCefWebSocketSendRequest, EQueueMode::Mpsc> SendQueue;
 	TAtomic<int64> InboundQueueDepth = 0;
 	TAtomic<int64> SendQueueDepth = 0;
-	int32 InboundQueueMax = 2048;
-	int32 SendQueueMax = 2048;
+	FCefWebSocketPipelineConfig PipelineConfig;
 
 	TUniquePtr<ICefWebSocketServerBackend> Backend;
 	int64 NextClientId = 1;

@@ -18,16 +18,23 @@ void UCefWebSocketServerBase::BeginDestroy()
 }
 
 bool UCefWebSocketServerBase::StartServerInternal(FName InNameId, int32 InBoundPort,
-                                                  TSubclassOf<UCefWebSocketClientBase> InClientClass)
+                                                  TSubclassOf<UCefWebSocketClientBase> InClientClass,
+                                                  ECefWebSocketPayloadFormat InPayloadFormat,
+                                                  const FCefWebSocketPipelineConfig& InPipelineConfig)
 {
 	NameId = InNameId;
 	BoundPort = InBoundPort;
 	ClientClass = InClientClass;
+	PayloadFormat = InPayloadFormat;
+	PipelineConfig = InPipelineConfig;
 
 	if (!Instance.IsValid())
 	{
 		Instance = MakeShared<FCefWebSocketServerInstance>(NameId, BoundPort, this);
 	}
+	Instance->SetPipelineConfig(PipelineConfig);
+	Instance->SetPayloadFormat(PayloadFormat);
+	Instance->SetPacketCodec(PacketCodec);
 
 	return Instance->Start();
 }
@@ -205,6 +212,33 @@ FCefWebSocketServerStats UCefWebSocketServerBase::GetStats() const
 		return FCefWebSocketServerStats();
 	}
 	return Instance->GetStats();
+}
+
+void UCefWebSocketServerBase::SetPayloadFormat(ECefWebSocketPayloadFormat InPayloadFormat)
+{
+	PayloadFormat = InPayloadFormat;
+	if (Instance.IsValid())
+	{
+		Instance->SetPayloadFormat(InPayloadFormat);
+	}
+}
+
+void UCefWebSocketServerBase::SetPipelineConfig(const FCefWebSocketPipelineConfig& InPipelineConfig)
+{
+	PipelineConfig = InPipelineConfig;
+	if (Instance.IsValid())
+	{
+		Instance->SetPipelineConfig(InPipelineConfig);
+	}
+}
+
+void UCefWebSocketServerBase::SetPacketCodec(const TSharedPtr<ICefWebSocketPacketCodec>& InCodec)
+{
+	PacketCodec = InCodec;
+	if (Instance.IsValid())
+	{
+		Instance->SetPacketCodec(InCodec);
+	}
 }
 
 void UCefWebSocketServerBase::NotifyClientConnected(const FCefWebSocketClientInfo& InClientInfo)

@@ -72,8 +72,6 @@ bool FCefWebSocketServerInstance::Start()
 	QueueDepthSamples = 0;
 	InboundQueueDepth.Store(0);
 	SendQueueDepth.Store(0);
-	InboundQueueMax = 2048;
-	SendQueueMax = 2048;
 
 	HandleWakeEvent = FPlatformProcess::GetSynchEventFromPool(false);
 	SendWakeEvent = FPlatformProcess::GetSynchEventFromPool(false);
@@ -220,6 +218,13 @@ void FCefWebSocketServerInstance::Stop()
 bool FCefWebSocketServerInstance::IsRunning() const
 {
 	return bRunning.Load();
+}
+
+void FCefWebSocketServerInstance::SetPipelineConfig(const FCefWebSocketPipelineConfig& InConfig)
+{
+	FScopeLock lock(&CodecLock);
+	PipelineConfig = InConfig;
+	PayloadFormat = InConfig.InPayloadFormat;
 }
 
 void FCefWebSocketServerInstance::SetPayloadFormat(ECefWebSocketPayloadFormat InPayloadFormat)
@@ -511,7 +516,7 @@ void FCefWebSocketServerInstance::HandleClientPacket(ICefNetWebSocket* InSocket,
 		return;
 	}
 
-	if (InboundQueueDepth.Load() >= InboundQueueMax)
+	if (InboundQueueDepth.Load() >= FMath::Max(1, PipelineConfig.InInboundQueueMax))
 	{
 		Stats.DroppedMessages += 1;
 		if (OwnerServer.IsValid())
@@ -541,7 +546,7 @@ ECefWebSocketSendResult FCefWebSocketServerInstance::QueueSendRequest(FCefWebSoc
 		return ECefWebSocketSendResult::InvalidServer;
 	}
 
-	if (SendQueueDepth.Load() >= SendQueueMax)
+	if (SendQueueDepth.Load() >= FMath::Max(1, PipelineConfig.InSendQueueMax))
 	{
 		Stats.DroppedMessages += 1;
 		return ECefWebSocketSendResult::QueueFull;
@@ -570,8 +575,11 @@ bool FCefWebSocketServerInstance::EnqueueWritePacket(int64 InClientId, const uin
 
 	const int32 maxMessages = FMath::Max(1, CefWebSocketCVars::GetMaxQueueMessagesPerClient());
 	const int32 maxBytes = FMath::Max(1, CefWebSocketCVars::GetMaxQueueBytesPerClient());
+	const int32 configuredMaxMessages = FMath::Max(1, PipelineConfig.InWriteQueueMaxPerClient);
+	const int32 finalMaxMessages = FMath::Min(maxMessages, configuredMaxMessages);
 
-	while ((found->QueueMessages >= maxMessages || found->QueueBytes + InCount > maxBytes) && found->QueueMessages > 0)
+	while ((found->QueueMessages >= finalMaxMessages || found->QueueBytes + InCount > maxBytes) &&
+		found->QueueMessages > 0)
 	{
 		FCefOutboundMessage dropped;
 		if (!found->Outbox || !found->Outbox->Dequeue(dropped))
@@ -585,7 +593,7 @@ bool FCefWebSocketServerInstance::EnqueueWritePacket(int64 InClientId, const uin
 		RecordQueueDepthSample_NoLock();
 	}
 
-	if (found->QueueMessages >= maxMessages || found->QueueBytes + InCount > maxBytes)
+	if (found->QueueMessages >= finalMaxMessages || found->QueueBytes + InCount > maxBytes)
 	{
 		Stats.DroppedMessages += 1;
 		return false;

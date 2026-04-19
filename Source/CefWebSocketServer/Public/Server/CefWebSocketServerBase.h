@@ -9,6 +9,7 @@
 
 class UCefWebSocketClientBase;
 class FCefWebSocketServerInstance;
+class ICefWebSocketPacketCodec;
 
 UCLASS(BlueprintType, Blueprintable)
 class CEFWEBSOCKETSERVER_API UCefWebSocketServerBase : public UObject
@@ -85,6 +86,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "CefWebSocket")
 	FCefWebSocketServerStats GetStats() const;
 
+	UFUNCTION(BlueprintCallable, Category = "CefWebSocket|Pipeline")
+	void SetPayloadFormat(ECefWebSocketPayloadFormat InPayloadFormat);
+
+	UFUNCTION(BlueprintCallable, Category = "CefWebSocket|Pipeline")
+	void SetPipelineConfig(const FCefWebSocketPipelineConfig& InPipelineConfig);
+
+	void SetPacketCodec(const TSharedPtr<ICefWebSocketPacketCodec>& InCodec);
+
 	virtual void HandleClientBytes(UCefWebSocketClientBase* InClient, const TArray<uint8>& InData);
 	virtual void HandleClientString(UCefWebSocketClientBase* InClient, const FString& InMessage);
 #pragma endregion
@@ -93,7 +102,9 @@ protected:
 #pragma region InternalApi
 	friend class UCefWebSocketSubsystem;
 	friend class FCefWebSocketServerInstance;
-	bool StartServerInternal(FName InNameId, int32 InBoundPort, TSubclassOf<UCefWebSocketClientBase> InClientClass);
+	bool StartServerInternal(FName InNameId, int32 InBoundPort, TSubclassOf<UCefWebSocketClientBase> InClientClass,
+	                         ECefWebSocketPayloadFormat InPayloadFormat,
+	                         const FCefWebSocketPipelineConfig& InPipelineConfig);
 	void AttachInstance(TSharedPtr<FCefWebSocketServerInstance> InInstance);
 	void NotifyClientConnected(const FCefWebSocketClientInfo& InClientInfo);
 	void NotifyClientDisconnected(int64 InClientId, ECefWebSocketCloseReason InReason);
@@ -107,6 +118,9 @@ private:
 	FName NameId = NAME_None;
 	int32 BoundPort = 0;
 	TSubclassOf<UCefWebSocketClientBase> ClientClass;
+	ECefWebSocketPayloadFormat PayloadFormat = ECefWebSocketPayloadFormat::Binary;
+	FCefWebSocketPipelineConfig PipelineConfig;
+	TSharedPtr<ICefWebSocketPacketCodec> PacketCodec;
 	mutable FCriticalSection ClientObjectsLock;
 	TMap<int64, TObjectPtr<UCefWebSocketClientBase>> ClientObjects;
 	TSharedPtr<FCefWebSocketServerInstance> Instance;

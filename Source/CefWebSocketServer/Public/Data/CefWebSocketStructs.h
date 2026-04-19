@@ -1,8 +1,26 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Data/CefWebSocketEnums.h"
 #include "CefWebSocketStructs.generated.h"
+
+USTRUCT(BlueprintType)
+struct CEFWEBSOCKETSERVER_API FCefWebSocketPipelineConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CefWebSocket|Pipeline")
+	int32 InInboundQueueMax = 2048;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CefWebSocket|Pipeline")
+	int32 InSendQueueMax = 2048;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CefWebSocket|Pipeline")
+	int32 InWriteQueueMaxPerClient = 1024;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CefWebSocket|Pipeline")
+	ECefWebSocketPayloadFormat InPayloadFormat = ECefWebSocketPayloadFormat::Binary;
+};
 
 USTRUCT(BlueprintType)
 struct CEFWEBSOCKETSERVER_API FCefWebSocketServerCreateOptions
@@ -17,6 +35,9 @@ struct CEFWEBSOCKETSERVER_API FCefWebSocketServerCreateOptions
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CefWebSocket|Pipeline")
 	ECefWebSocketPayloadFormat InDefaultPayloadFormat = ECefWebSocketPayloadFormat::Binary;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CefWebSocket|Pipeline")
+	FCefWebSocketPipelineConfig InPipelineConfig;
 };
 
 USTRUCT(BlueprintType)
@@ -86,22 +107,4 @@ struct CEFWEBSOCKETSERVER_API FCefWebSocketServerStats
 
 	UPROPERTY(BlueprintReadOnly, Category = "CefWebSocket|Stats")
 	int64 InWriteQueueDepth = 0;
-};
-
-USTRUCT(BlueprintType)
-struct CEFWEBSOCKETSERVER_API FCefWebSocketPipelineConfig
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CefWebSocket|Pipeline")
-	int32 InInboundQueueMax = 2048;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CefWebSocket|Pipeline")
-	int32 InSendQueueMax = 2048;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CefWebSocket|Pipeline")
-	int32 InWriteQueueMaxPerClient = 1024;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CefWebSocket|Pipeline")
-	ECefWebSocketPayloadFormat InPayloadFormat = ECefWebSocketPayloadFormat::Binary;
 };

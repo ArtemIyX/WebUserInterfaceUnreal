@@ -479,3 +479,32 @@ YYYY-MM-DD HH:MM
 - Runtime now has explicit per-stage wake/scheduling behavior for better control and scaling.
 
 ---
+
+## 2026-04-19 14:29
+
+### Changed
+- Exposed developer control hooks on `UCefWebSocketServerBase`:
+  - `SetPayloadFormat(...)`
+  - `SetPipelineConfig(...)`
+  - `SetPacketCodec(...)`
+- Extended internal server startup contract to pass pipeline controls:
+  - `StartServerInternal(..., InPayloadFormat, InPipelineConfig)`
+- Wired subsystem create options into startup:
+  - `InOptions.InDefaultPayloadFormat`
+  - `InOptions.InPipelineConfig`
+- Added create-options field for pipeline config and reordered struct declarations for compile-safe USTRUCT usage.
+- Wired pipeline config limits inside `FCefWebSocketServerInstance`:
+  - inbound queue max
+  - send queue max
+  - write queue per-client max
+  - payload format default from pipeline config
+
+### Why
+- Allow developers to choose format/codec and queue policy without editing engine internals.
+- Ensure configuration is applied at server construction/startup boundary.
+
+### Impact
+- Server behavior can now be tuned per server instance from create options or runtime setters.
+- Pipeline queue/backpressure behavior is now externally configurable.
+
+---
