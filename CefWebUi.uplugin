@@ -23,6 +23,11 @@
 			"Name": "CefWebSocketServer",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "CefProtobuf",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
 		}
 	]
 }
