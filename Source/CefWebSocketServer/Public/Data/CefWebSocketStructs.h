@@ -34,9 +34,6 @@ struct CEFWEBSOCKETSERVER_API FCefWebSocketServerCreateOptions
 	int32 RequestedPort = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CefWebSocket|Pipeline")
-	ECefWebSocketPayloadFormat InDefaultPayloadFormat = ECefWebSocketPayloadFormat::Binary;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CefWebSocket|Pipeline")
 	FCefWebSocketPipelineConfig InPipelineConfig;
 };
 

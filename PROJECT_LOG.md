@@ -531,3 +531,21 @@ YYYY-MM-DD HH:MM
 - Documentation now matches current architecture and extension points.
 
 ---
+## 2026-04-19 14:36
+
+### Changed
+- Removed redundant startup payload format source in websocket server API.
+- Deleted FCefWebSocketServerCreateOptions::InDefaultPayloadFormat.
+- Simplified startup contract to StartServerInternal(..., const FCefWebSocketPipelineConfig&).
+- Updated subsystem startup callsite to pass only pipeline config.
+- Updated README create-options docs and C++ sample to use InPipelineConfig.InPayloadFormat.
+
+### Why
+- PayloadFormat existed in two startup inputs (InDefaultPayloadFormat and InPipelineConfig.InPayloadFormat), causing ambiguity.
+- Keep one canonical configuration path to avoid mismatch and confusion.
+
+### Impact
+- Server startup now derives payload format only from FCefWebSocketPipelineConfig.
+- Public create options are clearer and less error-prone for future developers.
+
+---

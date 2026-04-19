@@ -106,7 +106,6 @@ protected:
 	friend class UCefWebSocketSubsystem;
 	friend class FCefWebSocketServerInstance;
 	bool StartServerInternal(FName InNameId, int32 InBoundPort, TSubclassOf<UCefWebSocketClientBase> InClientClass,
-	                         ECefWebSocketPayloadFormat InPayloadFormat,
 	                         const FCefWebSocketPipelineConfig& InPipelineConfig);
 	void AttachInstance(TSharedPtr<FCefWebSocketServerInstance> InInstance);
 	void NotifyClientConnected(const FCefWebSocketClientInfo& InClientInfo);

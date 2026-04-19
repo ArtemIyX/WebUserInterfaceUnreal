@@ -19,14 +19,13 @@ void UCefWebSocketServerBase::BeginDestroy()
 
 bool UCefWebSocketServerBase::StartServerInternal(FName InNameId, int32 InBoundPort,
                                                   TSubclassOf<UCefWebSocketClientBase> InClientClass,
-                                                  ECefWebSocketPayloadFormat InPayloadFormat,
                                                   const FCefWebSocketPipelineConfig& InPipelineConfig)
 {
 	NameId = InNameId;
 	BoundPort = InBoundPort;
 	ClientClass = InClientClass;
-	PayloadFormat = InPayloadFormat;
 	PipelineConfig = InPipelineConfig;
+	PayloadFormat = PipelineConfig.InPayloadFormat;
 
 	if (!Instance.IsValid())
 	{

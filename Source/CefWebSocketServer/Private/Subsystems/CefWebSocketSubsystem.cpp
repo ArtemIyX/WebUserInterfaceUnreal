@@ -68,7 +68,7 @@ FCefWebSocketServerCreateResult UCefWebSocketSubsystem::CreateOrGetServer(
 		}
 
 		if (NewServer->StartServerInternal(InOptions.NameId, candidatePort, InClientClass,
-		                                   InOptions.InDefaultPayloadFormat, InOptions.InPipelineConfig))
+		                                   InOptions.InPipelineConfig))
 		{
 			Servers.Add(InOptions.NameId, NewServer);
 			OutServer = NewServer;

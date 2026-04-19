@@ -16,7 +16,6 @@
 2. Build `FCefWebSocketServerCreateOptions`:
    - `NameId`
    - `RequestedPort`
-   - `InDefaultPayloadFormat`
    - `InPipelineConfig`
 3. Call `CreateOrGetServer(Options, ServerClass, ClientClass, OutServer)`.
 4. Bind server events:
@@ -44,7 +43,7 @@ if (!wsSubsystem)
 FCefWebSocketServerCreateOptions options;
 options.NameId = FName(TEXT("UiBridge"));
 options.RequestedPort = 7001;
-options.InDefaultPayloadFormat = ECefWebSocketPayloadFormat::JsonString;
+options.InPipelineConfig.InPayloadFormat = ECefWebSocketPayloadFormat::JsonString;
 options.InPipelineConfig.InInboundQueueMax = 4096;
 options.InPipelineConfig.InSendQueueMax = 4096;
 
