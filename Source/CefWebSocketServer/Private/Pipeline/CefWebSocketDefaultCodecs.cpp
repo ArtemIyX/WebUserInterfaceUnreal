@@ -1,4 +1,5 @@
 #include "Pipeline/CefWebSocketDefaultCodecs.h"
+#include "Config/CefWebSocketCVars.h"
 
 bool FCefWebSocketBinaryPassthroughCodec::DecodeInbound(const FCefWebSocketInboundPacket& InPacket,
                                                         FCefWebSocketInboundPacket& OutDecodedPacket,
@@ -61,6 +62,10 @@ bool FCefWebSocketUtf8StringCodec::DecodeInbound(const FCefWebSocketInboundPacke
 	OutError.Reset();
 	OutDecodedPacket = InPacket;
 	if (InPacket.bBinary)
+	{
+		return true;
+	}
+	if (!CefWebSocketCVars::GetValidateUtf8())
 	{
 		return true;
 	}

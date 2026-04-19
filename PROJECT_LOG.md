@@ -838,3 +838,16 @@ YYYY-MM-DD HH:MM
 - Developers can generate burst traffic from UE console to validate queue/cap/backoff behavior.
 
 ---
+## 2026-04-19 19:14
+
+### Changed
+- Subtask 14/14: wired UTF-8 validation toggle into default UTF-8 codec decode path.
+- FCefWebSocketUtf8StringCodec::DecodeInbound(...) now bypasses UTF-8 validation when cefws.validate_utf8=0.
+
+### Why
+- Allow projects to disable strict UTF-8 validation when interoperability/testing requires raw pass-through text frames.
+
+### Impact
+- UTF-8 decode strictness is now runtime-configurable.
+
+---
