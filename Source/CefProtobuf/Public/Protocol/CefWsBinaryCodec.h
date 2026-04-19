@@ -1,0 +1,21 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Protocol/CefWsCodec.h"
+
+class CEFPROTOBUF_API FCefWsBinaryCodec final : public ICefWsCodec
+{
+public:
+	static constexpr uint32 HeaderSize = 24;
+	static constexpr uint32 EnvelopeMagic = 0x43575342u; // "CWSB"
+
+	explicit FCefWsBinaryCodec(uint16 InSchemaVersion = 1, uint32 InMaxPayloadBytes = 16u * 1024u * 1024u);
+
+	virtual ECefProtoEncodeResult Encode(const FCefWsEnvelope& InEnvelope, TArray<uint8>& OutBytes) const override;
+	virtual ECefProtoDecodeResult Decode(const TArray<uint8>& InBytes, FCefWsEnvelope& OutEnvelope) const override;
+	virtual uint16 GetSchemaVersion() const override;
+
+private:
+	uint16 SchemaVersion = 1;
+	uint32 MaxPayloadBytes = 16u * 1024u * 1024u;
+};

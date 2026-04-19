@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
+#include "Protocol/CefWsBinaryCodec.h"
 #include "Protocol/CefWsCodec.h"
 #include "Protocol/CefWsEnvelope.h"
 

@@ -383,3 +383,25 @@ YYYY-MM-DD HH:MM
 - Next implementation steps can focus on concrete codec format and protobuf-backed adapter.
 
 ---
+
+## 2026-04-19 13:00
+
+### Changed
+- Implemented concrete binary websocket codec:
+  - `Source/CefProtobuf/Public/Protocol/CefWsBinaryCodec.h`
+  - `Source/CefProtobuf/Private/Protocol/CefWsBinaryCodec.cpp`
+- Updated umbrella protobuf header to expose binary codec:
+  - `Source/CefProtobuf/Public/CefProtobuf.h`
+- Added explicit helper namespace for binary read/write internals:
+  - `namespace CefWsBinaryIo` in `CefWsBinaryCodec.cpp`.
+- Kept protocol classes/contracts in global scope as requested (`FCefWsEnvelope`, `ICefWsCodec`, `FCefWsBinaryCodec`).
+
+### Why
+- Provide a reusable, schema-agnostic wire codec for websocket transport.
+- Establish deterministic envelope framing before game-specific protobuf schemas are added.
+
+### Impact
+- Plugin now has a concrete codec for envelope serialization/deserialization with version/payload validation.
+- Future protobuf message support can plug into envelope `Payload` using message-type dispatch.
+
+---
