@@ -549,3 +549,26 @@ YYYY-MM-DD HH:MM
 - Public create options are clearer and less error-prone for future developers.
 
 ---
+## 2026-04-19 18:31
+
+### Changed
+- Added CefDispatch core type-erased dispatch value contracts:
+  - ICefDispatchValue
+  - FCefDispatchTypeId
+  - TCefDispatchValue<T>
+  - CefDispatchTryGetValue<T>(...)
+- Added uint32 -> factory registry:
+  - FCefDispatchRegistry
+  - RegisterFactory(...), UnregisterFactory(...), Decode(...)
+  - dispatch decode result enum ECefDispatchFactoryResult.
+- Updated FCefDispatchModule to own a shared registry singleton (GetRegistry()) and expose Get()/IsAvailable() helpers.
+
+### Why
+- Create minimal abstraction where route factories can return any payload type (protobuf, custom struct, string) via type erasure.
+- Keep dispatch core independent from protobuf and transport modules.
+
+### Impact
+- Plugin now has a reusable runtime dispatch core keyed by MessageType.
+- Downstream modules can register factories and resolve typed payloads safely.
+
+---
