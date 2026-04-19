@@ -28,6 +28,11 @@
 			"Name": "CefProtobuf",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "CefDispatch",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
 		}
 	]
 }
