@@ -358,3 +358,28 @@ YYYY-MM-DD HH:MM
 - Future schema/codegen work can be added without changing third-party wiring.
 
 ---
+
+## 2026-04-19 11:54
+
+### Changed
+- Added `CefProtobuf` core protocol contracts for future websocket/protobuf integrations:
+  - `Source/CefProtobuf/Public/Protocol/CefWsEnvelope.h`
+  - `Source/CefProtobuf/Public/Protocol/CefWsCodec.h`
+- Added envelope/result abstractions:
+  - `FCefWsEnvelope`
+  - `ECefProtoEncodeResult`
+  - `ECefProtoDecodeResult`
+- Added codec interface abstraction:
+  - `ICefWsCodec` with `Encode`, `Decode`, `GetSchemaVersion`.
+- Updated umbrella header:
+  - `Source/CefProtobuf/Public/CefProtobuf.h` now includes protocol headers.
+
+### Why
+- Establish schema-agnostic plugin contracts before introducing game-specific `.proto` messages.
+- Keep `CefProtobuf` reusable for future projects and message sets.
+
+### Impact
+- Other plugin modules can depend on `CefProtobuf` contracts immediately.
+- Next implementation steps can focus on concrete codec format and protobuf-backed adapter.
+
+---

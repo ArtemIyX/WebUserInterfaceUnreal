@@ -1,7 +1,9 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
+#include "Protocol/CefWsCodec.h"
+#include "Protocol/CefWsEnvelope.h"
 
 class FCefProtobufModule : public IModuleInterface
 {
