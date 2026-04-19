@@ -649,3 +649,20 @@ YYYY-MM-DD HH:MM
 - Queue overflow behavior is now runtime-configurable without code changes.
 
 ---
+## 2026-04-19 19:02
+
+### Changed
+- Subtask 3/14: implemented adaptive write batching in write stage.
+- Added CVars:
+  - cefws.write_batch_max_messages
+  - cefws.write_batch_max_bytes
+- Updated PumpOutgoingOnWriteThread() to drain multiple queued packets per client per pass (bounded by message and byte limits).
+
+### Why
+- Reduce write-thread overhead and improve burst throughput for many small packets.
+
+### Impact
+- Fewer wake cycles and lock transitions are needed to flush per-client queues.
+- Batch size is tunable at runtime.
+
+---

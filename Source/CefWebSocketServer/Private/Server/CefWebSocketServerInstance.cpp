@@ -352,12 +352,23 @@ bool FCefWebSocketServerInstance::PumpOutgoingOnWriteThread()
 	};
 
 	TArray<FSendWork> workItems;
+	const int32 maxBatchMessagesPerClient = FMath::Max(1, CefWebSocketCVars::GetWriteBatchMaxMessages());
+	const int32 maxBatchBytesPerClient = FMath::Max(1, CefWebSocketCVars::GetWriteBatchMaxBytes());
 	{
 		FScopeLock lock(&ClientLock);
 		for (TPair<int64, FCefClientState>& pair : Clients)
 		{
+			if (!pair.Value.Outbox)
+			{
+				continue;
+			}
+
+			int32 drainedMessages = 0;
+			int32 drainedBytes = 0;
 			FCefOutboundMessage message;
-			if (pair.Value.Outbox && pair.Value.Outbox->Dequeue(message))
+			while (drainedMessages < maxBatchMessagesPerClient &&
+				drainedBytes < maxBatchBytesPerClient &&
+				pair.Value.Outbox->Dequeue(message))
 			{
 				pair.Value.QueueMessages = FMath::Max(0, pair.Value.QueueMessages - 1);
 				pair.Value.QueueBytes = FMath::Max<int64>(0, pair.Value.QueueBytes - message.Payload.Num());
@@ -367,6 +378,8 @@ bool FCefWebSocketServerInstance::PumpOutgoingOnWriteThread()
 				item.ClientId = pair.Key;
 				item.Socket = pair.Value.Socket;
 				item.Message = MoveTemp(message);
+				drainedMessages += 1;
+				drainedBytes += item.Message.Payload.Num();
 			}
 		}
 	}
