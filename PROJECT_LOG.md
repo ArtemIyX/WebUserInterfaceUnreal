@@ -336,3 +336,25 @@ YYYY-MM-DD HH:MM
 - `CefBrowserSurface.cpp` remained functionally unchanged in this commit due to explicit restore.
 
 ---
+
+## 2026-04-19 11:48
+
+### Changed
+- Added `CefProtobuf` module build wiring for bundled Protobuf third-party runtime.
+- Updated `Source/CefProtobuf/CefProtobuf.Build.cs`:
+  - added `PublicSystemIncludePaths` for `Source/ThirdParty/Protobuf/include`.
+  - added Win64 static link for `Source/ThirdParty/Protobuf/lib/Win64/libprotobuf-lite.lib`.
+- Verified third-party layout now includes:
+  - `Source/ThirdParty/Protobuf/include`
+  - `Source/ThirdParty/Protobuf/lib/Win64/libprotobuf-lite.lib`
+  - `Source/ThirdParty/Protobuf/bin/Win64/protoc.exe`
+
+### Why
+- Prepare plugin-side protobuf framework dependencies without adding message schemas yet.
+- Keep protobuf runtime deterministic and bundled in-plugin.
+
+### Impact
+- `CefProtobuf` module is ready to include protobuf headers and link lite runtime on Win64.
+- Future schema/codegen work can be added without changing third-party wiring.
+
+---
