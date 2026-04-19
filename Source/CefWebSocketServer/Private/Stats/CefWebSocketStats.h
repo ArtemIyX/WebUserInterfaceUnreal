@@ -8,3 +8,10 @@ DECLARE_DWORD_COUNTER_STAT(TEXT("RX Bytes Per Tick"), STAT_CefWs_RxBytes, STATGR
 DECLARE_DWORD_COUNTER_STAT(TEXT("TX Bytes Per Tick"), STAT_CefWs_TxBytes, STATGROUP_CefWebSocket);
 DECLARE_DWORD_COUNTER_STAT(TEXT("Dropped Messages"), STAT_CefWs_DroppedMessages, STATGROUP_CefWebSocket);
 DECLARE_DWORD_COUNTER_STAT(TEXT("Queue Depth"), STAT_CefWs_QueueDepth, STATGROUP_CefWebSocket);
+DECLARE_DWORD_COUNTER_STAT(TEXT("Inbound Queue Depth"), STAT_CefWs_InboundQueueDepth, STATGROUP_CefWebSocket);
+DECLARE_DWORD_COUNTER_STAT(TEXT("Send Queue Depth"), STAT_CefWs_SendQueueDepth, STATGROUP_CefWebSocket);
+DECLARE_DWORD_COUNTER_STAT(TEXT("Write Queue Depth"), STAT_CefWs_WriteQueueDepth, STATGROUP_CefWebSocket);
+DECLARE_CYCLE_STAT(TEXT("Read Pump"), STAT_CefWs_ReadPump, STATGROUP_CefWebSocket);
+DECLARE_CYCLE_STAT(TEXT("Handle Pump"), STAT_CefWs_HandlePump, STATGROUP_CefWebSocket);
+DECLARE_CYCLE_STAT(TEXT("Send Pump"), STAT_CefWs_SendPump, STATGROUP_CefWebSocket);
+DECLARE_CYCLE_STAT(TEXT("Write Pump"), STAT_CefWs_WritePump, STATGROUP_CefWebSocket);

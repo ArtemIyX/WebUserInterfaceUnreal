@@ -254,6 +254,7 @@ void FCefWebSocketServerInstance::SetPacketCodec(const TSharedPtr<ICefWebSocketP
 
 bool FCefWebSocketServerInstance::TickBackendOnReadThread()
 {
+	SCOPE_CYCLE_COUNTER(STAT_CefWs_ReadPump);
 	if (!bRunning.Load() || !Backend)
 	{
 		return false;
@@ -265,6 +266,7 @@ bool FCefWebSocketServerInstance::TickBackendOnReadThread()
 
 bool FCefWebSocketServerInstance::PumpInboundOnHandleThread()
 {
+	SCOPE_CYCLE_COUNTER(STAT_CefWs_HandlePump);
 	if (!bRunning.Load())
 	{
 		return false;
@@ -298,11 +300,13 @@ bool FCefWebSocketServerInstance::PumpInboundOnHandleThread()
 
 	Stats.InInboundQueueDepth = InboundQueueDepth.Load();
 	Stats.InHandleQueueDepth = Stats.InInboundQueueDepth;
+	SET_DWORD_STAT(STAT_CefWs_InboundQueueDepth, static_cast<uint32>(FMath::Min<int64>(Stats.InInboundQueueDepth, MAX_uint32)));
 	return bDidWork;
 }
 
 bool FCefWebSocketServerInstance::PumpOutgoingOnSendThread()
 {
+	SCOPE_CYCLE_COUNTER(STAT_CefWs_SendPump);
 	if (!bRunning.Load())
 	{
 		return false;
@@ -354,11 +358,13 @@ bool FCefWebSocketServerInstance::PumpOutgoingOnSendThread()
 	}
 
 	Stats.InSendQueueDepth = SendQueueDepth.Load();
+	SET_DWORD_STAT(STAT_CefWs_SendQueueDepth, static_cast<uint32>(FMath::Min<int64>(Stats.InSendQueueDepth, MAX_uint32)));
 	return bDidWork;
 }
 
 bool FCefWebSocketServerInstance::PumpOutgoingOnWriteThread()
 {
+	SCOPE_CYCLE_COUNTER(STAT_CefWs_WritePump);
 	if (!bRunning.Load())
 	{
 		return false;
@@ -407,6 +413,7 @@ bool FCefWebSocketServerInstance::PumpOutgoingOnWriteThread()
 	if (workItems.Num() == 0)
 	{
 		Stats.InWriteQueueDepth = Stats.QueueDepth;
+		SET_DWORD_STAT(STAT_CefWs_WriteQueueDepth, static_cast<uint32>(FMath::Min<int64>(Stats.InWriteQueueDepth, MAX_uint32)));
 		return false;
 	}
 
@@ -438,6 +445,7 @@ bool FCefWebSocketServerInstance::PumpOutgoingOnWriteThread()
 
 	SET_DWORD_STAT(STAT_CefWs_ActiveClients, Stats.ActiveClients);
 	SET_DWORD_STAT(STAT_CefWs_QueueDepth, static_cast<uint32>(FMath::Min<int64>(Stats.QueueDepth, MAX_uint32)));
+	SET_DWORD_STAT(STAT_CefWs_WriteQueueDepth, static_cast<uint32>(FMath::Min<int64>(Stats.InWriteQueueDepth, MAX_uint32)));
 	SET_DWORD_STAT(STAT_CefWs_TxBytes, static_cast<uint32>(FMath::Min<int64>(Stats.TxBytes, MAX_uint32)));
 	SET_DWORD_STAT(STAT_CefWs_DroppedMessages,
 	               static_cast<uint32>(FMath::Min<int64>(Stats.DroppedMessages, MAX_uint32)));

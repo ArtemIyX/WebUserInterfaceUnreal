@@ -746,3 +746,23 @@ YYYY-MM-DD HH:MM
 - Operators can inspect client population and runtime tuning state directly from UE console.
 
 ---
+## 2026-04-19 19:08
+
+### Changed
+- Subtask 9/14: added Unreal Stats/Insights instrumentation for websocket stages.
+- Added stage cycle stats:
+  - STAT_CefWs_ReadPump
+  - STAT_CefWs_HandlePump
+  - STAT_CefWs_SendPump
+  - STAT_CefWs_WritePump
+- Added queue depth counters:
+  - inbound/send/write queue depth stats.
+- Wired counter updates into pipeline pumps.
+
+### Why
+- Improve visibility into stage timing and queue pressure for performance tuning.
+
+### Impact
+- Insights/stat captures now expose per-stage execution and queue depth trends.
+
+---
