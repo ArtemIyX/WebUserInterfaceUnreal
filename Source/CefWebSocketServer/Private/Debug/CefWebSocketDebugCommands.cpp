@@ -60,6 +60,14 @@ void FCefWebSocketDebugCommands::Startup()
 			TEXT("Print websocket runtime cvar values."),
 			FConsoleCommandWithArgsDelegate::CreateRaw(this, &FCefWebSocketDebugCommands::HandleCVars));
 	}
+
+	if (!CommandBenchSend)
+	{
+		CommandBenchSend = consoleManager.RegisterConsoleCommand(
+			TEXT("ws.benchsend"),
+			TEXT("Send synthetic load traffic: ws.benchsend <name> <count> <bytes>."),
+			FConsoleCommandWithArgsDelegate::CreateRaw(this, &FCefWebSocketDebugCommands::HandleBenchSend));
+	}
 }
 
 void FCefWebSocketDebugCommands::Shutdown()
@@ -95,6 +103,11 @@ void FCefWebSocketDebugCommands::Shutdown()
 	{
 		consoleManager.UnregisterConsoleObject(CommandCVars);
 		CommandCVars = nullptr;
+	}
+	if (CommandBenchSend)
+	{
+		consoleManager.UnregisterConsoleObject(CommandBenchSend);
+		CommandBenchSend = nullptr;
 	}
 }
 
@@ -305,4 +318,53 @@ void FCefWebSocketDebugCommands::HandleCVars(const TArray<FString>& InArgs) cons
 		CefWebSocketCVars::GetWriteBatchMaxBytes(),
 		CefWebSocketCVars::GetHeartbeatIntervalSec(),
 		CefWebSocketCVars::GetIdleTimeoutSec());
+}
+
+void FCefWebSocketDebugCommands::HandleBenchSend(const TArray<FString>& InArgs) const
+{
+	if (InArgs.Num() < 3)
+	{
+		UE_LOG(LogCefWebSocketServer, Warning, TEXT("ws.benchsend usage: ws.benchsend <name> <count> <bytes>"));
+		return;
+	}
+
+	UCefWebSocketSubsystem* subsystem = ResolveSubsystem();
+	if (!subsystem)
+	{
+		UE_LOG(LogCefWebSocketServer, Warning, TEXT("ws.benchsend: subsystem not available"));
+		return;
+	}
+
+	const FName nameId(*InArgs[0]);
+	UCefWebSocketServerBase* server = subsystem->GetServer(nameId);
+	if (!server)
+	{
+		UE_LOG(LogCefWebSocketServer, Warning, TEXT("ws.benchsend: server not found for '%s'"), *nameId.ToString());
+		return;
+	}
+
+	int32 count = 0;
+	int32 bytesPerMessage = 0;
+	if (!LexTryParseString(count, *InArgs[1]) || !LexTryParseString(bytesPerMessage, *InArgs[2]) ||
+		count <= 0 || bytesPerMessage <= 0)
+	{
+		UE_LOG(LogCefWebSocketServer, Warning, TEXT("ws.benchsend: invalid count/bytes"));
+		return;
+	}
+
+	TArray<uint8> payload;
+	payload.SetNumZeroed(bytesPerMessage);
+	for (int32 i = 0; i < count; ++i)
+	{
+		payload[0] = static_cast<uint8>(i & 0xFF);
+		const ECefWebSocketSendResult result = server->BroadcastBytes(payload);
+		if (result != ECefWebSocketSendResult::Ok)
+		{
+			UE_LOG(LogCefWebSocketServer, Warning, TEXT("ws.benchsend: send failed at i=%d result=%d"), i, static_cast<int32>(result));
+			return;
+		}
+	}
+
+	UE_LOG(LogCefWebSocketServer, Log, TEXT("ws.benchsend: server=%s sent=%d bytes_each=%d"),
+		*nameId.ToString(), count, bytesPerMessage);
 }

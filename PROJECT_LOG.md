@@ -823,3 +823,18 @@ YYYY-MM-DD HH:MM
 - Lower contention pressure on hot read paths under multi-threaded load.
 
 ---
+## 2026-04-19 19:14
+
+### Changed
+- Subtask 13/14: added local websocket load-test harness command.
+- New console command:
+  - ws.benchsend <name> <count> <bytes>
+- Command sends synthetic broadcast binary traffic for quick throughput/backpressure checks.
+
+### Why
+- Provide repeatable local stress tool without external client scripts.
+
+### Impact
+- Developers can generate burst traffic from UE console to validate queue/cap/backoff behavior.
+
+---

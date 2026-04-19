@@ -23,6 +23,7 @@ private:
 	void HandleStats(const TArray<FString>& InArgs) const;
 	void HandleClients(const TArray<FString>& InArgs) const;
 	void HandleCVars(const TArray<FString>& InArgs) const;
+	void HandleBenchSend(const TArray<FString>& InArgs) const;
 #pragma endregion
 
 private:
@@ -38,5 +39,6 @@ private:
 	IConsoleObject* CommandStats = nullptr;
 	IConsoleObject* CommandClients = nullptr;
 	IConsoleObject* CommandCVars = nullptr;
+	IConsoleObject* CommandBenchSend = nullptr;
 #pragma endregion
 };
