@@ -1,4 +1,5 @@
-﻿using UnrealBuildTool;
+using UnrealBuildTool;
+using System.IO;
 
 public class CefProtobuf : ModuleRules
 {
@@ -22,5 +23,15 @@ public class CefProtobuf : ModuleRules
                 "SlateCore"
             }
         );
+
+        string protobufRoot = Path.GetFullPath(Path.Combine(ModuleDirectory, "..", "ThirdParty", "Protobuf"));
+        string protobufIncludePath = Path.Combine(protobufRoot, "include");
+        PublicSystemIncludePaths.Add(protobufIncludePath);
+
+        if (Target.Platform == UnrealTargetPlatform.Win64)
+        {
+            string protobufLibPath = Path.Combine(protobufRoot, "lib", "Win64", "libprotobuf-lite.lib");
+            PublicAdditionalLibraries.Add(protobufLibPath);
+        }
     }
 }
