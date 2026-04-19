@@ -105,14 +105,22 @@ void FCefNetWebSocket::FlushInternal()
 	}
 }
 
-void FCefNetWebSocket::Close()
+void FCefNetWebSocket::Close(uint16 InStatusCode, const FString& InReason)
 {
 	if (!Wsi)
 	{
 		return;
 	}
 
-	lws_close_reason(Wsi, LWS_CLOSE_STATUS_NORMAL, nullptr, 0);
+	FTCHARToUTF8 utf8Reason(*InReason);
+	const uint8* reasonData = nullptr;
+	int reasonLen = 0;
+	if (utf8Reason.Length() > 0)
+	{
+		reasonData = reinterpret_cast<const uint8*>(utf8Reason.Get());
+		reasonLen = utf8Reason.Length();
+	}
+	lws_close_reason(Wsi, InStatusCode, reasonData, reasonLen);
 	lws_callback_on_writable(Wsi);
 }
 

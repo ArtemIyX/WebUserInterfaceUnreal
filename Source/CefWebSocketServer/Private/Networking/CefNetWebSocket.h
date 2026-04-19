@@ -17,7 +17,7 @@ public:
 	virtual bool Send(const uint8* InData, uint32 InSize, bool bInPrependSize = true) override;
 	virtual void Tick() override;
 	virtual void Flush() override;
-	virtual void Close() override;
+	virtual void Close(uint16 InStatusCode = 1000, const FString& InReason = FString()) override;
 
 	virtual FString RemoteEndPoint(bool bInAppendPort) override;
 	virtual FString LocalEndPoint(bool bInAppendPort) override;

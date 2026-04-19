@@ -18,6 +18,45 @@
 #include "HAL/PlatformTime.h"
 #include "HAL/RunnableThread.h"
 
+namespace
+{
+uint16 ResolveCloseStatusCode(ECefWebSocketCloseReason InReason)
+{
+	switch (InReason)
+	{
+	case ECefWebSocketCloseReason::ServerShutdown:
+		return 1001; // going away
+	case ECefWebSocketCloseReason::Kicked:
+		return 1008; // policy violation
+	case ECefWebSocketCloseReason::Timeout:
+		return 1001; // going away
+	case ECefWebSocketCloseReason::Error:
+		return 1011; // internal error
+	case ECefWebSocketCloseReason::ClientClosed:
+	default:
+		return 1000; // normal closure
+	}
+}
+
+FString ResolveCloseReasonText(ECefWebSocketCloseReason InReason)
+{
+	switch (InReason)
+	{
+	case ECefWebSocketCloseReason::ServerShutdown:
+		return TEXT("server_shutdown");
+	case ECefWebSocketCloseReason::Kicked:
+		return TEXT("kicked");
+	case ECefWebSocketCloseReason::Timeout:
+		return TEXT("timeout");
+	case ECefWebSocketCloseReason::Error:
+		return TEXT("error");
+	case ECefWebSocketCloseReason::ClientClosed:
+	default:
+		return TEXT("normal");
+	}
+}
+}
+
 FCefWebSocketServerInstance::FCefWebSocketServerInstance(FName InNameId, int32 InBoundPort,
                                                          TWeakObjectPtr<UCefWebSocketServerBase> InOwnerServer)
 	: NameId(InNameId)
@@ -207,7 +246,8 @@ void FCefWebSocketServerInstance::Stop()
 
 	for (ICefNetWebSocket* socket : socketsToClose)
 	{
-		socket->Close();
+		socket->Close(ResolveCloseStatusCode(ECefWebSocketCloseReason::ServerShutdown),
+		              ResolveCloseReasonText(ECefWebSocketCloseReason::ServerShutdown));
 	}
 
 	Backend.Reset();
@@ -883,7 +923,6 @@ ECefWebSocketSendResult FCefWebSocketServerInstance::BroadcastBytesExcept(int64 
 ECefWebSocketSendResult FCefWebSocketServerInstance::DisconnectClient(int64 InClientId,
                                                                       ECefWebSocketCloseReason InReason)
 {
-	(void)InReason;
 	ICefNetWebSocket* socket = nullptr;
 	{
 		FScopeLock lock(&ClientLock);
@@ -897,7 +936,7 @@ ECefWebSocketSendResult FCefWebSocketServerInstance::DisconnectClient(int64 InCl
 		return ECefWebSocketSendResult::InvalidClient;
 	}
 
-	socket->Close();
+	socket->Close(ResolveCloseStatusCode(InReason), ResolveCloseReasonText(InReason));
 	return ECefWebSocketSendResult::Ok;
 }
 
@@ -1036,7 +1075,8 @@ void FCefWebSocketServerInstance::SweepConnectionHealthOnReadThread()
 		{
 			continue;
 		}
-		socket->Close();
+		socket->Close(ResolveCloseStatusCode(ECefWebSocketCloseReason::Timeout),
+		              ResolveCloseReasonText(ECefWebSocketCloseReason::Timeout));
 	}
 }
 

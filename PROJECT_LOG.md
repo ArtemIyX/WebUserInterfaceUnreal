@@ -784,3 +784,22 @@ YYYY-MM-DD HH:MM
 - Bandwidth governance is now enforceable per client at runtime.
 
 ---
+## 2026-04-19 19:11
+
+### Changed
+- Subtask 11/14: improved websocket close-code/error mapping.
+- Extended socket interface close API to accept status code + reason string.
+- Implemented close-reason payload support in FCefNetWebSocket::Close(...).
+- Added mapping from ECefWebSocketCloseReason to RFC6455 close codes/reason text.
+- Applied mapped close behavior for:
+  - explicit disconnects,
+  - idle timeout closes,
+  - server shutdown closes.
+
+### Why
+- Preserve richer close diagnostics and clearer semantics for clients.
+
+### Impact
+- Close paths now communicate specific reason categories instead of always normal closure.
+
+---
