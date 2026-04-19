@@ -633,3 +633,19 @@ YYYY-MM-DD HH:MM
 - Server can automatically close idle clients and periodically emit heartbeat traffic without user code.
 
 ---
+## 2026-04-19 19:01
+
+### Changed
+- Subtask 2/14: added configurable write-queue overflow policy.
+- Added CVar cefws.queue_drop_policy:
+  -   = drop oldest queued messages (existing behavior)
+  - 1 = reject new message when queue is full.
+- Updated per-client write queue enqueue logic in FCefWebSocketServerInstance::EnqueueWritePacket(...) to honor policy.
+
+### Why
+- Different projects need different backpressure semantics (preserve freshest vs preserve queued data).
+
+### Impact
+- Queue overflow behavior is now runtime-configurable without code changes.
+
+---

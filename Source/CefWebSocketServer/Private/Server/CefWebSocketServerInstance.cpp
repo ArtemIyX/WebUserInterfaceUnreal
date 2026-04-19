@@ -583,10 +583,12 @@ bool FCefWebSocketServerInstance::EnqueueWritePacket(int64 InClientId, const uin
 
 	const int32 maxMessages = FMath::Max(1, CefWebSocketCVars::GetMaxQueueMessagesPerClient());
 	const int32 maxBytes = FMath::Max(1, CefWebSocketCVars::GetMaxQueueBytesPerClient());
+	const bool bRejectNewOnOverflow = CefWebSocketCVars::GetQueueDropPolicy() == 1;
 	const int32 configuredMaxMessages = FMath::Max(1, PipelineConfig.InWriteQueueMaxPerClient);
 	const int32 finalMaxMessages = FMath::Min(maxMessages, configuredMaxMessages);
 
-	while ((found->QueueMessages >= finalMaxMessages || found->QueueBytes + InCount > maxBytes) &&
+	while (!bRejectNewOnOverflow &&
+		(found->QueueMessages >= finalMaxMessages || found->QueueBytes + InCount > maxBytes) &&
 		found->QueueMessages > 0)
 	{
 		FCefOutboundMessage dropped;
