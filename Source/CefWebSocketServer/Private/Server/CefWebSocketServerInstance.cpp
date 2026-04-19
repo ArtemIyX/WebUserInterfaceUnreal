@@ -109,6 +109,19 @@ void FCefWebSocketServerInstance::Stop()
 		return;
 	}
 
+	const int32 shutdownDrainMs = FMath::Max(0, CefWebSocketCVars::GetShutdownDrainMs());
+	if (bRunning.Load() && shutdownDrainMs > 0)
+	{
+		const double deadlineSec = FPlatformTime::Seconds() + (static_cast<double>(shutdownDrainMs) / 1000.0);
+		while (bRunning.Load() && !AreQueuesDrained() && FPlatformTime::Seconds() < deadlineSec)
+		{
+			WakeHandleThread();
+			WakeSendThread();
+			WakeWriteThread();
+			FPlatformProcess::SleepNoStats(0.001f);
+		}
+	}
+
 	bRunning.Store(false);
 
 	if (ReadRunnable)
@@ -973,6 +986,28 @@ void FCefWebSocketServerInstance::SweepConnectionHealthOnReadThread()
 		}
 		socket->Close();
 	}
+}
+
+bool FCefWebSocketServerInstance::AreQueuesDrained() const
+{
+	if (InboundQueueDepth.Load() > 0 || SendQueueDepth.Load() > 0)
+	{
+		return false;
+	}
+
+	FScopeLock lock(&ClientLock);
+	if (Stats.QueueDepth > 0)
+	{
+		return false;
+	}
+	for (const TPair<int64, FCefClientState>& pair : Clients)
+	{
+		if (pair.Value.QueueMessages > 0)
+		{
+			return false;
+		}
+	}
+	return true;
 }
 
 

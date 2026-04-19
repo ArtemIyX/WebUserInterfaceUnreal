@@ -14,6 +14,7 @@ namespace CefWebSocketCVars
 	int32 GetWriteBatchMaxBytes();
 	int32 GetReadBusySleepMs();
 	int32 GetReadIdleMaxSleepMs();
+	int32 GetShutdownDrainMs();
 	int32 GetWriteIdleSleepMs();
 	int32 GetShutdownTimeoutMs();
 	int32 GetMaxPortScan();

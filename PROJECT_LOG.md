@@ -701,3 +701,18 @@ YYYY-MM-DD HH:MM
 - Oversized text inbound or outbound payloads are now blocked before queue pressure escalates.
 
 ---
+## 2026-04-19 19:06
+
+### Changed
+- Subtask 6/14: added graceful shutdown drain behavior.
+- Added CVar cefws.shutdown_drain_ms.
+- FCefWebSocketServerInstance::Stop() now performs bounded queue-drain loop before stopping worker threads.
+- Added queue-drain readiness helper (AreQueuesDrained()).
+
+### Why
+- Reduce message loss during intentional server shutdown by allowing in-flight queues to flush first.
+
+### Impact
+- Stop path now supports short controlled drain window before full teardown.
+
+---

@@ -98,6 +98,7 @@ private:
 	void RecordQueueDepthSample_NoLock();
 	void UpdateRateStats_NoLock();
 	void SweepConnectionHealthOnReadThread();
+	bool AreQueuesDrained() const;
 #pragma endregion
 
 private:
