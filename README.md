@@ -8,7 +8,7 @@ CEF-powered Web UI + local WebSocket stack for Unreal Engine, with an external `
 
 ## 1) What This Plugin Includes
 
-This plugin is split into 4 runtime modules:
+This plugin is split into 5 runtime modules:
 
 - `CefWebUi`
   - Browser session API, shared-memory IPC, input/control writers, frame reader, Slate browser surface.
@@ -18,6 +18,8 @@ This plugin is split into 4 runtime modules:
   - Binary websocket envelope/codec helpers intended for protobuf-based payloads.
 - `CefDispatch`
   - Format-agnostic `MessageType(uint32) -> Factory` registry (works with protobuf or any custom type).
+- `CefContentHttpServer`
+  - Local HTTP image endpoint (`/img`) with pluggable request handler strategy.
 
 ---
 
@@ -211,7 +213,92 @@ Custom transport logic:
 
 ---
 
-## 11) Runtime Settings (Developer Settings)
+## 11) Content HTTP Server Quick Start
+
+`CefContentHttpServer` is started/stopped by `UCefContentHttpServerSubsystem` lifecycle.
+
+Default:
+
+- Port: `18080`
+- Route: `GET /img`
+- Default handler:
+  1. Resolve `asset` from query/body.
+  2. Load texture via module image cache.
+  3. Encode texture to PNG.
+  4. Return `image/png`.
+
+Example request:
+
+```text
+http://localhost:18080/img?asset=/Game/Folder/T_Image
+```
+
+If your file is:
+
+```text
+Content/Folder/T_Image.upackage
+```
+
+then request path should be:
+
+```text
+/Game/Folder/T_Image
+```
+
+The module normalizes to object path internally (`/Game/Folder/T_Image.T_Image`).
+
+Body alternatives:
+
+- JSON body: `{"asset":"/Game/Folder/T_Image"}`
+- Raw body: `asset=/Game/Folder/T_Image`
+
+### Override Request Handling
+
+Create custom handler:
+
+```cpp
+#include "Handlers/CefContentHttpImageRequestHandler.h"
+#include "MyCustomImageHandler.generated.h"
+
+UCLASS()
+class UMyCustomImageHandler : public UCefContentHttpImageRequestHandler
+{
+    GENERATED_BODY()
+
+public:
+    virtual bool HandleImageRequest_Implementation(
+        const FCefContentHttpImageRequestContext& InRequestContext,
+        FCefContentHttpImageResponse& OutResponse,
+        FString& OutError) override
+    {
+        // custom logic...
+        OutResponse.StatusCode = 200;
+        OutResponse.ContentType = TEXT("application/json");
+        const FString payload = TEXT("{\"ok\":true}");
+        FTCHARToUTF8 utf8(*payload);
+        OutResponse.Body.Append(reinterpret_cast<const uint8*>(utf8.Get()), utf8.Length());
+        return true;
+    }
+};
+```
+
+Assign handler class through subsystem:
+
+```cpp
+#include "Subsystems/CefContentHttpServerSubsystem.h"
+
+void UMyGameInstance::InitHttpHandler()
+{
+    if (UCefContentHttpServerSubsystem* subsystem = GetSubsystem<UCefContentHttpServerSubsystem>())
+    {
+        subsystem->SetRequestHandlerClass(UMyCustomImageHandler::StaticClass(), true);
+    }
+}
+```
+
+---
+
+## 12) Runtime Settings (Developer Settings)
 
 Project Settings includes `Cef Web UI` section:
 
@@ -224,7 +311,7 @@ Use these for diagnostics and host runtime tuning.
 
 ---
 
-## 12) Common Troubleshooting
+## 13) Common Troubleshooting
 
 ### Host not starting
 
@@ -251,7 +338,7 @@ Use these for diagnostics and host runtime tuning.
 
 ---
 
-## 13) Suggested First Integration Steps
+## 14) Suggested First Integration Steps
 
 1. Run minimal browser session in viewport.
 2. Load local simple HTML first (then remote URL).
