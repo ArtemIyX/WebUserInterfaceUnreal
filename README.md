@@ -1,6 +1,8 @@
 # CefWebUi Plugin
 
 CEF-powered Web UI + local WebSocket stack for Unreal Engine, with an external `Host.exe` renderer process.
+<img width="1280" height="720" alt="blueprints" src="https://github.com/user-attachments/assets/4343cb57-61c4-46dc-b007-44e4aad9597a" />
+
 
 ---
 
@@ -257,11 +259,14 @@ Use these for diagnostics and host runtime tuning.
 4. Add websocket server only after browser path is stable.
 5. Add protobuf envelope/dispatch routing last.
 
----
-
-## 14) Notes for New Team Members
+### Notes
 
 - Do not edit `ThirdParty` headers as part of plugin logic changes.
 - Keep host package in `Source/ThirdParty/Cef` consistent across machines.
 - If IPC structs/events are changed, UE and host must be updated together.
 
+---
+
+## License
+
+Project is licensed under [MIT](LICENSE)
