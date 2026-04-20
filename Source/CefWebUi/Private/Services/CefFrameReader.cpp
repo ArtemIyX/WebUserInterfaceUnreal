@@ -313,7 +313,17 @@ bool FCefFrameReader::PollSharedTexture(FCefSharedFrame& OutFrame)
 
 	if (LastDeliveredFrameId != 0 && OutFrame.FrameId <= LastDeliveredFrameId)
 	{
-		return false;
+		const bool bResizeReset = ((OutFrame.Flags & CefFrameFlag_Resized) != 0);
+		if (!bResizeReset)
+		{
+			return false;
+		}
+
+		UE_LOG(LogCefWebUi, Warning,
+			TEXT("FCefFrameReader: FrameId reset on resize (last=%llu new=%llu), accepting new sequence."),
+			static_cast<unsigned long long>(LastDeliveredFrameId),
+			static_cast<unsigned long long>(OutFrame.FrameId));
+		LastDeliveredFrameId = 0;
 	}
 	if (LastDeliveredFrameId != 0 && OutFrame.FrameId != (LastDeliveredFrameId + 1))
 	{

@@ -920,3 +920,20 @@ YYYY-MM-DD HH:MM
 - Resize behavior can now be validated with deterministic telemetry in runtime logs.
 
 ---
+## 2026-04-20 11:12
+
+### Changed
+- Resize follow-up fix: corrected resize scheduler gate to require both throttle and debounce windows before sending (`MaybeSendAutoResize`).
+- Input mapping fix: reworked browser coordinate conversion to use absolute geometry bounds after resize (`GetBrowserCoords`).
+- Frame continuity fix: accepted frame-id reset when resize flag is present (reader + surface), instead of dropping post-resize frames.
+- Resource refresh fix: when applied frame size changes, mark shared textures for reopen and reacquire handles on next poll.
+
+### Why
+- After window resize, browser image could freeze and pointer/input became stuck due to dropped reset sequences and stale shared texture bindings.
+
+### Impact
+- Post-resize rendering resumes from new frame sequence.
+- Shared texture resources are refreshed after size transitions.
+- Pointer/input mapping stays aligned with resized browser surface.
+
+---

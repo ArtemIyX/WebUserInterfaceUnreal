@@ -125,6 +125,7 @@ private:
 	mutable FTextureRHIRef SharedPopupTextureRHI;
 	mutable ID3D12Fence* SharedGpuFence = nullptr;
 	mutable bool bTriedOpenSharedGpuFence = false;
+	mutable bool bSharedTexturesReopenPending = false;
 	mutable TSharedPtr<FCefBrowserSurfaceDrawer, ESPMode::ThreadSafe> CustomDrawer;
 	mutable double LastConsumerFrameTimeSec = 0.0;
 	mutable double LastCadenceSentTimeSec = 0.0;

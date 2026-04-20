@@ -660,7 +660,17 @@ void SCefBrowserSurface::PollLatestFrame() const
 
 		if (LastSeenFrameId != 0 && frame.FrameId <= LastSeenFrameId)
 		{
-			return;
+			const bool bResizeReset = ((frame.Flags & CefFrameFlag_Resized) != 0);
+			if (!bResizeReset)
+			{
+				return;
+			}
+
+			UE_LOG(LogCefWebUiTelemetry, Warning,
+				TEXT("[CefAutoResize] frame id reset accepted last=%llu new=%llu"),
+				static_cast<unsigned long long>(LastSeenFrameId),
+				static_cast<unsigned long long>(frame.FrameId));
+			LastSeenFrameId = 0;
 		}
 
 		LastFrame = frame;
@@ -688,6 +698,17 @@ void SCefBrowserSurface::PollLatestFrame() const
 	}
 
 	HandleAppliedFrameSize(static_cast<int32>(LastFrame.Width), static_cast<int32>(LastFrame.Height));
+	if (bSharedTexturesReopenPending)
+	{
+		for (uint32 i = 0; i < MaxSharedSlots; ++i)
+		{
+			SharedTextureRHI[i] = nullptr;
+		}
+		SharedPopupTextureRHI = nullptr;
+		bSharedTexturesReopenPending = false;
+		UE_LOG(LogCefWebUiTelemetry, Log,
+			TEXT("[CefAutoResize] shared textures reopen requested"));
+	}
 
 	SharedSlotCount = FMath::Clamp(LastFrame.SlotCount, 1u, MaxSharedSlots);
 	EnsureSharedRhi();
@@ -996,7 +1017,7 @@ void SCefBrowserSurface::MaybeSendAutoResize(double inNowSec)
 		const bool bDebounceElapsed =
 			(LastAutoResizeObservedTimeSec <= 0.0) ||
 			((inNowSec - LastAutoResizeObservedTimeSec) >= CefWebUi::BrowserSurface::AutoResizeDebouncePeriodSec);
-		if (!bThrottleElapsed && !bDebounceElapsed)
+		if (!bThrottleElapsed || !bDebounceElapsed)
 		{
 			return;
 		}
@@ -1062,8 +1083,15 @@ void SCefBrowserSurface::HandleAppliedFrameSize(int32 inFrameWidth, int32 inFram
 		return;
 	}
 
+	const bool bSizeChanged =
+		(AppliedBrowserWidth != inFrameWidth) ||
+		(AppliedBrowserHeight != inFrameHeight);
 	AppliedBrowserWidth = inFrameWidth;
 	AppliedBrowserHeight = inFrameHeight;
+	if (bSizeChanged)
+	{
+		bSharedTexturesReopenPending = true;
+	}
 	if (bAwaitingAutoResizeApply &&
 		AppliedBrowserWidth == LastSentBrowserWidth &&
 		AppliedBrowserHeight == LastSentBrowserHeight)
@@ -1080,14 +1108,21 @@ void SCefBrowserSurface::HandleAppliedFrameSize(int32 inFrameWidth, int32 inFram
 
 void SCefBrowserSurface::GetBrowserCoords(const FGeometry& inGeometry, const FVector2D& inScreenPosition, int32& outX, int32& outY) const
 {
-	const FVector2D localPos = inGeometry.AbsoluteToLocal(inScreenPosition);
-	const FVector2D localSize = inGeometry.GetLocalSize();
-	const float width = FMath::Max(localSize.X, 1.0f);
-	const float height = FMath::Max(localSize.Y, 1.0f);
 	const int32 browserWidth = FMath::Max(1, AppliedBrowserWidth);
 	const int32 browserHeight = FMath::Max(1, AppliedBrowserHeight);
-	outX = FMath::Clamp(FMath::RoundToInt(localPos.X / width * browserWidth), 0, browserWidth - 1);
-	outY = FMath::Clamp(FMath::RoundToInt(localPos.Y / height * browserHeight), 0, browserHeight - 1);
+
+	const FVector2D absolutePos = inGeometry.GetAbsolutePosition();
+	const FVector2D absoluteSize = inGeometry.GetAbsoluteSize();
+	const float width = FMath::Max(absoluteSize.X, 1.0f);
+	const float height = FMath::Max(absoluteSize.Y, 1.0f);
+
+	float normalizedX = static_cast<float>((inScreenPosition.X - absolutePos.X) / width);
+	float normalizedY = static_cast<float>((inScreenPosition.Y - absolutePos.Y) / height);
+	normalizedX = FMath::Clamp(normalizedX, 0.0f, 1.0f);
+	normalizedY = FMath::Clamp(normalizedY, 0.0f, 1.0f);
+
+	outX = FMath::Clamp(FMath::RoundToInt(normalizedX * static_cast<float>(browserWidth - 1)), 0, browserWidth - 1);
+	outY = FMath::Clamp(FMath::RoundToInt(normalizedY * static_cast<float>(browserHeight - 1)), 0, browserHeight - 1);
 }
 
 bool SCefBrowserSurface::SlateButtonToCef(const FKey& inKey, ECefMouseButton& outButton)
