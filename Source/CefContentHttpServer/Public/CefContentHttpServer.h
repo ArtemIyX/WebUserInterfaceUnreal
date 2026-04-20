@@ -8,6 +8,14 @@ CEFCONTENTHTTPSERVER_API DECLARE_LOG_CATEGORY_EXTERN(LogCefContentHttpServer, Lo
 class FCefContentHttpServerModule : public IModuleInterface
 {
 public:
+	static FCefContentHttpServerModule& Get();
+	static bool IsAvailable();
+
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
+
+	class FCefContentImageCacheService* GetImageCacher() const;
+
+private:
+	TSharedPtr<class FCefContentImageCacheService> ImageCacher;
 };

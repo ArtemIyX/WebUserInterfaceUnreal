@@ -29,17 +29,3 @@ UCefContentHttpServerSubsystem* UCefContentHttpServerBPLibrary::GetCefContentHtt
 
 	return gameInstance->GetSubsystem<UCefContentHttpServerSubsystem>();
 }
-
-bool UCefContentHttpServerBPLibrary::InitDefaultImageCacher(const UObject* InWorldContextObject)
-{
-	UCefContentHttpServerSubsystem* const subsystem = GetCefContentHttpServerSubsystem(InWorldContextObject);
-	if (!subsystem)
-	{
-		UE_LOG(LogCefContentHttpServer, Error, TEXT("InitDefaultImageCacher failed: subsystem is null"));
-		return false;
-	}
-
-	subsystem->InitDefaultImageCacher();
-	UE_LOG(LogCefContentHttpServer, Log, TEXT("InitDefaultImageCacher succeeded"));
-	return true;
-}

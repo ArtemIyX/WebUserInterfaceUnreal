@@ -14,7 +14,4 @@ class CEFCONTENTHTTPSERVER_API UCefContentHttpServerBPLibrary : public UBlueprin
 public:
 	UFUNCTION(BlueprintCallable, Category = "CefContentHttpServer", meta = (WorldContext = "InWorldContextObject"))
 	static UCefContentHttpServerSubsystem* GetCefContentHttpServerSubsystem(const UObject* InWorldContextObject);
-
-	UFUNCTION(BlueprintCallable, Category = "CefContentHttpServer", meta = (WorldContext = "InWorldContextObject"))
-	static bool InitDefaultImageCacher(const UObject* InWorldContextObject);
 };
