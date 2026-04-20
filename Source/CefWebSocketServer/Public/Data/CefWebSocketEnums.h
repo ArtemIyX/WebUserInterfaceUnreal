@@ -9,6 +9,7 @@
 #include "CefWebSocketEnums.generated.h"
 
 UENUM(BlueprintType)
+/** @brief Type declaration. */
 enum class ECefWebSocketCreateResult : uint8
 {
 	Created = 0,
@@ -18,6 +19,7 @@ enum class ECefWebSocketCreateResult : uint8
 };
 
 UENUM(BlueprintType)
+/** @brief Type declaration. */
 enum class ECefWebSocketSendResult : uint8
 {
 	Ok = 0,
@@ -32,6 +34,7 @@ enum class ECefWebSocketSendResult : uint8
 };
 
 UENUM(BlueprintType)
+/** @brief Type declaration. */
 enum class ECefWebSocketErrorCode : uint8
 {
 	None = 0,
@@ -47,6 +50,7 @@ enum class ECefWebSocketErrorCode : uint8
 };
 
 UENUM(BlueprintType)
+/** @brief Type declaration. */
 enum class ECefWebSocketCloseReason : uint8
 {
 	ClientClosed = 0,
@@ -57,6 +61,7 @@ enum class ECefWebSocketCloseReason : uint8
 };
 
 UENUM(BlueprintType)
+/** @brief Type declaration. */
 enum class ECefWebSocketPayloadFormat : uint8
 {
 	Binary = 0,

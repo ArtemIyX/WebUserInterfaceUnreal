@@ -15,6 +15,7 @@ class UCefWebSocketServerBase;
 class UCefWebSocketClientBase;
 
 UCLASS()
+/** @brief Type declaration. */
 class CEFWEBSOCKETSERVER_API UCefWebSocketSubsystem : public UGameInstanceSubsystem
 {
 	GENERATED_BODY()
@@ -35,23 +36,29 @@ public:
 		UCefWebSocketServerBase*& OutServer);
 
 	UFUNCTION(BlueprintPure, Category = "CefWebSocket")
+	/** @brief GetServer API. */
 	UCefWebSocketServerBase* GetServer(FName InNameId) const;
 
 	UFUNCTION(BlueprintCallable, Category = "CefWebSocket")
+	/** @brief StopServer API. */
 	bool StopServer(FName InNameId);
 
 	UFUNCTION(BlueprintCallable, Category = "CefWebSocket")
+	/** @brief StopAllServers API. */
 	void StopAllServers();
 
 	UFUNCTION(BlueprintPure, Category = "CefWebSocket")
+	/** @brief GetAllServers API. */
 	TArray<UCefWebSocketServerBase*> GetAllServers() const;
 #pragma endregion
 
 private:
 #pragma region Internal
+	/** @brief TryResolvePort API. */
 	bool TryResolvePort(int32 InRequestedPort, int32& OutResolvedPort, bool& bOutAdjusted) const;
 
 	UPROPERTY(Transient)
+	/** @brief Servers state. */
 	TMap<FName, TObjectPtr<UCefWebSocketServerBase>> Servers;
 #pragma endregion
 };

@@ -8,9 +8,11 @@
 #include "Networking/ICefNetWebSocket.h"
 #include "Networking/CefWebSocketPrivate.h"
 
+/** @brief Type declaration. */
 class FCefNetWebSocket : public ICefNetWebSocket
 {
 public:
+	/** @brief FCefNetWebSocket API. */
 	FCefNetWebSocket(CefWebSocketInternalContext* InContext, CefWebSocketInternal* InWsi);
 	virtual ~FCefNetWebSocket() override;
 
@@ -27,24 +29,38 @@ public:
 	virtual FString RemoteEndPoint(bool bInAppendPort) override;
 	virtual FString LocalEndPoint(bool bInAppendPort) override;
 
+	/** @brief OnReceive API. */
 	void OnReceive(void* InData, uint32 InSize, bool bInIsBinary);
+	/** @brief OnRawWebSocketWritable API. */
 	void OnRawWebSocketWritable(CefWebSocketInternal* InWsi);
+	/** @brief OnClose API. */
 	void OnClose();
 
 private:
+	/** @brief FlushInternal API. */
 	void FlushInternal();
 
 public:
+	/** @brief ReceivedCallback state. */
 	FCefNetWebSocketPacketReceivedCallback ReceivedCallback;
+	/** @brief ConnectedCallBack state. */
 	FCefNetWebSocketInfoCallback ConnectedCallBack;
+	/** @brief ErrorCallBack state. */
 	FCefNetWebSocketInfoCallback ErrorCallBack;
+	/** @brief SocketClosedCallback state. */
 	FCefNetWebSocketInfoCallback SocketClosedCallback;
 
+	/** @brief OutgoingBuffer state. */
 	TArray<TArray<uint8>> OutgoingBuffer;
+	/** @brief OutgoingLock state. */
 	FCriticalSection OutgoingLock;
+	/** @brief Context state. */
 	CefWebSocketInternalContext* Context = nullptr;
+	/** @brief Wsi state. */
 	CefWebSocketInternal* Wsi = nullptr;
+	/** @brief RemoteIp state. */
 	FString RemoteIp;
+	/** @brief RemotePort state. */
 	int32 RemotePort = 0;
 };
 

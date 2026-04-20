@@ -7,6 +7,7 @@
 
 #include "CoreMinimal.h"
 
+/** @brief Type declaration. */
 enum class ECefProtoEncodeResult : uint8
 {
 	Ok = 0,
@@ -15,6 +16,7 @@ enum class ECefProtoEncodeResult : uint8
 	SerializeFailed,
 };
 
+/** @brief Type declaration. */
 enum class ECefProtoDecodeResult : uint8
 {
 	Ok = 0,
@@ -23,12 +25,18 @@ enum class ECefProtoDecodeResult : uint8
 	ParseFailed,
 };
 
+/** @brief Type declaration. */
 struct CEFPROTOBUF_API FCefWsEnvelope
 {
+	/** @brief MessageType state. */
 	uint32 MessageType = 0;
+	/** @brief SchemaVersion state. */
 	uint16 SchemaVersion = 1;
+	/** @brief Flags state. */
 	uint16 Flags = 0;
+	/** @brief RequestId state. */
 	uint64 RequestId = 0;
+	/** @brief Payload state. */
 	TArray<uint8> Payload;
 };
 

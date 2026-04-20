@@ -16,6 +16,7 @@
  * 
  */
 UCLASS()
+/** @brief Type declaration. */
 class CEFWEBUI_API UWBP_RenderTest : public UUserWidget
 {
 	GENERATED_BODY()
@@ -29,6 +30,7 @@ public:
 
 protected:
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidget), Category="Display")
+	/** @brief DisplayImage state. */
 	TObjectPtr<class UImage> DisplayImage;
 };
 

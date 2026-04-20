@@ -9,6 +9,7 @@
 #include "Networking/ICefWebSocketServerBackend.h"
 #include "Networking/CefWebSocketPrivate.h"
 
+/** @brief Type declaration. */
 class FCefWebSocketServerBackend : public ICefWebSocketServerBackend
 {
 public:
@@ -20,12 +21,17 @@ public:
 	virtual FString Info() const override;
 	virtual uint32 GetServerPort() const override { return ServerPort; }
 
+	/** @brief ConnectedCallback state. */
 	FCefNetWebSocketClientConnectedCallback ConnectedCallback;
+	/** @brief DisconnectedCallback state. */
 	FCefNetWebSocketClientDisconnectedCallback DisconnectedCallback;
+	/** @brief Context state. */
 	CefWebSocketInternalContext* Context = nullptr;
+	/** @brief Protocols state. */
 	CefWebSocketInternalProtocol* Protocols = nullptr;
 
 private:
+	/** @brief ServerPort state. */
 	uint32 ServerPort = 0;
 };
 

@@ -11,6 +11,7 @@
 #include "CefControlEventType.generated.h"
 
 UENUM(Blueprintable, BlueprintType)
+/** @brief Type declaration. */
 enum class ECefControlEventType : uint8
 {
 	GoBack = 0,

@@ -11,6 +11,7 @@
 #include "Protocol/CefWsCodec.h"
 #include "Protocol/CefWsEnvelope.h"
 
+/** @brief Type declaration. */
 class FCefProtobufModule : public IModuleInterface
 {
 public:

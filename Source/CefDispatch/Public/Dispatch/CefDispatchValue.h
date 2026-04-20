@@ -8,8 +8,10 @@
 #include "CoreMinimal.h"
 #include <type_traits>
 
+/** @brief Type declaration. */
 struct FCefDispatchTypeId
 {
+	/** @brief Value state. */
 	const void* Value = nullptr;
 
 	bool IsValid() const
@@ -30,21 +32,27 @@ struct FCefDispatchTypeId
 	template <typename T>
 	static FCefDispatchTypeId Of()
 	{
+		/** @brief token state. */
 		static const uint8 token = 0;
+		/** @brief outTypeId state. */
 		FCefDispatchTypeId outTypeId;
+		/** @brief Value state. */
 		outTypeId.Value = &token;
 		return outTypeId;
 	}
 };
 
+/** @brief Type declaration. */
 class CEFDISPATCH_API ICefDispatchValue
 {
 public:
 	virtual ~ICefDispatchValue() = default;
+	/** @brief GetTypeId API. */
 	virtual FCefDispatchTypeId GetTypeId() const = 0;
 };
 
 template <typename T>
+/** @brief Type declaration. */
 class TCefDispatchValue final : public ICefDispatchValue
 {
 public:
@@ -74,6 +82,7 @@ public:
 	}
 
 private:
+	/** @brief Value state. */
 	T Value;
 };
 

@@ -12,6 +12,7 @@
 #include "CefCustomCursorType.generated.h"
 
 UENUM(Blueprintable, BlueprintType)
+/** @brief Type declaration. */
 enum class ECefCustomCursorType : uint8
 {
 	CT_POINTER,

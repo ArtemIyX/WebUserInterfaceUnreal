@@ -15,11 +15,13 @@ class UCefWebUiBrowserSession;
 #pragma endregion
 
 UCLASS(BlueprintType)
+/** @brief Type declaration. */
 class CEFWEBUI_API UCefWebUiGameInstanceSubsystem : public UGameInstanceSubsystem
 {
 	GENERATED_BODY()
 
 public:
+	/** @brief UCefWebUiGameInstanceSubsystem API. */
 	UCefWebUiGameInstanceSubsystem();
 public:
 #pragma region Lifecycle
@@ -39,6 +41,7 @@ public:
 
 	void DestroySession()
 	{
+		/** @brief DestroySession API. */
 		DestroySession(NAME_None);
 	}
 
@@ -48,11 +51,13 @@ public:
 		int32 InBrowserWidth = 1920,
 		int32 InBrowserHeight = 1080)
 	{
+		/** @brief ShowSessionInViewport API. */
 		ShowSessionInViewport(NAME_None, InPlayerController, InZOrder, InBrowserWidth, InBrowserHeight);
 	}
 
 	void HideSessionFromViewport()
 	{
+		/** @brief HideSessionFromViewport API. */
 		HideSessionFromViewport(NAME_None);
 	}
 #pragma endregion
@@ -64,9 +69,11 @@ public:
 		TSubclassOf<UCefWebUiBrowserSession> InSessionClass = nullptr);
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
+	/** @brief GetSession API. */
 	UCefWebUiBrowserSession* GetSession(FName InSessionId) const;
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
+	/** @brief DestroySession API. */
 	void DestroySession(FName InSessionId);
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
@@ -78,6 +85,7 @@ public:
 		int32 InBrowserHeight);
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
+	/** @brief HideSessionFromViewport API. */
 	void HideSessionFromViewport(FName InSessionId);
 #pragma endregion
 
@@ -86,18 +94,22 @@ public:
 	TSubclassOf<UCefWebUiBrowserSession> GetDefaultSessionClass() const { return DefaultSessionClass; }
 
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
+	/** @brief SetDefaultSessionClass API. */
 	void SetDefaultSessionClass(TSubclassOf<UCefWebUiBrowserSession> InSessionClass);
 #pragma endregion
 
 private:
+	/** @brief NormalizeSessionId API. */
 	FName NormalizeSessionId(FName InSessionId) const;
 
 private:
 #pragma region State
 	UPROPERTY(EditAnywhere, Category="CefWebUi")
+	/** @brief DefaultSessionClass state. */
 	TSubclassOf<UCefWebUiBrowserSession> DefaultSessionClass;
 
 	UPROPERTY(Transient)
+	/** @brief Sessions state. */
 	TMap<FName, TObjectPtr<UCefWebUiBrowserSession>> Sessions;
 #pragma endregion
 };

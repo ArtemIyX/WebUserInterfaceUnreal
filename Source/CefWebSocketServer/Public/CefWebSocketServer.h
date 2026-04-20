@@ -8,6 +8,7 @@
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
 
+/** @brief Type declaration. */
 class FCefWebSocketServerModule : public IModuleInterface
 {
 public:
@@ -18,6 +19,7 @@ public:
 
 private:
 #pragma region InternalState
+	/** @brief DebugCommands state. */
 	TUniquePtr<class FCefWebSocketDebugCommands> DebugCommands;
 #pragma endregion
 };

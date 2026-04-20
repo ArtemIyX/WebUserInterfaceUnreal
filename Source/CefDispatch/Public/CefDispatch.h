@@ -11,10 +11,13 @@
 #include "Dispatch/CefDispatchRegistration.h"
 #include "Dispatch/CefDispatchValue.h"
 
+/** @brief Type declaration. */
 class FCefDispatchModule : public IModuleInterface
 {
 public:
+	/** @brief Get API. */
 	static FCefDispatchModule& Get();
+	/** @brief IsAvailable API. */
 	static bool IsAvailable();
 
 	virtual void StartupModule() override;
@@ -22,9 +25,11 @@ public:
 
 	TSharedPtr<class FCefDispatchRegistry> GetRegistry() const { return Registry; }
 	static void RegisterDeferredFactory(uint32 InMessageType, FCefDispatchRegistry::FCefDispatchFactory InFactory,
+	                                    /** @brief Function API. */
 	                                    bool bInAllowReplace = false);
 
 private:
+	/** @brief Registry state. */
 	TSharedPtr<class FCefDispatchRegistry> Registry;
 };
 

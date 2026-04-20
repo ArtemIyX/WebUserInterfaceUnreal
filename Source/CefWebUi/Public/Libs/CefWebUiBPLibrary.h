@@ -18,6 +18,7 @@ class UCefWebUiGameInstanceSubsystem;
 #pragma endregion
 
 UCLASS()
+/** @brief Type declaration. */
 class CEFWEBUI_API UCefWebUiBPLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
@@ -28,11 +29,13 @@ public:
 	 * @brief Returns absolute path to Host.exe.
 	 */
 	UFUNCTION(BlueprintCallable, Category="CefWebUi")
+	/** @brief GetHostExePath API. */
 	static FString GetHostExePath();
 #pragma endregion
 
 #pragma region Subsystem
 	UFUNCTION(BlueprintCallable, Category="CefWebUi", meta=(WorldContext="WorldContextObject"))
+	/** @brief GetCefWebUiSubsystem API. */
 	static UCefWebUiGameInstanceSubsystem* GetCefWebUiSubsystem(const UObject* InWorldContextObject);
 #pragma endregion
 

@@ -8,14 +8,20 @@
 #pragma once
 
 #include "Modules/ModuleManager.h"
+/** @brief DECLARE_LOG_CATEGORY_EXTERN API. */
 CEFWEBUI_API DECLARE_LOG_CATEGORY_EXTERN(LogCefWebUi, Log, All);
+/** @brief DECLARE_LOG_CATEGORY_EXTERN API. */
 CEFWEBUI_API DECLARE_LOG_CATEGORY_EXTERN(LogCefWebUiTelemetry, Log, All);
+/** @brief DECLARE_LOG_CATEGORY_EXTERN API. */
 CEFWEBUI_API DECLARE_LOG_CATEGORY_EXTERN(LogCefWebUiJsConsole, Log, All);
 
+/** @brief Type declaration. */
 class FCefWebUiModule : public IModuleInterface
 {
 public:
+	/** @brief Get API. */
 	static FCefWebUiModule& Get();
+	/** @brief IsAvailable API. */
 	static bool IsAvailable();
 
 	virtual void StartupModule() override;

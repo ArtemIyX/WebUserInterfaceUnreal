@@ -9,6 +9,7 @@
 #include "CefConsoleLogLevel.generated.h"
 
 UENUM(BlueprintType)
+/** @brief Type declaration. */
 enum class ECefConsoleLogLevel : uint8
 {
 	Log = 0,

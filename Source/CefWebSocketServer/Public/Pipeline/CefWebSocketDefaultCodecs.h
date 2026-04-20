@@ -8,6 +8,7 @@
 #include "CoreMinimal.h"
 #include "Pipeline/ICefWebSocketPacketCodec.h"
 
+/** @brief Type declaration. */
 class CEFWEBSOCKETSERVER_API FCefWebSocketBinaryPassthroughCodec : public ICefWebSocketPacketCodec
 {
 public:
@@ -16,6 +17,7 @@ public:
 	virtual ECefWebSocketPayloadFormat GetPayloadFormat() const override { return ECefWebSocketPayloadFormat::Binary; }
 };
 
+/** @brief Type declaration. */
 class CEFWEBSOCKETSERVER_API FCefWebSocketUtf8StringCodec : public ICefWebSocketPacketCodec
 {
 public:
@@ -29,6 +31,7 @@ public:
 	virtual ECefWebSocketPayloadFormat GetPayloadFormat() const override { return PayloadFormat; }
 
 private:
+	/** @brief PayloadFormat state. */
 	ECefWebSocketPayloadFormat PayloadFormat = ECefWebSocketPayloadFormat::Utf8String;
 };
 

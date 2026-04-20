@@ -9,10 +9,12 @@
 
 class FCefWebSocketServerInstance;
 
+/** @brief Type declaration. */
 class FCefWebSocketReadRunnable : public FRunnable
 {
 public:
 #pragma region Lifecycle
+	/** @brief FCefWebSocketReadRunnable API. */
 	explicit FCefWebSocketReadRunnable(FCefWebSocketServerInstance* InOwner);
 	virtual ~FCefWebSocketReadRunnable() override = default;
 #pragma endregion
@@ -24,7 +26,9 @@ public:
 
 private:
 #pragma region InternalState
+	/** @brief Owner state. */
 	FCefWebSocketServerInstance* Owner = nullptr;
+	/** @brief bStopRequested state. */
 	TAtomic<bool> bStopRequested = false;
 #pragma endregion
 };

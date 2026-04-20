@@ -10,6 +10,7 @@
 #include "CoreMinimal.h"
 
 UENUM(BlueprintType, Blueprintable)
+/** @brief Type declaration. */
 enum class ECefLoadState : uint8
 {
 	Idle = 0,

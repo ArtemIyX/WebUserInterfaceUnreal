@@ -8,10 +8,12 @@
 #include "CoreMinimal.h"
 #include "Dispatch/CefDispatchRegistry.h"
 
+/** @brief Type declaration. */
 class CEFDISPATCH_API FCefDispatchFactoryRegistrar
 {
 public:
 	FCefDispatchFactoryRegistrar(uint32 InMessageType, FCefDispatchRegistry::FCefDispatchFactory InFactory,
+	                             /** @brief Function API. */
 	                             bool bInAllowReplace = false);
 };
 

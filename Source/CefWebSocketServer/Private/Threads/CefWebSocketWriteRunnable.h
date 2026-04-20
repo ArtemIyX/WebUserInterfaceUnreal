@@ -10,10 +10,12 @@
 class FCefWebSocketServerInstance;
 class FEvent;
 
+/** @brief Type declaration. */
 class FCefWebSocketWriteRunnable : public FRunnable
 {
 public:
 #pragma region Lifecycle
+	/** @brief FCefWebSocketWriteRunnable API. */
 	FCefWebSocketWriteRunnable(FCefWebSocketServerInstance* InOwner, FEvent* InWakeEvent);
 	virtual ~FCefWebSocketWriteRunnable() override = default;
 #pragma endregion
@@ -25,8 +27,11 @@ public:
 
 private:
 #pragma region InternalState
+	/** @brief Owner state. */
 	FCefWebSocketServerInstance* Owner = nullptr;
+	/** @brief WakeEvent state. */
 	FEvent* WakeEvent = nullptr;
+	/** @brief bStopRequested state. */
 	TAtomic<bool> bStopRequested = false;
 #pragma endregion
 };

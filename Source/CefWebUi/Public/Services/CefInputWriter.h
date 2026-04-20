@@ -15,6 +15,7 @@ namespace Windows
 }
 
 // Mirror of SharedMemoryLayout.h — keep in sync with CEF side.
+/** @brief Type declaration. */
 enum class ECefInputEventType : uint8
 {
 	MouseMove = 0,
@@ -26,6 +27,7 @@ enum class ECefInputEventType : uint8
 	KeyChar = 6,
 };
 
+/** @brief Type declaration. */
 enum class ECefMouseButton : uint8
 {
 	Left = 0,
@@ -33,10 +35,13 @@ enum class ECefMouseButton : uint8
 	Right = 2,
 };
 
+/** @brief Type declaration. */
 class CEFWEBUI_API FCefInputWriter
 {
 public:
+	/** @brief FCefInputWriter API. */
 	FCefInputWriter();
+	/** @brief FCefInputWriter API. */
 	virtual ~FCefInputWriter();
 
 	/**
@@ -60,6 +65,7 @@ public:
 	 * @param InX X position in browser pixels.
 	 * @param InY Y position in browser pixels.
 	 */
+	/** @brief WriteMouseMove API. */
 	void WriteMouseMove(int32 InX, int32 InY);
 
 	/**
@@ -69,6 +75,7 @@ public:
 	 * @param InButton Mouse button.
 	 * @param bInIsUp True for release, false for press.
 	 */
+	/** @brief WriteMouseButton API. */
 	void WriteMouseButton(int32 InX, int32 InY, ECefMouseButton InButton, bool bInIsUp);
 
 	/**
@@ -78,6 +85,7 @@ public:
 	 * @param InDeltaX Horizontal scroll delta.
 	 * @param InDeltaY Vertical scroll delta.
 	 */
+	/** @brief WriteMouseScroll API. */
 	void WriteMouseScroll(int32 InX, int32 InY, float InDeltaX, float InDeltaY);
 
 	/**
@@ -86,6 +94,7 @@ public:
 	 * @param InModifiers CEF modifier flags.
 	 * @param bInIsDown True for key down, false for key up.
 	 */
+	/** @brief WriteKey API. */
 	void WriteKey(uint32 InWindowsKeyCode, uint32 InModifiers, bool bInIsDown);
 
 	/**
@@ -100,13 +109,19 @@ public:
 	struct FCefInputEvent;
 
 private:
+	/** @brief WriteEvent API. */
 	void WriteEvent(const FCefInputEvent& InEvent);
+	/** @brief CloseHandles API. */
 	void CloseHandles();
 
+	/** @brief HMap state. */
 	Windows::HANDLE HMap = nullptr;
+	/** @brief HEvent state. */
 	Windows::HANDLE HEvent = nullptr;
+	/** @brief PData state. */
 	void* PData = nullptr;
 
+	/** @brief WriteLock state. */
 	FCriticalSection WriteLock;
 };
 

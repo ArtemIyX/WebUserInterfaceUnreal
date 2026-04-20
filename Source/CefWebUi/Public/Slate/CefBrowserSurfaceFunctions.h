@@ -11,7 +11,9 @@
 
 namespace CefWebUi::BrowserSurface
 {
+/** @brief BuildCefKeyModifiers API. */
 uint32 BuildCefKeyModifiers(const FKeyEvent& InKeyEvent);
+/** @brief MakeIntersection API. */
 FIntRect MakeIntersection(const FIntRect& InA, const FIntRect& InB);
 void AddCefSlateBlitPass(
 	FRDGBuilder& OutGraphBuilder,
