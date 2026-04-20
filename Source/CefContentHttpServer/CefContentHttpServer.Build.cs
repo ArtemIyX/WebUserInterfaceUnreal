@@ -10,14 +10,14 @@ public class CefContentHttpServer : ModuleRules
             new string[]
             {
                 "Core",
+                "CoreUObject",
+                "Engine",
             }
         );
 
         PrivateDependencyModuleNames.AddRange(
             new string[]
             {
-                "CoreUObject",
-                "Engine",
                 "Slate",
                 "SlateCore"
             }
