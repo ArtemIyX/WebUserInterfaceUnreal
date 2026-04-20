@@ -905,3 +905,18 @@ YYYY-MM-DD HH:MM
 - Resize flow is now detect -> send -> await apply -> retry(if needed).
 
 ---
+## 2026-04-20 10:29
+
+### Changed
+- Resize Task 4/4: added resize-flow telemetry and guarded failure logging.
+- Added log points for detect/send/retry/applied states (LogCefWebUiTelemetry).
+- Added one-shot apply-timeout warning after retry budget is exhausted.
+- Added failure-log reset on successful applied confirmation.
+
+### Why
+- Make resize state transitions debuggable and avoid silent regressions.
+
+### Impact
+- Resize behavior can now be validated with deterministic telemetry in runtime logs.
+
+---

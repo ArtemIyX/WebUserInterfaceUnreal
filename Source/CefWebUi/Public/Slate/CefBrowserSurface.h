@@ -107,6 +107,7 @@ private:
 	bool bAutoResizePending = false;
 	mutable bool bAwaitingAutoResizeApply = false;
 	mutable int32 AutoResizeRetryCount = 0;
+	mutable bool bAutoResizeFailureLogged = false;
 	double LastAutoResizeObservedTimeSec = 0.0;
 	double LastAutoResizeSentTimeSec = 0.0;
 	mutable double LastAutoResizeAwaitStartTimeSec = 0.0;

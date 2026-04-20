@@ -120,6 +120,7 @@ void SCefBrowserSurface::Construct(const FArguments& inArgs)
 	bAutoResizePending = false;
 	bAwaitingAutoResizeApply = false;
 	AutoResizeRetryCount = 0;
+	bAutoResizeFailureLogged = false;
 	LastAutoResizeObservedTimeSec = 0.0;
 	LastAutoResizeSentTimeSec = 0.0;
 	LastAutoResizeAwaitStartTimeSec = 0.0;
@@ -174,6 +175,7 @@ void SCefBrowserSurface::SetBrowserSize(int32 inBrowserWidth, int32 inBrowserHei
 	bAutoResizePending = false;
 	bAwaitingAutoResizeApply = false;
 	AutoResizeRetryCount = 0;
+	bAutoResizeFailureLogged = false;
 	LastAutoResizeObservedTimeSec = 0.0;
 	LastAutoResizeSentTimeSec = 0.0;
 	LastAutoResizeAwaitStartTimeSec = 0.0;
@@ -959,6 +961,10 @@ void SCefBrowserSurface::MaybeQueueAutoResize(const FGeometry& inAllottedGeometr
 	bAutoResizePending = true;
 	bAwaitingAutoResizeApply = false;
 	AutoResizeRetryCount = 0;
+	bAutoResizeFailureLogged = false;
+	UE_LOG(LogCefWebUiTelemetry, Log,
+		TEXT("[CefAutoResize] detect target=%dx%d"),
+		TargetBrowserWidth, TargetBrowserHeight);
 }
 
 void SCefBrowserSurface::MaybeSendAutoResize(double inNowSec)
@@ -1004,6 +1010,9 @@ void SCefBrowserSurface::MaybeSendAutoResize(double inNowSec)
 		LastAutoResizeAwaitStartTimeSec = inNowSec;
 		bAutoResizePending = false;
 		bAwaitingAutoResizeApply = true;
+		UE_LOG(LogCefWebUiTelemetry, Log,
+			TEXT("[CefAutoResize] send target=%dx%d"),
+			LastSentBrowserWidth, LastSentBrowserHeight);
 		return;
 	}
 
@@ -1024,6 +1033,13 @@ void SCefBrowserSurface::MaybeSendAutoResize(double inNowSec)
 	}
 	if (AutoResizeRetryCount >= CefWebUi::BrowserSurface::AutoResizeMaxRetries)
 	{
+		if (!bAutoResizeFailureLogged)
+		{
+			bAutoResizeFailureLogged = true;
+			UE_LOG(LogCefWebUiTelemetry, Warning,
+				TEXT("[CefAutoResize] apply timeout target=%dx%d retries=%d"),
+				LastSentBrowserWidth, LastSentBrowserHeight, AutoResizeRetryCount);
+		}
 		return;
 	}
 
@@ -1033,6 +1049,9 @@ void SCefBrowserSurface::MaybeSendAutoResize(double inNowSec)
 	LastAutoResizeSentTimeSec = inNowSec;
 	LastAutoResizeAwaitStartTimeSec = inNowSec;
 	++AutoResizeRetryCount;
+	UE_LOG(LogCefWebUiTelemetry, Warning,
+		TEXT("[CefAutoResize] retry target=%dx%d retry=%d"),
+		LastSentBrowserWidth, LastSentBrowserHeight, AutoResizeRetryCount);
 }
 
 void SCefBrowserSurface::HandleAppliedFrameSize(int32 inFrameWidth, int32 inFrameHeight) const
@@ -1051,7 +1070,11 @@ void SCefBrowserSurface::HandleAppliedFrameSize(int32 inFrameWidth, int32 inFram
 	{
 		bAwaitingAutoResizeApply = false;
 		AutoResizeRetryCount = 0;
+		bAutoResizeFailureLogged = false;
 		LastAutoResizeAwaitStartTimeSec = 0.0;
+		UE_LOG(LogCefWebUiTelemetry, Log,
+			TEXT("[CefAutoResize] applied=%dx%d"),
+			AppliedBrowserWidth, AppliedBrowserHeight);
 	}
 }
 
