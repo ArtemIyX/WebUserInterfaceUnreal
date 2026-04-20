@@ -1,3 +1,7 @@
+/**
+ * @file CefContentHttpServer/Private/CefContentHttpServer.cpp
+ * @brief Module lifecycle and service creation/destruction.
+ */
 #include "CefContentHttpServer.h"
 
 #include "Services/CefContentImageCacheService.h"

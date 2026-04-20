@@ -1,3 +1,7 @@
+/**
+ * @file CefContentHttpServer/Private/Services/CefContentImageEncodeService.cpp
+ * @brief Texture to PNG byte encoding implementation.
+ */
 #include "Services/CefContentImageEncodeService.h"
 
 #include "CefContentHttpServer.h"

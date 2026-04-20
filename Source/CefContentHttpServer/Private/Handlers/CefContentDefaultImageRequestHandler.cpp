@@ -1,3 +1,7 @@
+/**
+ * @file CefContentHttpServer/Private/Handlers/CefContentDefaultImageRequestHandler.cpp
+ * @brief Default handler implementation using module services.
+ */
 #include "Handlers/CefContentDefaultImageRequestHandler.h"
 
 #include "CefContentHttpServer.h"

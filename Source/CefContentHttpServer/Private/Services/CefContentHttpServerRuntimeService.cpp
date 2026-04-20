@@ -1,3 +1,7 @@
+/**
+ * @file CefContentHttpServer/Private/Services/CefContentHttpServerRuntimeService.cpp
+ * @brief HTTP listener and /img route dispatch implementation.
+ */
 #include "Services/CefContentHttpServerRuntimeService.h"
 
 #include "CefContentHttpServer.h"

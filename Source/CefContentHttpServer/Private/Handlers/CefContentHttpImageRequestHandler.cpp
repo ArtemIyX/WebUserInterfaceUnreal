@@ -1,3 +1,7 @@
+/**
+ * @file CefContentHttpServer/Private/Handlers/CefContentHttpImageRequestHandler.cpp
+ * @brief Base handler default implementation.
+ */
 #include "Handlers/CefContentHttpImageRequestHandler.h"
 
 bool UCefContentHttpImageRequestHandler::HandleImageRequest_Implementation(const FCefContentHttpImageRequestContext& InRequestContext, FCefContentHttpImageResponse& OutResponse, FString& OutError)

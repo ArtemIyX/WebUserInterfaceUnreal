@@ -1,9 +1,14 @@
+/**
+ * @file CefContentHttpServer/Public/Handlers/CefContentHttpImageRequestHandler.h
+ * @brief Base request handler types for /img route processing.
+ */
 #pragma once
 
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
 #include "CefContentHttpImageRequestHandler.generated.h"
 
+/** @brief Input payload used by image request handlers. */
 USTRUCT(BlueprintType)
 struct CEFCONTENTHTTPSERVER_API FCefContentHttpImageRequestContext
 {
@@ -19,6 +24,7 @@ struct CEFCONTENTHTTPSERVER_API FCefContentHttpImageRequestContext
 	TMap<FString, FString> QueryParams;
 };
 
+/** @brief Output payload produced by image request handlers. */
 USTRUCT(BlueprintType)
 struct CEFCONTENTHTTPSERVER_API FCefContentHttpImageResponse
 {
@@ -34,12 +40,20 @@ struct CEFCONTENTHTTPSERVER_API FCefContentHttpImageResponse
 	TArray<uint8> Body;
 };
 
-UCLASS(Abstract, Blueprintable, BlueprintType, DisplayName="Image Handler (Abstract)")
+/** @brief Pluggable image request handler contract. */
+UCLASS(Abstract, Blueprintable, BlueprintType, DisplayName = "Image Handler (Abstract)")
 class CEFCONTENTHTTPSERVER_API UCefContentHttpImageRequestHandler : public UObject
 {
 	GENERATED_BODY()
 
 public:
+	/**
+	 * @brief Handles /img request.
+	 * @param InRequestContext Parsed request data.
+	 * @param OutResponse Response payload.
+	 * @param OutError Error text for failed handling.
+	 * @return True when request is handled successfully.
+	 */
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	bool HandleImageRequest(const FCefContentHttpImageRequestContext& InRequestContext, FCefContentHttpImageResponse& OutResponse, FString& OutError);
 };

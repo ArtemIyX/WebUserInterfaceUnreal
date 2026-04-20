@@ -1,3 +1,7 @@
+/**
+ * @file CefContentHttpServer/Private/Services/CefContentImageCacheService.cpp
+ * @brief Image cache load/lookup/clear implementation.
+ */
 #include "Services/CefContentImageCacheService.h"
 
 #include "CefContentHttpServer.h"

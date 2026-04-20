@@ -1,3 +1,7 @@
+/**
+ * @file CefContentHttpServer/Private/Stats/CefContentHttpServerStats.h
+ * @brief Runtime stats declarations for content HTTP server module.
+ */
 #pragma once
 
 #include "Stats/Stats.h"

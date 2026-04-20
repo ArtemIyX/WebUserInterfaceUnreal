@@ -1,3 +1,7 @@
+/**
+ * @file CefContentHttpServer/Private/Subsystems/CefContentHttpServerSubsystem.cpp
+ * @brief Subsystem lifecycle and module-service forwarding.
+ */
 #include "Subsystems/CefContentHttpServerSubsystem.h"
 
 #include "CefContentHttpServer.h"
@@ -8,7 +12,6 @@
 
 UCefContentHttpServerSubsystem::UCefContentHttpServerSubsystem()
 {
-	
 }
 
 void UCefContentHttpServerSubsystem::Initialize(FSubsystemCollectionBase& InCollection)

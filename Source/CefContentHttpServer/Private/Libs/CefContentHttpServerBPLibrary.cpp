@@ -1,3 +1,7 @@
+/**
+ * @file CefContentHttpServer/Private/Libs/CefContentHttpServerBPLibrary.cpp
+ * @brief Blueprint helper implementation.
+ */
 #include "Libs/CefContentHttpServerBPLibrary.h"
 
 #include "CefContentHttpServer.h"
