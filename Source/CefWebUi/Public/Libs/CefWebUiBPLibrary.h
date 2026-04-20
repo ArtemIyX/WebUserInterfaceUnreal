@@ -1,3 +1,8 @@
+﻿/**
+ * @file CefWebUi\Public\Libs\CefWebUiBPLibrary.h
+ * @brief Declares CefWebUiBPLibrary for module CefWebUi\Public\Libs\CefWebUiBPLibrary.h.
+ * @details Contains types and APIs used by the plugin runtime and gameplay-facing systems.
+ */
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
@@ -61,3 +66,4 @@ public:
 		FName InSessionId);
 #pragma endregion
 };
+

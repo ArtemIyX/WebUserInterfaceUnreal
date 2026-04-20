@@ -1,4 +1,9 @@
-﻿#pragma once
+﻿/**
+ * @file CefDispatch\Public\CefDispatch.h
+ * @brief Declares CefDispatch for module CefDispatch\Public\CefDispatch.h.
+ * @details Contains dispatch registry and value plumbing used by the plugin runtime and gameplay-facing systems.
+ */
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
@@ -22,3 +27,4 @@ public:
 private:
 	TSharedPtr<class FCefDispatchRegistry> Registry;
 };
+

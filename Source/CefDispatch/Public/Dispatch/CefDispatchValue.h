@@ -1,3 +1,8 @@
+﻿/**
+ * @file CefDispatch\Public\Dispatch\CefDispatchValue.h
+ * @brief Declares CefDispatchValue for module CefDispatch\Public\Dispatch\CefDispatchValue.h.
+ * @details Contains dispatch registry and value plumbing used by the plugin runtime and gameplay-facing systems.
+ */
 #pragma once
 
 #include "CoreMinimal.h"
@@ -98,3 +103,4 @@ TUniquePtr<ICefDispatchValue> MakeCefDispatchValue(T&& InValue)
 	using FValueType = std::decay_t<T>;
 	return MakeUnique<TCefDispatchValue<FValueType>>(Forward<T>(InValue));
 }
+

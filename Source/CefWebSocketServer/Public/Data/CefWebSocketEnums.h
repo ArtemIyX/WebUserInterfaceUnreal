@@ -1,4 +1,9 @@
-﻿#pragma once
+﻿/**
+ * @file CefWebSocketServer\Public\Data\CefWebSocketEnums.h
+ * @brief Declares CefWebSocketEnums for module CefWebSocketServer\Public\Data\CefWebSocketEnums.h.
+ * @details Contains websocket server components used by the plugin runtime and gameplay-facing systems.
+ */
+#pragma once
 
 #include "CoreMinimal.h"
 #include "CefWebSocketEnums.generated.h"
@@ -60,3 +65,4 @@ enum class ECefWebSocketPayloadFormat : uint8
 	XmlString = 3,
 	Custom = 4
 };
+

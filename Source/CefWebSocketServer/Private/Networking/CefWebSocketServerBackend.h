@@ -1,4 +1,9 @@
-﻿#pragma once
+﻿/**
+ * @file CefWebSocketServer\Private\Networking\CefWebSocketServerBackend.h
+ * @brief Declares CefWebSocketServerBackend for module CefWebSocketServer\Private\Networking\CefWebSocketServerBackend.h.
+ * @details Contains websocket server components used by the plugin runtime and gameplay-facing systems.
+ */
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Networking/ICefWebSocketServerBackend.h"
@@ -23,3 +28,4 @@ public:
 private:
 	uint32 ServerPort = 0;
 };
+

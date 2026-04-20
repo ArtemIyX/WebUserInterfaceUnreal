@@ -1,4 +1,9 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+﻿/**
+ * @file CefWebUi\Public\Services\CefFrameReader.h
+ * @brief Declares CefFrameReader for module CefWebUi\Public\Services\CefFrameReader.h.
+ * @details Contains IPC reader/writer primitives used by the plugin runtime and gameplay-facing systems.
+ */
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -113,3 +118,4 @@ private:
 	uint64 LastDeliveredFrameId = 0;
 	uint64 LastSharedHandle = 0; // track handle value to detect texture recreation
 };
+

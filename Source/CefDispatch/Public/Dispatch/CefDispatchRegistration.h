@@ -1,3 +1,8 @@
+﻿/**
+ * @file CefDispatch\Public\Dispatch\CefDispatchRegistration.h
+ * @brief Declares CefDispatchRegistration for module CefDispatch\Public\Dispatch\CefDispatchRegistration.h.
+ * @details Contains dispatch registry and value plumbing used by the plugin runtime and gameplay-facing systems.
+ */
 #pragma once
 
 #include "CoreMinimal.h"
@@ -26,3 +31,4 @@ public:
 	static FCefDispatchFactoryRegistrar CEF_DISPATCH_CONCAT(GCefDispatchFactoryRegistrarReplace_, __LINE__)(     \
 		InMessageType, InFactory, true);                                                                          \
 	}
+

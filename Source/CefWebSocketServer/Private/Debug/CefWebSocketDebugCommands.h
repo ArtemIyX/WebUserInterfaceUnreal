@@ -1,3 +1,8 @@
+﻿/**
+ * @file CefWebSocketServer\Private\Debug\CefWebSocketDebugCommands.h
+ * @brief Declares CefWebSocketDebugCommands for module CefWebSocketServer\Private\Debug\CefWebSocketDebugCommands.h.
+ * @details Contains websocket server components used by the plugin runtime and gameplay-facing systems.
+ */
 #pragma once
 
 #include "CoreMinimal.h"
@@ -42,3 +47,4 @@ private:
 	IConsoleObject* CommandBenchSend = nullptr;
 #pragma endregion
 };
+

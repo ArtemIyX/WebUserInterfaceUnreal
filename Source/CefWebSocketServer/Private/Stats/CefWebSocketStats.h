@@ -1,4 +1,9 @@
-﻿#pragma once
+﻿/**
+ * @file CefWebSocketServer\Private\Stats\CefWebSocketStats.h
+ * @brief Declares CefWebSocketStats for module CefWebSocketServer\Private\Stats\CefWebSocketStats.h.
+ * @details Contains websocket server components used by the plugin runtime and gameplay-facing systems.
+ */
+#pragma once
 
 #include "CoreMinimal.h"
 
@@ -15,3 +20,4 @@ DECLARE_CYCLE_STAT(TEXT("Read Pump"), STAT_CefWs_ReadPump, STATGROUP_CefWebSocke
 DECLARE_CYCLE_STAT(TEXT("Handle Pump"), STAT_CefWs_HandlePump, STATGROUP_CefWebSocket);
 DECLARE_CYCLE_STAT(TEXT("Send Pump"), STAT_CefWs_SendPump, STATGROUP_CefWebSocket);
 DECLARE_CYCLE_STAT(TEXT("Write Pump"), STAT_CefWs_WritePump, STATGROUP_CefWebSocket);
+

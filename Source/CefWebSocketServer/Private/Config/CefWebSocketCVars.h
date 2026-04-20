@@ -1,4 +1,9 @@
-﻿#pragma once
+﻿/**
+ * @file CefWebSocketServer\Private\Config\CefWebSocketCVars.h
+ * @brief Declares CefWebSocketCVars for module CefWebSocketServer\Private\Config\CefWebSocketCVars.h.
+ * @details Contains websocket server components used by the plugin runtime and gameplay-facing systems.
+ */
+#pragma once
 
 #include "CoreMinimal.h"
 
@@ -25,3 +30,4 @@ namespace CefWebSocketCVars
 	bool GetValidateUtf8();
 	bool GetLogTraffic();
 }
+

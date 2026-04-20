@@ -1,4 +1,9 @@
-﻿#pragma once
+﻿/**
+ * @file CefWebUi\Public\Slate\CefBrowserSurfaceStats.h
+ * @brief Declares CefBrowserSurfaceStats for module CefWebUi\Public\Slate\CefBrowserSurfaceStats.h.
+ * @details Contains telemetry and tuning configuration used by the plugin runtime and gameplay-facing systems.
+ */
+#pragma once
 
 #include "CoreMinimal.h"
 
@@ -10,3 +15,4 @@ DECLARE_DWORD_COUNTER_STAT(TEXT("Frame Gaps"), STAT_CefTel_FrameGaps, STATGROUP_
 DECLARE_DWORD_COUNTER_STAT(TEXT("Input->Frame Latency Ms"), STAT_CefTel_InputToFrameLatencyMs, STATGROUP_CefWebUiTelemetry);
 DECLARE_DWORD_COUNTER_STAT(TEXT("Input->Frame Max Ms"), STAT_CefTel_InputToFrameLatencyMaxMs, STATGROUP_CefWebUiTelemetry);
 DECLARE_DWORD_COUNTER_STAT(TEXT("Fence Not Ready"), STAT_CefTel_FenceNotReady, STATGROUP_CefWebUiTelemetry);
+

@@ -1,4 +1,9 @@
-﻿#pragma once
+﻿/**
+ * @file CefWebSocketServer\Private\Threads\CefWebSocketWriteRunnable.h
+ * @brief Declares CefWebSocketWriteRunnable for module CefWebSocketServer\Private\Threads\CefWebSocketWriteRunnable.h.
+ * @details Contains IPC reader/writer primitives used by the plugin runtime and gameplay-facing systems.
+ */
+#pragma once
 
 #include "HAL/Runnable.h"
 
@@ -25,3 +30,4 @@ private:
 	TAtomic<bool> bStopRequested = false;
 #pragma endregion
 };
+

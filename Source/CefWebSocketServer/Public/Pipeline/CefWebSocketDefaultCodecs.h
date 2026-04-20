@@ -1,3 +1,8 @@
+﻿/**
+ * @file CefWebSocketServer\Public\Pipeline\CefWebSocketDefaultCodecs.h
+ * @brief Declares CefWebSocketDefaultCodecs for module CefWebSocketServer\Public\Pipeline\CefWebSocketDefaultCodecs.h.
+ * @details Contains websocket server components used by the plugin runtime and gameplay-facing systems.
+ */
 #pragma once
 
 #include "CoreMinimal.h"
@@ -26,3 +31,4 @@ public:
 private:
 	ECefWebSocketPayloadFormat PayloadFormat = ECefWebSocketPayloadFormat::Utf8String;
 };
+

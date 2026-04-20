@@ -1,4 +1,9 @@
-﻿#pragma once
+﻿/**
+ * @file CefWebUi\Public\Slate\CefBrowserSurfaceConstants.h
+ * @brief Declares CefBrowserSurfaceConstants for module CefWebUi\Public\Slate\CefBrowserSurfaceConstants.h.
+ * @details Contains types and APIs used by the plugin runtime and gameplay-facing systems.
+ */
+#pragma once
 
 #include "CoreMinimal.h"
 
@@ -33,3 +38,4 @@ inline constexpr uint32 CefEventFlagIsLeft = 1u << 10;
 inline constexpr uint32 CefEventFlagIsRight = 1u << 11;
 inline constexpr uint32 CefEventFlagIsRepeat = 1u << 13;
 }
+

@@ -1,4 +1,9 @@
-﻿// ARenderTestActor.h
+﻿/**
+ * @file CefWebUi\Public\Debug\RenderTestActor.h
+ * @brief Declares RenderTestActor for module CefWebUi\Public\Debug\RenderTestActor.h.
+ * @details Contains types and APIs used by the plugin runtime and gameplay-facing systems.
+ */
+// ARenderTestActor.h
 #pragma once
 
 #include "CoreMinimal.h"

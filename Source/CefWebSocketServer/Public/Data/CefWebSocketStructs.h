@@ -1,3 +1,8 @@
+﻿/**
+ * @file CefWebSocketServer\Public\Data\CefWebSocketStructs.h
+ * @brief Declares CefWebSocketStructs for module CefWebSocketServer\Public\Data\CefWebSocketStructs.h.
+ * @details Contains websocket server components used by the plugin runtime and gameplay-facing systems.
+ */
 #pragma once
 
 #include "CoreMinimal.h"
@@ -105,3 +110,4 @@ struct CEFWEBSOCKETSERVER_API FCefWebSocketServerStats
 	UPROPERTY(BlueprintReadOnly, Category = "CefWebSocket|Stats")
 	int64 InWriteQueueDepth = 0;
 };
+

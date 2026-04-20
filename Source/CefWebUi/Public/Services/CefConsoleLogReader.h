@@ -1,3 +1,8 @@
+﻿/**
+ * @file CefWebUi\Public\Services\CefConsoleLogReader.h
+ * @brief Declares CefConsoleLogReader for module CefWebUi\Public\Services\CefConsoleLogReader.h.
+ * @details Contains IPC reader/writer primitives used by the plugin runtime and gameplay-facing systems.
+ */
 #pragma once
 
 #include "CoreMinimal.h"
@@ -39,3 +44,4 @@ private:
 	FRunnableThread* Thread = nullptr;
 	std::atomic<bool> bRunning{ false };
 };
+

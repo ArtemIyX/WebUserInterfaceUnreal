@@ -1,4 +1,9 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+﻿/**
+ * @file CefWebUi\Public\Data\CefCustomCursorType.h
+ * @brief Declares CefCustomCursorType for module CefWebUi\Public\Data\CefCustomCursorType.h.
+ * @details Contains types and APIs used by the plugin runtime and gameplay-facing systems.
+ */
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -61,3 +66,4 @@ enum class ECefCustomCursorType : uint8
 	CT_DND_LINK,
 	CT_NUM_VALUES,
 };
+

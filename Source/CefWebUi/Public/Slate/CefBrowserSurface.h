@@ -1,3 +1,8 @@
+﻿/**
+ * @file CefWebUi\Public\Slate\CefBrowserSurface.h
+ * @brief Declares CefBrowserSurface for module CefWebUi\Public\Slate\CefBrowserSurface.h.
+ * @details Contains types and APIs used by the plugin runtime and gameplay-facing systems.
+ */
 #pragma once
 
 #include "CoreMinimal.h"
@@ -152,3 +157,4 @@ private:
 	mutable uint32 TelemetryPollSuccess = 0;
 #pragma endregion
 };
+

@@ -1,4 +1,9 @@
-﻿#pragma once
+﻿/**
+ * @file CefWebSocketServer\Public\Networking\ICefWebSocketServerBackend.h
+ * @brief Declares ICefWebSocketServerBackend for module CefWebSocketServer\Public\Networking\ICefWebSocketServerBackend.h.
+ * @details Contains interface contracts used by the plugin runtime and gameplay-facing systems.
+ */
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Networking/CefNetWebSocketDelegates.h"
@@ -13,3 +18,4 @@ public:
 	virtual FString Info() const = 0;
 	virtual uint32 GetServerPort() const = 0;
 };
+

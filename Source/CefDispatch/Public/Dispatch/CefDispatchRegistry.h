@@ -1,3 +1,8 @@
+﻿/**
+ * @file CefDispatch\Public\Dispatch\CefDispatchRegistry.h
+ * @brief Declares CefDispatchRegistry for module CefDispatch\Public\Dispatch\CefDispatchRegistry.h.
+ * @details Contains dispatch registry and value plumbing used by the plugin runtime and gameplay-facing systems.
+ */
 #pragma once
 
 #include "CoreMinimal.h"
@@ -28,3 +33,4 @@ private:
 	mutable FRWLock RoutesLock;
 	TMap<uint32, FCefDispatchFactory> Routes;
 };
+

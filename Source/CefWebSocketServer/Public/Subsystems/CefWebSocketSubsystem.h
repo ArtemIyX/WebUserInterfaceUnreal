@@ -1,4 +1,9 @@
-﻿#pragma once
+﻿/**
+ * @file CefWebSocketServer\Public\Subsystems\CefWebSocketSubsystem.h
+ * @brief Declares CefWebSocketSubsystem for module CefWebSocketServer\Public\Subsystems\CefWebSocketSubsystem.h.
+ * @details Contains subsystem APIs and lifecycle entry points used by the plugin runtime and gameplay-facing systems.
+ */
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
@@ -50,3 +55,4 @@ private:
 	TMap<FName, TObjectPtr<UCefWebSocketServerBase>> Servers;
 #pragma endregion
 };
+

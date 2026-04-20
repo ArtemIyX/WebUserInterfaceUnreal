@@ -1,3 +1,8 @@
+﻿/**
+ * @file CefWebUi\Public\Sessions\CefWebUiBrowserSession.h
+ * @brief Declares CefWebUiBrowserSession for module CefWebUi\Public\Sessions\CefWebUiBrowserSession.h.
+ * @details Contains types and APIs used by the plugin runtime and gameplay-facing systems.
+ */
 #pragma once
 
 #include "CoreMinimal.h"
@@ -183,3 +188,4 @@ private:
 	FDelegateHandle ConsoleLogDelegateHandle;
 #pragma endregion
 };
+

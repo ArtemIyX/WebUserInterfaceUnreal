@@ -1,3 +1,8 @@
+﻿/**
+ * @file CefWebUi\Public\Subsystems\CefWebUiGameInstanceSubsystem.h
+ * @brief Declares CefWebUiGameInstanceSubsystem for module CefWebUi\Public\Subsystems\CefWebUiGameInstanceSubsystem.h.
+ * @details Contains subsystem APIs and lifecycle entry points used by the plugin runtime and gameplay-facing systems.
+ */
 #pragma once
 
 #include "CoreMinimal.h"
@@ -96,3 +101,4 @@ private:
 	TMap<FName, TObjectPtr<UCefWebUiBrowserSession>> Sessions;
 #pragma endregion
 };
+

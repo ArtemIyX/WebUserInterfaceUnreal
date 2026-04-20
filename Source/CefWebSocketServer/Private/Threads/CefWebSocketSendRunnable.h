@@ -1,3 +1,8 @@
+﻿/**
+ * @file CefWebSocketServer\Private\Threads\CefWebSocketSendRunnable.h
+ * @brief Declares CefWebSocketSendRunnable for module CefWebSocketServer\Private\Threads\CefWebSocketSendRunnable.h.
+ * @details Contains websocket server components used by the plugin runtime and gameplay-facing systems.
+ */
 #pragma once
 
 #include "HAL/Runnable.h"
@@ -25,3 +30,4 @@ private:
 	TAtomic<bool> bStopRequested = false;
 #pragma endregion
 };
+

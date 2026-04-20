@@ -1,4 +1,9 @@
-﻿#pragma once
+﻿/**
+ * @file CefWebSocketServer\Public\Server\CefWebSocketClientBase.h
+ * @brief Declares CefWebSocketClientBase for module CefWebSocketServer\Public\Server\CefWebSocketClientBase.h.
+ * @details Contains websocket server components used by the plugin runtime and gameplay-facing systems.
+ */
+#pragma once
 
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
@@ -48,3 +53,4 @@ private:
 	FCefWebSocketClientInfo ClientInfo;
 #pragma endregion
 };
+

@@ -1,4 +1,9 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+﻿/**
+ * @file CefWebUi\Public\Services\CefControlWriter.h
+ * @brief Declares CefControlWriter for module CefWebUi\Public\Services\CefControlWriter.h.
+ * @details Contains IPC reader/writer primitives used by the plugin runtime and gameplay-facing systems.
+ */
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -62,3 +67,4 @@ private:
 
 	FCriticalSection WriteLock;
 };
+

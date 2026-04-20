@@ -1,3 +1,8 @@
+﻿/**
+ * @file CefWebSocketServer\Private\Server\CefWebSocketServerInstance.h
+ * @brief Declares CefWebSocketServerInstance for module CefWebSocketServer\Private\Server\CefWebSocketServerInstance.h.
+ * @details Contains websocket server components used by the plugin runtime and gameplay-facing systems.
+ */
 #pragma once
 
 #include "CoreMinimal.h"
@@ -153,3 +158,4 @@ private:
 	TAtomic<bool> bReadActivity = false;
 #pragma endregion
 };
+

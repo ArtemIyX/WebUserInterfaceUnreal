@@ -1,4 +1,9 @@
-﻿#pragma once
+﻿/**
+ * @file CefWebSocketServer\Private\Networking\CefNetWebSocket.h
+ * @brief Declares CefNetWebSocket for module CefWebSocketServer\Private\Networking\CefNetWebSocket.h.
+ * @details Contains websocket server components used by the plugin runtime and gameplay-facing systems.
+ */
+#pragma once
 
 #include "Networking/ICefNetWebSocket.h"
 #include "Networking/CefWebSocketPrivate.h"
@@ -42,3 +47,4 @@ public:
 	FString RemoteIp;
 	int32 RemotePort = 0;
 };
+

@@ -1,3 +1,8 @@
+﻿/**
+ * @file CefWebSocketServer\Public\Pipeline\CefWebSocketPipelineTypes.h
+ * @brief Declares CefWebSocketPipelineTypes for module CefWebSocketServer\Public\Pipeline\CefWebSocketPipelineTypes.h.
+ * @details Contains websocket server components used by the plugin runtime and gameplay-facing systems.
+ */
 #pragma once
 
 #include "CoreMinimal.h"
@@ -27,3 +32,4 @@ struct CEFWEBSOCKETSERVER_API FCefWebSocketWritePacket
 	TArray<uint8> Payload;
 	bool bBinary = true;
 };
+

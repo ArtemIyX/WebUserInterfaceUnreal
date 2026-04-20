@@ -1,3 +1,8 @@
+﻿/**
+ * @file CefProtobuf\Public\Protocol\CefWsEnvelope.h
+ * @brief Declares CefWsEnvelope for module CefProtobuf\Public\Protocol\CefWsEnvelope.h.
+ * @details Contains message codec and envelope definitions used by the plugin runtime and gameplay-facing systems.
+ */
 #pragma once
 
 #include "CoreMinimal.h"
@@ -26,3 +31,4 @@ struct CEFPROTOBUF_API FCefWsEnvelope
 	uint64 RequestId = 0;
 	TArray<uint8> Payload;
 };
+

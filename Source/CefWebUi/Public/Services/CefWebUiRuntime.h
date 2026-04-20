@@ -1,3 +1,8 @@
+﻿/**
+ * @file CefWebUi\Public\Services\CefWebUiRuntime.h
+ * @brief Declares CefWebUiRuntime for module CefWebUi\Public\Services\CefWebUiRuntime.h.
+ * @details Contains runtime process and IPC orchestration used by the plugin runtime and gameplay-facing systems.
+ */
 #pragma once
 
 #include "HAL/PlatformProcess.h"
@@ -46,3 +51,4 @@ private:
 	FProcHandle HostProcess;
 	void* JobHandle = nullptr;
 };
+

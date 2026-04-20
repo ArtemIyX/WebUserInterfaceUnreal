@@ -1,4 +1,9 @@
-﻿// Copyright Epic Games, Inc. All Rights Reserved.
+﻿/**
+ * @file CefWebUi\Public\CefWebUi.h
+ * @brief Declares CefWebUi for module CefWebUi\Public\CefWebUi.h.
+ * @details Contains types and APIs used by the plugin runtime and gameplay-facing systems.
+ */
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #pragma once
 
@@ -16,3 +21,4 @@ public:
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
 };
+

@@ -1,4 +1,9 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+﻿/**
+ * @file CefWebUi\Public\Data\CefControlEventType.h
+ * @brief Declares CefControlEventType for module CefWebUi\Public\Data\CefControlEventType.h.
+ * @details Contains types and APIs used by the plugin runtime and gameplay-facing systems.
+ */
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -33,3 +38,4 @@ enum class ECefControlEventType : uint8
 	OpenLocalFile = 22,
 	LoadHtmlString = 23,
 };
+

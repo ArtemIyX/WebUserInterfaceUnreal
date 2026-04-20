@@ -1,3 +1,8 @@
+﻿/**
+ * @file CefProtobuf\Public\CefProtobuf.h
+ * @brief Declares CefProtobuf for module CefProtobuf\Public\CefProtobuf.h.
+ * @details Contains types and APIs used by the plugin runtime and gameplay-facing systems.
+ */
 #pragma once
 
 #include "CoreMinimal.h"
@@ -12,3 +17,4 @@ public:
     virtual void StartupModule() override;
     virtual void ShutdownModule() override;
 };
+

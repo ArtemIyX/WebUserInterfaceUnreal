@@ -1,4 +1,9 @@
-﻿#pragma once
+﻿/**
+ * @file CefWebUi\Public\Slate\CefBrowserSurfaceFunctions.h
+ * @brief Declares CefBrowserSurfaceFunctions for module CefWebUi\Public\Slate\CefBrowserSurfaceFunctions.h.
+ * @details Contains types and APIs used by the plugin runtime and gameplay-facing systems.
+ */
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Input/Events.h"
@@ -16,3 +21,4 @@ void AddCefSlateBlitPass(
 	const FIntRect& InSrcRect,
 	const FIntPoint& InSrcExtent);
 }
+

@@ -1,4 +1,9 @@
-﻿#pragma once
+﻿/**
+ * @file CefWebSocketServer\Public\Networking\ICefNetWebSocket.h
+ * @brief Declares ICefNetWebSocket for module CefWebSocketServer\Public\Networking\ICefNetWebSocket.h.
+ * @details Contains interface contracts used by the plugin runtime and gameplay-facing systems.
+ */
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Networking/CefNetWebSocketDelegates.h"
@@ -21,3 +26,4 @@ public:
 	virtual FString RemoteEndPoint(bool bInAppendPort) = 0;
 	virtual FString LocalEndPoint(bool bInAppendPort) = 0;
 };
+

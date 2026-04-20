@@ -1,3 +1,8 @@
+﻿/**
+ * @file CefProtobuf\Public\Protocol\CefWsBinaryCodec.h
+ * @brief Declares CefWsBinaryCodec for module CefProtobuf\Public\Protocol\CefWsBinaryCodec.h.
+ * @details Contains message codec and envelope definitions used by the plugin runtime and gameplay-facing systems.
+ */
 #pragma once
 
 #include "CoreMinimal.h"
@@ -19,3 +24,4 @@ private:
 	uint16 SchemaVersion = 1;
 	uint32 MaxPayloadBytes = 16u * 1024u * 1024u;
 };
+
