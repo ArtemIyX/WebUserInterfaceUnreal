@@ -870,3 +870,21 @@ YYYY-MM-DD HH:MM
 - Input mapping now references explicit applied-size state.
 
 ---
+## 2026-04-20 10:27
+
+### Changed
+- Resize Task 2/4: implemented resize detection + request send scheduler.
+- Tick(...) now runs:
+  - MaybeQueueAutoResize(...) to detect meaningful widget-size changes,
+  - MaybeSendAutoResize(...) to dispatch resize with throttle/debounce.
+- Added local-size-based detection with min dimension and min delta guards.
+- Added control-writer send path for Resize(TargetBrowserWidth, TargetBrowserHeight).
+
+### Why
+- Add controlled, non-spam resize request flow during window drag/resize.
+
+### Impact
+- Browser resize requests are now emitted from game-thread tick in a bounded schedule.
+- Apply-confirmation behavior is not enabled yet (next task).
+
+---

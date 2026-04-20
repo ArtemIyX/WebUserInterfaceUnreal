@@ -245,6 +245,8 @@ void SCefBrowserSurface::Tick(const FGeometry& allottedGeometry, const double in
 {
 	SLeafWidget::Tick(allottedGeometry, inCurrentTime, inDeltaTime);
 	++TelemetryTickCalls;
+	MaybeQueueAutoResize(allottedGeometry, inCurrentTime);
+	MaybeSendAutoResize(inCurrentTime);
 	Invalidate(EInvalidateWidgetReason::Paint);
 }
 
@@ -924,13 +926,80 @@ void SCefBrowserSurface::ReleaseResources()
 
 void SCefBrowserSurface::MaybeQueueAutoResize(const FGeometry& inAllottedGeometry, double inNowSec)
 {
-	(void)inAllottedGeometry;
-	(void)inNowSec;
+	if (!CefWebUi::BrowserSurface::EnableAutoResizeToWidget)
+	{
+		return;
+	}
+
+	const FVector2D localSize = inAllottedGeometry.GetLocalSize();
+	const int32 rawWidth = FMath::RoundToInt(localSize.X);
+	const int32 rawHeight = FMath::RoundToInt(localSize.Y);
+	if (rawWidth < CefWebUi::BrowserSurface::AutoResizeMinDimensionPx ||
+		rawHeight < CefWebUi::BrowserSurface::AutoResizeMinDimensionPx)
+	{
+		return;
+	}
+
+	const int32 targetWidth = FMath::Max(1, rawWidth);
+	const int32 targetHeight = FMath::Max(1, rawHeight);
+	const int32 minDeltaPx = FMath::Max(1, CefWebUi::BrowserSurface::AutoResizeMinDeltaPx);
+	const bool bMeaningfulDelta =
+		FMath::Abs(targetWidth - TargetBrowserWidth) >= minDeltaPx ||
+		FMath::Abs(targetHeight - TargetBrowserHeight) >= minDeltaPx;
+	if (!bMeaningfulDelta)
+	{
+		return;
+	}
+
+	TargetBrowserWidth = targetWidth;
+	TargetBrowserHeight = targetHeight;
+	LastAutoResizeObservedTimeSec = inNowSec;
+	bAutoResizePending = true;
+	bAwaitingAutoResizeApply = false;
+	AutoResizeRetryCount = 0;
 }
 
 void SCefBrowserSurface::MaybeSendAutoResize(double inNowSec)
 {
-	(void)inNowSec;
+	if (!bAutoResizePending)
+	{
+		return;
+	}
+
+	const bool bThrottleElapsed =
+		(LastAutoResizeSentTimeSec <= 0.0) ||
+		((inNowSec - LastAutoResizeSentTimeSec) >= CefWebUi::BrowserSurface::AutoResizeThrottlePeriodSec);
+	const bool bDebounceElapsed =
+		(LastAutoResizeObservedTimeSec <= 0.0) ||
+		((inNowSec - LastAutoResizeObservedTimeSec) >= CefWebUi::BrowserSurface::AutoResizeDebouncePeriodSec);
+	if (!bThrottleElapsed && !bDebounceElapsed)
+	{
+		return;
+	}
+
+	TSharedPtr<FCefControlWriter> controlWriter;
+	if (!TryGetControlWriter(controlWriter))
+	{
+		return;
+	}
+	if (!controlWriter->IsOpen())
+	{
+		controlWriter->Open();
+	}
+	if (!controlWriter->IsOpen())
+	{
+		return;
+	}
+
+	controlWriter->Resize(
+		static_cast<uint32>(FMath::Max(1, TargetBrowserWidth)),
+		static_cast<uint32>(FMath::Max(1, TargetBrowserHeight)));
+	LastSentBrowserWidth = TargetBrowserWidth;
+	LastSentBrowserHeight = TargetBrowserHeight;
+	LastAutoResizeSentTimeSec = inNowSec;
+	LastAutoResizeAwaitStartTimeSec = inNowSec;
+	bAutoResizePending = false;
+	bAwaitingAutoResizeApply = true;
 }
 
 void SCefBrowserSurface::HandleAppliedFrameSize(int32 inFrameWidth, int32 inFrameHeight) const
