@@ -685,6 +685,8 @@ void SCefBrowserSurface::PollLatestFrame() const
 		return;
 	}
 
+	HandleAppliedFrameSize(static_cast<int32>(LastFrame.Width), static_cast<int32>(LastFrame.Height));
+
 	SharedSlotCount = FMath::Clamp(LastFrame.SlotCount, 1u, MaxSharedSlots);
 	EnsureSharedRhi();
 	if ((LastFrame.Flags & CefFrameFlag_PopupPlane) != 0)
@@ -961,18 +963,7 @@ void SCefBrowserSurface::MaybeQueueAutoResize(const FGeometry& inAllottedGeometr
 
 void SCefBrowserSurface::MaybeSendAutoResize(double inNowSec)
 {
-	if (!bAutoResizePending)
-	{
-		return;
-	}
-
-	const bool bThrottleElapsed =
-		(LastAutoResizeSentTimeSec <= 0.0) ||
-		((inNowSec - LastAutoResizeSentTimeSec) >= CefWebUi::BrowserSurface::AutoResizeThrottlePeriodSec);
-	const bool bDebounceElapsed =
-		(LastAutoResizeObservedTimeSec <= 0.0) ||
-		((inNowSec - LastAutoResizeObservedTimeSec) >= CefWebUi::BrowserSurface::AutoResizeDebouncePeriodSec);
-	if (!bThrottleElapsed && !bDebounceElapsed)
+	if (!bAutoResizePending && !bAwaitingAutoResizeApply)
 	{
 		return;
 	}
@@ -991,21 +982,77 @@ void SCefBrowserSurface::MaybeSendAutoResize(double inNowSec)
 		return;
 	}
 
+	if (bAutoResizePending)
+	{
+		const bool bThrottleElapsed =
+			(LastAutoResizeSentTimeSec <= 0.0) ||
+			((inNowSec - LastAutoResizeSentTimeSec) >= CefWebUi::BrowserSurface::AutoResizeThrottlePeriodSec);
+		const bool bDebounceElapsed =
+			(LastAutoResizeObservedTimeSec <= 0.0) ||
+			((inNowSec - LastAutoResizeObservedTimeSec) >= CefWebUi::BrowserSurface::AutoResizeDebouncePeriodSec);
+		if (!bThrottleElapsed && !bDebounceElapsed)
+		{
+			return;
+		}
+
+		controlWriter->Resize(
+			static_cast<uint32>(FMath::Max(1, TargetBrowserWidth)),
+			static_cast<uint32>(FMath::Max(1, TargetBrowserHeight)));
+		LastSentBrowserWidth = TargetBrowserWidth;
+		LastSentBrowserHeight = TargetBrowserHeight;
+		LastAutoResizeSentTimeSec = inNowSec;
+		LastAutoResizeAwaitStartTimeSec = inNowSec;
+		bAutoResizePending = false;
+		bAwaitingAutoResizeApply = true;
+		return;
+	}
+
+	if (!bAwaitingAutoResizeApply)
+	{
+		return;
+	}
+	if (LastAutoResizeAwaitStartTimeSec <= 0.0)
+	{
+		LastAutoResizeAwaitStartTimeSec = inNowSec;
+		return;
+	}
+
+	const double elapsedSec = inNowSec - LastAutoResizeAwaitStartTimeSec;
+	if (elapsedSec < CefWebUi::BrowserSurface::AutoResizeApplyTimeoutSec)
+	{
+		return;
+	}
+	if (AutoResizeRetryCount >= CefWebUi::BrowserSurface::AutoResizeMaxRetries)
+	{
+		return;
+	}
+
 	controlWriter->Resize(
-		static_cast<uint32>(FMath::Max(1, TargetBrowserWidth)),
-		static_cast<uint32>(FMath::Max(1, TargetBrowserHeight)));
-	LastSentBrowserWidth = TargetBrowserWidth;
-	LastSentBrowserHeight = TargetBrowserHeight;
+		static_cast<uint32>(FMath::Max(1, LastSentBrowserWidth)),
+		static_cast<uint32>(FMath::Max(1, LastSentBrowserHeight)));
 	LastAutoResizeSentTimeSec = inNowSec;
 	LastAutoResizeAwaitStartTimeSec = inNowSec;
-	bAutoResizePending = false;
-	bAwaitingAutoResizeApply = true;
+	++AutoResizeRetryCount;
 }
 
 void SCefBrowserSurface::HandleAppliedFrameSize(int32 inFrameWidth, int32 inFrameHeight) const
 {
-	(void)inFrameWidth;
-	(void)inFrameHeight;
+	if (inFrameWidth < CefWebUi::BrowserSurface::AutoResizeMinDimensionPx ||
+		inFrameHeight < CefWebUi::BrowserSurface::AutoResizeMinDimensionPx)
+	{
+		return;
+	}
+
+	AppliedBrowserWidth = inFrameWidth;
+	AppliedBrowserHeight = inFrameHeight;
+	if (bAwaitingAutoResizeApply &&
+		AppliedBrowserWidth == LastSentBrowserWidth &&
+		AppliedBrowserHeight == LastSentBrowserHeight)
+	{
+		bAwaitingAutoResizeApply = false;
+		AutoResizeRetryCount = 0;
+		LastAutoResizeAwaitStartTimeSec = 0.0;
+	}
 }
 
 void SCefBrowserSurface::GetBrowserCoords(const FGeometry& inGeometry, const FVector2D& inScreenPosition, int32& outX, int32& outY) const

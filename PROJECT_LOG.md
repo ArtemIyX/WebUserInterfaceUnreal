@@ -888,3 +888,20 @@ YYYY-MM-DD HH:MM
 - Apply-confirmation behavior is not enabled yet (next task).
 
 ---
+## 2026-04-20 10:28
+
+### Changed
+- Resize Task 3/4: added apply-confirmation and retry logic.
+- PollLatestFrame() now feeds frame dimensions into HandleAppliedFrameSize(...).
+- Applied size now updates only from confirmed frame metadata (host-applied state).
+- Send path now supports timeout/retry while awaiting apply confirmation.
+- Await state clears only when frame size matches last sent resize dimensions.
+
+### Why
+- Prevent input mapping from switching to unconfirmed requested size and avoid stuck cursor states.
+
+### Impact
+- Input coordinates remain tied to host-applied browser dimensions.
+- Resize flow is now detect -> send -> await apply -> retry(if needed).
+
+---
