@@ -13,3 +13,11 @@ bool UCefContentHttpImageRequestHandler::HandleImageRequest_Implementation(const
 	OutResponse.Body.Reset();
 	return false;
 }
+
+void UCefContentHttpImageRequestHandler::HandleImageRequestAsync(const FCefContentHttpImageRequestContext& InRequestContext, FOnImageRequestCompleted InOnCompleted)
+{
+	FCefContentHttpImageResponse response;
+	FString error;
+	const bool bHandled = HandleImageRequest(InRequestContext, response, error);
+	InOnCompleted(bHandled, response, error);
+}

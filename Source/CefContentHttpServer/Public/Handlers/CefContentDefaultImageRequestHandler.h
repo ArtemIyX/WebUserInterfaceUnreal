@@ -23,4 +23,11 @@ public:
 	 * @return True on success.
 	 */
 	virtual bool HandleImageRequest_Implementation(const FCefContentHttpImageRequestContext& InRequestContext, FCefContentHttpImageResponse& OutResponse, FString& OutError) override;
+
+	/**
+	 * @brief Handles request asynchronously with encoded-bytes dedupe/cache.
+	 * @param InRequestContext Parsed request data.
+	 * @param InOnCompleted Completion callback.
+	 */
+	virtual void HandleImageRequestAsync(const FCefContentHttpImageRequestContext& InRequestContext, FOnImageRequestCompleted InOnCompleted) override;
 };

@@ -7,6 +7,7 @@
 #include "CefContentHttpServer.h"
 #include "Handlers/CefContentDefaultImageRequestHandler.h"
 #include "Services/CefContentImageCacheService.h"
+#include "Services/CefContentImageEncodeService.h"
 #include "Services/CefContentHttpServerRuntimeService.h"
 #include "Stats/CefContentHttpServerStats.h"
 
@@ -75,6 +76,12 @@ void UCefContentHttpServerSubsystem::ClearCachedImages()
 	}
 
 	imageCacher->ClearCache();
+
+	FCefContentImageEncodeService* const imageEncoder = FCefContentHttpServerModule::Get().GetImageEncoder();
+	if (imageEncoder)
+	{
+		imageEncoder->ClearEncodedCache();
+	}
 }
 
 int32 UCefContentHttpServerSubsystem::GetCachedImageCount() const

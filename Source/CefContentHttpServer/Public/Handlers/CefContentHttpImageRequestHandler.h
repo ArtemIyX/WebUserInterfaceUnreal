@@ -56,4 +56,14 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	bool HandleImageRequest(const FCefContentHttpImageRequestContext& InRequestContext, FCefContentHttpImageResponse& OutResponse, FString& OutError);
+
+	/** @brief Async completion callback type for image handlers. */
+	using FOnImageRequestCompleted = TFunction<void(bool, const FCefContentHttpImageResponse&, const FString&)>;
+
+	/**
+	 * @brief Handles /img request asynchronously.
+	 * @param InRequestContext Parsed request data.
+	 * @param InOnCompleted Completion callback.
+	 */
+	virtual void HandleImageRequestAsync(const FCefContentHttpImageRequestContext& InRequestContext, FOnImageRequestCompleted InOnCompleted);
 };

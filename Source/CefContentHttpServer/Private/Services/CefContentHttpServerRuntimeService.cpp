@@ -103,17 +103,17 @@ bool FCefContentHttpServerRuntimeService::HandleImageRoute(const FHttpServerRequ
 	requestContext.QueryParams = InRequest.QueryParams;
 	requestContext.AssetPath = ResolveAssetPath(InRequest, rawBody);
 
-	FCefContentHttpImageResponse response;
-	FString error;
-	const bool bHandled = RequestHandler->HandleImageRequest(requestContext, response, error);
-	if (!bHandled)
-	{
-		const int32 statusCode = response.StatusCode > 0 ? response.StatusCode : 500;
-		CompleteJson(InOnComplete, statusCode, error.IsEmpty() ? TEXT("Request handling failed") : error);
-		return true;
-	}
+	RequestHandler->HandleImageRequestAsync(requestContext, [InOnComplete](bool bHandled, const FCefContentHttpImageResponse& response, const FString& error) {
+		if (!bHandled)
+		{
+			const int32 statusCode = response.StatusCode > 0 ? response.StatusCode : 500;
+			CompleteJson(InOnComplete, statusCode, error.IsEmpty() ? TEXT("Request handling failed") : error);
+			return;
+		}
 
-	CompleteBinary(InOnComplete, response.StatusCode, response.ContentType, response.Body);
+		CompleteBinary(InOnComplete, response.StatusCode, response.ContentType, response.Body);
+	});
+
 	return true;
 }
 

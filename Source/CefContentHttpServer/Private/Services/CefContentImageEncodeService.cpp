@@ -5,10 +5,12 @@
 #include "Services/CefContentImageEncodeService.h"
 
 #include "CefContentHttpServer.h"
+#include "Async/Async.h"
 #include "Engine/Texture2D.h"
 #include "IImageWrapper.h"
 #include "IImageWrapperModule.h"
 #include "Modules/ModuleManager.h"
+#include "Services/CefContentImageCacheService.h"
 
 bool FCefContentImageEncodeService::EncodeTextureToPngBytes(UTexture2D* InTexture, TArray<uint8>& OutPngBytes, FString& OutError) const
 {
@@ -78,4 +80,108 @@ bool FCefContentImageEncodeService::EncodeTextureToPngBytes(UTexture2D* InTextur
 
 	UE_LOG(LogCefContentHttpServer, Verbose, TEXT("Encoded texture '%s' to png bytes: %d"), *InTexture->GetName(), OutPngBytes.Num());
 	return true;
+}
+
+void FCefContentImageEncodeService::RequestPngBytesByAssetPathAsync(const FString& InAssetPath, FOnEncodedImageReady InOnCompleted)
+{
+	FString normalizedPath = InAssetPath;
+	normalizedPath.TrimStartAndEndInline();
+	if (normalizedPath.IsEmpty())
+	{
+		InOnCompleted(false, TArray<uint8>(), TEXT("Asset path is empty"));
+		return;
+	}
+
+	{
+		FScopeLock lock(&EncodedCacheMutex);
+		if (const FEncodedImageEntry* cachedEntry = EncodedImageCacheByPath.Find(normalizedPath))
+		{
+			InOnCompleted(true, cachedEntry->Bytes, FString());
+			return;
+		}
+
+		if (TArray<FOnEncodedImageReady>* inFlightCallbacks = InFlightRequestsByPath.Find(normalizedPath))
+		{
+			inFlightCallbacks->Add(MoveTemp(InOnCompleted));
+			return;
+		}
+
+		TArray<FOnEncodedImageReady> callbacks;
+		callbacks.Add(MoveTemp(InOnCompleted));
+		InFlightRequestsByPath.Add(normalizedPath, MoveTemp(callbacks));
+	}
+
+	AsyncTask(ENamedThreads::GameThread, [this, normalizedPath]() {
+		if (!FCefContentHttpServerModule::IsAvailable())
+		{
+			CompletePendingRequests(normalizedPath, false, TArray<uint8>(), TEXT("Module is not available"));
+			return;
+		}
+
+		FCefContentImageCacheService* const imageCacher = FCefContentHttpServerModule::Get().GetImageCacher();
+		if (!imageCacher)
+		{
+			CompletePendingRequests(normalizedPath, false, TArray<uint8>(), TEXT("Image cache service is unavailable"));
+			return;
+		}
+
+		UTexture2D* image = nullptr;
+		if (!imageCacher->GetImageByPackagePath(normalizedPath, image) || !image)
+		{
+			CompletePendingRequests(normalizedPath, false, TArray<uint8>(), FString::Printf(TEXT("Image not found: '%s'"), *normalizedPath));
+			return;
+		}
+
+		Async(EAsyncExecution::ThreadPool, [this, normalizedPath, image]() {
+			TArray<uint8> pngBytes;
+			FString error;
+			const bool bSuccess = EncodeTextureToPngBytes(image, pngBytes, error);
+			if (!bSuccess)
+			{
+				CompletePendingRequests(normalizedPath, false, TArray<uint8>(), error);
+				return;
+			}
+
+			{
+				FScopeLock lock(&EncodedCacheMutex);
+				FEncodedImageEntry& cachedEntry = EncodedImageCacheByPath.FindOrAdd(normalizedPath);
+				cachedEntry.Bytes = pngBytes;
+			}
+
+			CompletePendingRequests(normalizedPath, true, pngBytes, FString());
+		});
+	});
+}
+
+void FCefContentImageEncodeService::ClearEncodedCache()
+{
+	FScopeLock lock(&EncodedCacheMutex);
+	EncodedImageCacheByPath.Reset();
+	InFlightRequestsByPath.Reset();
+}
+
+int32 FCefContentImageEncodeService::GetEncodedCacheCount() const
+{
+	FScopeLock lock(&EncodedCacheMutex);
+	return EncodedImageCacheByPath.Num();
+}
+
+void FCefContentImageEncodeService::CompletePendingRequests(const FString& InAssetPath, bool bInSuccess, const TArray<uint8>& InBytes, const FString& InError)
+{
+	TArray<FOnEncodedImageReady> callbacks;
+	{
+		FScopeLock lock(&EncodedCacheMutex);
+		TArray<FOnEncodedImageReady>* pendingCallbacks = InFlightRequestsByPath.Find(InAssetPath);
+		if (!pendingCallbacks)
+		{
+			return;
+		}
+		callbacks = MoveTemp(*pendingCallbacks);
+		InFlightRequestsByPath.Remove(InAssetPath);
+	}
+
+	for (FOnEncodedImageReady& callback : callbacks)
+	{
+		callback(bInSuccess, InBytes, InError);
+	}
 }

@@ -50,6 +50,7 @@ void FCefContentHttpServerModule::ShutdownModule()
 	}
 	if (ImageEncoder.IsValid())
 	{
+		ImageEncoder->ClearEncodedCache();
 		ImageEncoder.Reset();
 		UE_LOG(LogCefContentHttpServer, Log, TEXT("Image encode service destroyed"));
 	}

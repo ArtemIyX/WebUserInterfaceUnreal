@@ -58,3 +58,46 @@ bool UCefContentDefaultImageRequestHandler::HandleImageRequest_Implementation(co
 	OutResponse.Body = MoveTemp(pngBytes);
 	return true;
 }
+
+void UCefContentDefaultImageRequestHandler::HandleImageRequestAsync(const FCefContentHttpImageRequestContext& InRequestContext, FOnImageRequestCompleted InOnCompleted)
+{
+	if (InRequestContext.AssetPath.IsEmpty())
+	{
+		FCefContentHttpImageResponse response;
+		response.StatusCode = 400;
+		response.ContentType = TEXT("application/json");
+		InOnCompleted(false, response, TEXT("Missing required 'asset' parameter"));
+		return;
+	}
+
+	if (!FCefContentHttpServerModule::IsAvailable())
+	{
+		FCefContentHttpImageResponse response;
+		response.StatusCode = 500;
+		response.ContentType = TEXT("application/json");
+		InOnCompleted(false, response, TEXT("CefContentHttpServer module is not available"));
+		return;
+	}
+
+	FCefContentImageEncodeService* const imageEncoder = FCefContentHttpServerModule::Get().GetImageEncoder();
+	if (!imageEncoder)
+	{
+		FCefContentHttpImageResponse response;
+		response.StatusCode = 500;
+		response.ContentType = TEXT("application/json");
+		InOnCompleted(false, response, TEXT("Image encode service is not initialized"));
+		return;
+	}
+
+	imageEncoder->RequestPngBytesByAssetPathAsync(InRequestContext.AssetPath, [InOnCompleted](bool bInSuccess, const TArray<uint8>& InPngBytes, const FString& InError) {
+		FCefContentHttpImageResponse response;
+		const bool bNotFound = InError.Contains(TEXT("not found"));
+		response.StatusCode = bInSuccess ? 200 : (bNotFound ? 404 : 500);
+		response.ContentType = bInSuccess ? TEXT("image/png") : TEXT("application/json");
+		if (bInSuccess)
+		{
+			response.Body = InPngBytes;
+		}
+		InOnCompleted(bInSuccess, response, InError);
+	});
+}
