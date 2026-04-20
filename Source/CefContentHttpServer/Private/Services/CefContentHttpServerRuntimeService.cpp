@@ -102,15 +102,30 @@ bool FCefContentHttpServerRuntimeService::HandleImageRoute(const FHttpServerRequ
 	requestContext.RawBody = rawBody;
 	requestContext.QueryParams = InRequest.QueryParams;
 	requestContext.AssetPath = ResolveAssetPath(InRequest, rawBody);
+	UE_LOG(
+		LogCefContentHttpServer,
+		Log,
+		TEXT("HTTP /img request received. asset='%s' queryCount=%d bodyBytes=%d"),
+		*requestContext.AssetPath,
+		requestContext.QueryParams.Num(),
+		InRequest.Body.Num());
 
 	RequestHandler->HandleImageRequestAsync(requestContext, [InOnComplete](bool bHandled, const FCefContentHttpImageResponse& response, const FString& error) {
 		if (!bHandled)
 		{
 			const int32 statusCode = response.StatusCode > 0 ? response.StatusCode : 500;
+			UE_LOG(LogCefContentHttpServer, Warning, TEXT("HTTP /img failed. status=%d error='%s'"), statusCode, *error);
 			CompleteJson(InOnComplete, statusCode, error.IsEmpty() ? TEXT("Request handling failed") : error);
 			return;
 		}
 
+		UE_LOG(
+			LogCefContentHttpServer,
+			Verbose,
+			TEXT("HTTP /img success. status=%d contentType='%s' bytes=%d"),
+			response.StatusCode,
+			*response.ContentType,
+			response.Body.Num());
 		CompleteBinary(InOnComplete, response.StatusCode, response.ContentType, response.Body);
 	});
 

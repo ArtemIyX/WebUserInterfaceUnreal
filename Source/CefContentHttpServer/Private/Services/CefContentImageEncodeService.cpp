@@ -96,12 +96,14 @@ void FCefContentImageEncodeService::RequestPngBytesByAssetPathAsync(const FStrin
 		FScopeLock lock(&EncodedCacheMutex);
 		if (const FEncodedImageEntry* cachedEntry = EncodedImageCacheByPath.Find(normalizedPath))
 		{
+			UE_LOG(LogCefContentHttpServer, Verbose, TEXT("Encoded cache hit for '%s' (%d bytes)"), *normalizedPath, cachedEntry->Bytes.Num());
 			InOnCompleted(true, cachedEntry->Bytes, FString());
 			return;
 		}
 
 		if (TArray<FOnEncodedImageReady>* inFlightCallbacks = InFlightRequestsByPath.Find(normalizedPath))
 		{
+			UE_LOG(LogCefContentHttpServer, Verbose, TEXT("Join in-flight encode for '%s'"), *normalizedPath);
 			inFlightCallbacks->Add(MoveTemp(InOnCompleted));
 			return;
 		}
@@ -109,6 +111,7 @@ void FCefContentImageEncodeService::RequestPngBytesByAssetPathAsync(const FStrin
 		TArray<FOnEncodedImageReady> callbacks;
 		callbacks.Add(MoveTemp(InOnCompleted));
 		InFlightRequestsByPath.Add(normalizedPath, MoveTemp(callbacks));
+		UE_LOG(LogCefContentHttpServer, Verbose, TEXT("Start new async encode flow for '%s'"), *normalizedPath);
 	}
 
 	AsyncTask(ENamedThreads::GameThread, [this, normalizedPath]() {
@@ -131,13 +134,16 @@ void FCefContentImageEncodeService::RequestPngBytesByAssetPathAsync(const FStrin
 			CompletePendingRequests(normalizedPath, false, TArray<uint8>(), FString::Printf(TEXT("Image not found: '%s'"), *normalizedPath));
 			return;
 		}
+		UE_LOG(LogCefContentHttpServer, Verbose, TEXT("Image loaded for encode '%s'"), *normalizedPath);
 
 		Async(EAsyncExecution::ThreadPool, [this, normalizedPath, image]() {
 			TArray<uint8> pngBytes;
 			FString error;
+			UE_LOG(LogCefContentHttpServer, Verbose, TEXT("Begin PNG encode '%s'"), *normalizedPath);
 			const bool bSuccess = EncodeTextureToPngBytes(image, pngBytes, error);
 			if (!bSuccess)
 			{
+				UE_LOG(LogCefContentHttpServer, Warning, TEXT("PNG encode failed '%s': %s"), *normalizedPath, *error);
 				CompletePendingRequests(normalizedPath, false, TArray<uint8>(), error);
 				return;
 			}
@@ -147,6 +153,7 @@ void FCefContentImageEncodeService::RequestPngBytesByAssetPathAsync(const FStrin
 				FEncodedImageEntry& cachedEntry = EncodedImageCacheByPath.FindOrAdd(normalizedPath);
 				cachedEntry.Bytes = pngBytes;
 			}
+			UE_LOG(LogCefContentHttpServer, Verbose, TEXT("PNG encode done '%s' (%d bytes)"), *normalizedPath, pngBytes.Num());
 
 			CompletePendingRequests(normalizedPath, true, pngBytes, FString());
 		});
@@ -156,8 +163,11 @@ void FCefContentImageEncodeService::RequestPngBytesByAssetPathAsync(const FStrin
 void FCefContentImageEncodeService::ClearEncodedCache()
 {
 	FScopeLock lock(&EncodedCacheMutex);
+	const int32 numCached = EncodedImageCacheByPath.Num();
+	const int32 numInflight = InFlightRequestsByPath.Num();
 	EncodedImageCacheByPath.Reset();
 	InFlightRequestsByPath.Reset();
+	UE_LOG(LogCefContentHttpServer, Log, TEXT("Encoded cache cleared. cached=%d inflight=%d"), numCached, numInflight);
 }
 
 int32 FCefContentImageEncodeService::GetEncodedCacheCount() const
@@ -179,6 +189,14 @@ void FCefContentImageEncodeService::CompletePendingRequests(const FString& InAss
 		callbacks = MoveTemp(*pendingCallbacks);
 		InFlightRequestsByPath.Remove(InAssetPath);
 	}
+	UE_LOG(
+		LogCefContentHttpServer,
+		Verbose,
+		TEXT("Complete pending encode callbacks '%s'. success=%s callbacks=%d bytes=%d"),
+		*InAssetPath,
+		bInSuccess ? TEXT("true") : TEXT("false"),
+		callbacks.Num(),
+		InBytes.Num());
 
 	for (FOnEncodedImageReady& callback : callbacks)
 	{

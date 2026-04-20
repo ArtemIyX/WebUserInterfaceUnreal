@@ -61,11 +61,13 @@ bool UCefContentDefaultImageRequestHandler::HandleImageRequest_Implementation(co
 
 void UCefContentDefaultImageRequestHandler::HandleImageRequestAsync(const FCefContentHttpImageRequestContext& InRequestContext, FOnImageRequestCompleted InOnCompleted)
 {
+	UE_LOG(LogCefContentHttpServer, Verbose, TEXT("Default handler start. asset='%s'"), *InRequestContext.AssetPath);
 	if (InRequestContext.AssetPath.IsEmpty())
 	{
 		FCefContentHttpImageResponse response;
 		response.StatusCode = 400;
 		response.ContentType = TEXT("application/json");
+		UE_LOG(LogCefContentHttpServer, Warning, TEXT("Default handler reject: asset is empty"));
 		InOnCompleted(false, response, TEXT("Missing required 'asset' parameter"));
 		return;
 	}
@@ -75,6 +77,7 @@ void UCefContentDefaultImageRequestHandler::HandleImageRequestAsync(const FCefCo
 		FCefContentHttpImageResponse response;
 		response.StatusCode = 500;
 		response.ContentType = TEXT("application/json");
+		UE_LOG(LogCefContentHttpServer, Error, TEXT("Default handler failed: module is not available"));
 		InOnCompleted(false, response, TEXT("CefContentHttpServer module is not available"));
 		return;
 	}
@@ -85,6 +88,7 @@ void UCefContentDefaultImageRequestHandler::HandleImageRequestAsync(const FCefCo
 		FCefContentHttpImageResponse response;
 		response.StatusCode = 500;
 		response.ContentType = TEXT("application/json");
+		UE_LOG(LogCefContentHttpServer, Error, TEXT("Default handler failed: encoder service is null"));
 		InOnCompleted(false, response, TEXT("Image encode service is not initialized"));
 		return;
 	}
@@ -98,6 +102,14 @@ void UCefContentDefaultImageRequestHandler::HandleImageRequestAsync(const FCefCo
 		{
 			response.Body = InPngBytes;
 		}
+		UE_LOG(
+			LogCefContentHttpServer,
+			Verbose,
+			TEXT("Default handler complete. success=%s status=%d bytes=%d error='%s'"),
+			bInSuccess ? TEXT("true") : TEXT("false"),
+			response.StatusCode,
+			response.Body.Num(),
+			*InError);
 		InOnCompleted(bInSuccess, response, InError);
 	});
 }
