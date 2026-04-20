@@ -4,7 +4,7 @@
 #include "Services/CefContentImageCacheService.h"
 #include "Services/CefContentImageEncodeService.h"
 
-bool UCefContentDefaultImageRequestHandler::HandleImageRequest(const FCefContentHttpImageRequestContext& InRequestContext, FCefContentHttpImageResponse& OutResponse, FString& OutError)
+bool UCefContentDefaultImageRequestHandler::HandleImageRequest_Implementation(const FCefContentHttpImageRequestContext& InRequestContext, FCefContentHttpImageResponse& OutResponse, FString& OutError)
 {
 	if (InRequestContext.AssetPath.IsEmpty())
 	{

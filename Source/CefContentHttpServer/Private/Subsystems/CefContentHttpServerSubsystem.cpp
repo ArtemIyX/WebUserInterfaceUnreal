@@ -6,6 +6,11 @@
 #include "Services/CefContentHttpServerRuntimeService.h"
 #include "Stats/CefContentHttpServerStats.h"
 
+UCefContentHttpServerSubsystem::UCefContentHttpServerSubsystem()
+{
+	
+}
+
 void UCefContentHttpServerSubsystem::Initialize(FSubsystemCollectionBase& InCollection)
 {
 	Super::Initialize(InCollection);

@@ -34,11 +34,12 @@ struct CEFCONTENTHTTPSERVER_API FCefContentHttpImageResponse
 	TArray<uint8> Body;
 };
 
-UCLASS(Abstract, Blueprintable, BlueprintType)
+UCLASS(Abstract, Blueprintable, BlueprintType, DisplayName="Image Handler (Abstract)")
 class CEFCONTENTHTTPSERVER_API UCefContentHttpImageRequestHandler : public UObject
 {
 	GENERATED_BODY()
 
 public:
-	virtual bool HandleImageRequest(const FCefContentHttpImageRequestContext& InRequestContext, FCefContentHttpImageResponse& OutResponse, FString& OutError);
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	bool HandleImageRequest(const FCefContentHttpImageRequestContext& InRequestContext, FCefContentHttpImageResponse& OutResponse, FString& OutError);
 };

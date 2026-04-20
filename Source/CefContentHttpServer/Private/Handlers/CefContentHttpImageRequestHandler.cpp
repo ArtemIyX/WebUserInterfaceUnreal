@@ -1,6 +1,6 @@
 #include "Handlers/CefContentHttpImageRequestHandler.h"
 
-bool UCefContentHttpImageRequestHandler::HandleImageRequest(const FCefContentHttpImageRequestContext& InRequestContext, FCefContentHttpImageResponse& OutResponse, FString& OutError)
+bool UCefContentHttpImageRequestHandler::HandleImageRequest_Implementation(const FCefContentHttpImageRequestContext& InRequestContext, FCefContentHttpImageResponse& OutResponse, FString& OutError)
 {
 	(void)InRequestContext;
 	OutResponse.StatusCode = 501;

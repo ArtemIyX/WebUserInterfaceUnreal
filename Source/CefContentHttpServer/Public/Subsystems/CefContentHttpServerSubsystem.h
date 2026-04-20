@@ -13,6 +13,9 @@ class CEFCONTENTHTTPSERVER_API UCefContentHttpServerSubsystem : public UGameInst
 {
 	GENERATED_BODY()
 
+	
+public:
+	UCefContentHttpServerSubsystem();
 public:
 	virtual void Initialize(FSubsystemCollectionBase& InCollection) override;
 	virtual void Deinitialize() override;
