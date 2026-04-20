@@ -112,15 +112,16 @@ void FCefNetWebSocket::Close(uint16 InStatusCode, const FString& InReason)
 		return;
 	}
 
-	FTCHARToUTF8 utf8Reason(*InReason);
-	const uint8* reasonData = nullptr;
-	int reasonLen = 0;
-	if (utf8Reason.Length() > 0)
+	TArray<uint8> reasonBytes;
+	if (!InReason.IsEmpty())
 	{
-		reasonData = reinterpret_cast<const uint8*>(utf8Reason.Get());
-		reasonLen = utf8Reason.Length();
+		FTCHARToUTF8 utf8Reason(*InReason);
+		reasonBytes.Append(reinterpret_cast<const uint8*>(utf8Reason.Get()), utf8Reason.Length());
 	}
-	lws_close_reason(Wsi, InStatusCode, reasonData, reasonLen);
+
+	uint8* reasonData = reasonBytes.Num() > 0 ? reasonBytes.GetData() : nullptr;
+	const size_t reasonLen = static_cast<size_t>(reasonBytes.Num());
+	lws_close_reason(Wsi, static_cast<lws_close_status>(InStatusCode), reasonData, reasonLen);
 	lws_callback_on_writable(Wsi);
 }
 
