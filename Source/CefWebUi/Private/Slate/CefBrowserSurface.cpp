@@ -109,8 +109,20 @@ SCefBrowserSurface::~SCefBrowserSurface()
 void SCefBrowserSurface::Construct(const FArguments& inArgs)
 {
 	BrowserSession = inArgs._BrowserSession;
-	BrowserWidth = FMath::Max(1, inArgs._BrowserWidth);
-	BrowserHeight = FMath::Max(1, inArgs._BrowserHeight);
+	DesiredBrowserWidth = FMath::Max(1, inArgs._BrowserWidth);
+	DesiredBrowserHeight = FMath::Max(1, inArgs._BrowserHeight);
+	AppliedBrowserWidth = DesiredBrowserWidth;
+	AppliedBrowserHeight = DesiredBrowserHeight;
+	TargetBrowserWidth = DesiredBrowserWidth;
+	TargetBrowserHeight = DesiredBrowserHeight;
+	LastSentBrowserWidth = DesiredBrowserWidth;
+	LastSentBrowserHeight = DesiredBrowserHeight;
+	bAutoResizePending = false;
+	bAwaitingAutoResizeApply = false;
+	AutoResizeRetryCount = 0;
+	LastAutoResizeObservedTimeSec = 0.0;
+	LastAutoResizeSentTimeSec = 0.0;
+	LastAutoResizeAwaitStartTimeSec = 0.0;
 	LastConsumerFrameTimeSec = 0.0;
 	LastCadenceSentTimeSec = 0.0;
 	LastHostTuningPushTimeSec = 0.0;
@@ -151,8 +163,20 @@ void SCefBrowserSurface::SetBrowserSession(TWeakObjectPtr<UCefWebUiBrowserSessio
 
 void SCefBrowserSurface::SetBrowserSize(int32 inBrowserWidth, int32 inBrowserHeight)
 {
-	BrowserWidth = FMath::Max(1, inBrowserWidth);
-	BrowserHeight = FMath::Max(1, inBrowserHeight);
+	DesiredBrowserWidth = FMath::Max(1, inBrowserWidth);
+	DesiredBrowserHeight = FMath::Max(1, inBrowserHeight);
+	AppliedBrowserWidth = DesiredBrowserWidth;
+	AppliedBrowserHeight = DesiredBrowserHeight;
+	TargetBrowserWidth = DesiredBrowserWidth;
+	TargetBrowserHeight = DesiredBrowserHeight;
+	LastSentBrowserWidth = DesiredBrowserWidth;
+	LastSentBrowserHeight = DesiredBrowserHeight;
+	bAutoResizePending = false;
+	bAwaitingAutoResizeApply = false;
+	AutoResizeRetryCount = 0;
+	LastAutoResizeObservedTimeSec = 0.0;
+	LastAutoResizeSentTimeSec = 0.0;
+	LastAutoResizeAwaitStartTimeSec = 0.0;
 }
 
 int32 SCefBrowserSurface::OnPaint(
@@ -226,7 +250,8 @@ void SCefBrowserSurface::Tick(const FGeometry& allottedGeometry, const double in
 
 FVector2D SCefBrowserSurface::ComputeDesiredSize(float layoutScaleMultiplier) const
 {
-	return FVector2D(static_cast<float>(BrowserWidth), static_cast<float>(BrowserHeight));
+	(void)layoutScaleMultiplier;
+	return FVector2D(static_cast<float>(DesiredBrowserWidth), static_cast<float>(DesiredBrowserHeight));
 }
 
 FReply SCefBrowserSurface::OnMouseMove(const FGeometry& myGeometry, const FPointerEvent& mouseEvent)
@@ -897,14 +922,33 @@ void SCefBrowserSurface::ReleaseResources()
 	bTriedOpenSharedGpuFence = false;
 }
 
+void SCefBrowserSurface::MaybeQueueAutoResize(const FGeometry& inAllottedGeometry, double inNowSec)
+{
+	(void)inAllottedGeometry;
+	(void)inNowSec;
+}
+
+void SCefBrowserSurface::MaybeSendAutoResize(double inNowSec)
+{
+	(void)inNowSec;
+}
+
+void SCefBrowserSurface::HandleAppliedFrameSize(int32 inFrameWidth, int32 inFrameHeight) const
+{
+	(void)inFrameWidth;
+	(void)inFrameHeight;
+}
+
 void SCefBrowserSurface::GetBrowserCoords(const FGeometry& inGeometry, const FVector2D& inScreenPosition, int32& outX, int32& outY) const
 {
 	const FVector2D localPos = inGeometry.AbsoluteToLocal(inScreenPosition);
 	const FVector2D localSize = inGeometry.GetLocalSize();
 	const float width = FMath::Max(localSize.X, 1.0f);
 	const float height = FMath::Max(localSize.Y, 1.0f);
-	outX = FMath::Clamp(FMath::RoundToInt(localPos.X / width * BrowserWidth), 0, BrowserWidth - 1);
-	outY = FMath::Clamp(FMath::RoundToInt(localPos.Y / height * BrowserHeight), 0, BrowserHeight - 1);
+	const int32 browserWidth = FMath::Max(1, AppliedBrowserWidth);
+	const int32 browserHeight = FMath::Max(1, AppliedBrowserHeight);
+	outX = FMath::Clamp(FMath::RoundToInt(localPos.X / width * browserWidth), 0, browserWidth - 1);
+	outY = FMath::Clamp(FMath::RoundToInt(localPos.Y / height * browserHeight), 0, browserHeight - 1);
 }
 
 bool SCefBrowserSurface::SlateButtonToCef(const FKey& inKey, ECefMouseButton& outButton)

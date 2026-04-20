@@ -851,3 +851,22 @@ YYYY-MM-DD HH:MM
 - UTF-8 decode strictness is now runtime-configurable.
 
 ---
+## 2026-04-20 10:27
+
+### Changed
+- Resize Task 1/4: added auto-resize state/config scaffolding in browser surface.
+- Added auto-resize tuning constants in CefBrowserSurfaceConstants.h (enable flag, min size/delta, throttle/debounce, apply-timeout, retries).
+- Refactored browser surface size state split:
+  - desired widget size
+  - applied input-mapping size
+  - requested/target tracking fields.
+- Added stub methods for upcoming resize state machine (MaybeQueueAutoResize, MaybeSendAutoResize, HandleAppliedFrameSize).
+
+### Why
+- Prepare safe, explicit resize state model before enabling behavior changes.
+
+### Impact
+- No active auto-resize behavior yet.
+- Input mapping now references explicit applied-size state.
+
+---

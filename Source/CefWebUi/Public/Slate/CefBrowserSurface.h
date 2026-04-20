@@ -83,6 +83,9 @@ private:
 	bool EnsurePopupPlaneRhi() const;
 	bool EnsureSharedGpuFence() const;
 	bool IsFrameGpuReady(const FCefSharedFrame& InFrame) const;
+	void MaybeQueueAutoResize(const FGeometry& InAllottedGeometry, double InNowSec);
+	void MaybeSendAutoResize(double InNowSec);
+	void HandleAppliedFrameSize(int32 InFrameWidth, int32 InFrameHeight) const;
 	void ReleaseResources();
 	void GetBrowserCoords(const FGeometry& InGeometry, const FVector2D& InScreenPosition, int32& OutX, int32& OutY) const;
 	static bool SlateButtonToCef(const FKey& InKey, ECefMouseButton& OutButton);
@@ -93,8 +96,20 @@ private:
 	static constexpr uint32 MaxSharedSlots = 3;
 
 	TWeakObjectPtr<UCefWebUiBrowserSession> BrowserSession;
-	int32 BrowserWidth = 1920;
-	int32 BrowserHeight = 1080;
+	int32 DesiredBrowserWidth = 1920;
+	int32 DesiredBrowserHeight = 1080;
+	mutable int32 AppliedBrowserWidth = 1920;
+	mutable int32 AppliedBrowserHeight = 1080;
+	int32 TargetBrowserWidth = 0;
+	int32 TargetBrowserHeight = 0;
+	int32 LastSentBrowserWidth = 0;
+	int32 LastSentBrowserHeight = 0;
+	bool bAutoResizePending = false;
+	mutable bool bAwaitingAutoResizeApply = false;
+	mutable int32 AutoResizeRetryCount = 0;
+	double LastAutoResizeObservedTimeSec = 0.0;
+	double LastAutoResizeSentTimeSec = 0.0;
+	mutable double LastAutoResizeAwaitStartTimeSec = 0.0;
 
 	mutable TWeakPtr<FCefFrameReader> FrameReader;
 	mutable TWeakPtr<FCefControlWriter> ControlWriter;
