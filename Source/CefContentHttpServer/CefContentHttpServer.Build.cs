@@ -18,6 +18,9 @@ public class CefContentHttpServer : ModuleRules
         PrivateDependencyModuleNames.AddRange(
             new string[]
             {
+                "HttpServer",
+                "ImageWrapper",
+                "Json",
                 "Slate",
                 "SlateCore"
             }

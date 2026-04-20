@@ -15,7 +15,11 @@ public:
 	virtual void ShutdownModule() override;
 
 	class FCefContentImageCacheService* GetImageCacher() const;
+	class FCefContentImageEncodeService* GetImageEncoder() const;
+	class FCefContentHttpServerRuntimeService* GetHttpServerService() const;
 
 private:
 	TSharedPtr<class FCefContentImageCacheService> ImageCacher;
+	TSharedPtr<class FCefContentImageEncodeService> ImageEncoder;
+	TSharedPtr<class FCefContentHttpServerRuntimeService> HttpServerService;
 };
