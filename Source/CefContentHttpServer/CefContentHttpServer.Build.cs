@@ -2,7 +2,7 @@
 
 public class CefContentHttpServer : ModuleRules
 {
-    public CefContentHttpServer(ReadOnlyTargetRules Target) : base(Target)
+    public CefContentHttpServer(ReadOnlyTargetRules InTarget) : base(InTarget)
     {
         PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 

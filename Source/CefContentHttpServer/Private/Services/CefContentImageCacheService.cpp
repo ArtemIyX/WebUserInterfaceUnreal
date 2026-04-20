@@ -8,95 +8,95 @@
 
 FString FCefContentImageCacheService::NormalizeAssetPath(const FString& InPackagePath) const
 {
-    FString AssetPath = InPackagePath.TrimStartAndEnd();
-    if (AssetPath.IsEmpty())
-    {
-        return AssetPath;
-    }
+	FString assetPath = InPackagePath.TrimStartAndEnd();
+	if (assetPath.IsEmpty())
+	{
+		return assetPath;
+	}
 
-    if (!AssetPath.Contains(TEXT(".")))
-    {
-        const FString AssetName = FPackageName::GetShortName(AssetPath);
-        if (!AssetName.IsEmpty())
-        {
-            AssetPath = FString::Printf(TEXT("%s.%s"), *AssetPath, *AssetName);
-        }
-    }
+	if (!assetPath.Contains(TEXT(".")))
+	{
+		const FString assetName = FPackageName::GetShortName(assetPath);
+		if (!assetName.IsEmpty())
+		{
+			assetPath = FString::Printf(TEXT("%s.%s"), *assetPath, *assetName);
+		}
+	}
 
-    return AssetPath;
+	return assetPath;
 }
 
 bool FCefContentImageCacheService::GetImageByPackagePath(const FString& InPackagePath, UTexture2D*& OutImage)
 {
-    OutImage = nullptr;
-    const FString NormalizedPath = NormalizeAssetPath(InPackagePath);
-    if (NormalizedPath.IsEmpty())
-    {
-        UE_LOG(LogCefContentHttpServer, Error, TEXT("GetImageByPackagePath failed: input path is empty"));
-        return false;
-    }
+	OutImage = nullptr;
+	const FString normalizedPath = NormalizeAssetPath(InPackagePath);
+	if (normalizedPath.IsEmpty())
+	{
+		UE_LOG(LogCefContentHttpServer, Error, TEXT("GetImageByPackagePath failed: input path is empty"));
+		return false;
+	}
 
-    {
-        FScopeLock Lock(&CacheMutex);
-        if (const TStrongObjectPtr<UTexture2D>* CachedImage = CachedImagesByPath.Find(NormalizedPath))
-        {
-            if (CachedImage->IsValid())
-            {
-                OutImage = CachedImage->Get();
-                UE_LOG(LogCefContentHttpServer, Verbose, TEXT("Cache hit for '%s'"), *NormalizedPath);
-                return true;
-            }
+	{
+		FScopeLock lock(&CacheMutex);
+		if (const TStrongObjectPtr<UTexture2D>* cachedImage = CachedImagesByPath.Find(normalizedPath))
+		{
+			if (cachedImage->IsValid())
+			{
+				OutImage = cachedImage->Get();
+				UE_LOG(LogCefContentHttpServer, Verbose, TEXT("Cache hit for '%s'"), *normalizedPath);
+				return true;
+			}
 
-            UE_LOG(LogCefContentHttpServer, Warning, TEXT("Stale cache entry for '%s', removing"), *NormalizedPath);
-            CachedImagesByPath.Remove(NormalizedPath);
-            SET_DWORD_STAT(STAT_CefContentHttpServer_CachedImages, static_cast<uint32>(CachedImagesByPath.Num()));
-        }
-    }
+			UE_LOG(LogCefContentHttpServer, Warning, TEXT("Stale cache entry for '%s', removing"), *normalizedPath);
+			CachedImagesByPath.Remove(normalizedPath);
+			SET_DWORD_STAT(STAT_CefContentHttpServer_CachedImages, static_cast<uint32>(CachedImagesByPath.Num()));
+		}
+	}
 
-    FSoftObjectPath SoftPath(NormalizedPath);
-    UE_LOG(LogCefContentHttpServer, Verbose, TEXT("Cache miss for '%s'. Loading asset"), *NormalizedPath);
-    if (!SoftPath.IsValid())
-    {
-        UE_LOG(LogCefContentHttpServer, Error, TEXT("Invalid image asset path '%s'"), *NormalizedPath);
-        return false;
-    }
+	FSoftObjectPath softPath(normalizedPath);
+	UE_LOG(LogCefContentHttpServer, Verbose, TEXT("Cache miss for '%s'. Loading asset"), *normalizedPath);
+	if (!softPath.IsValid())
+	{
+		UE_LOG(LogCefContentHttpServer, Error, TEXT("Invalid image asset path '%s'"), *normalizedPath);
+		return false;
+	}
 
-    UObject* const LoadedObject = SoftPath.TryLoad();
-    if (!LoadedObject)
-    {
-        UE_LOG(LogCefContentHttpServer, Error, TEXT("Failed to load image from path '%s'"), *NormalizedPath);
-        return false;
-    }
+	UObject* const loadedObject = softPath.TryLoad();
+	if (!loadedObject)
+	{
+		UE_LOG(LogCefContentHttpServer, Error, TEXT("Failed to load image from path '%s'"), *normalizedPath);
+		return false;
+	}
 
-    UTexture2D* const LoadedTexture = Cast<UTexture2D>(LoadedObject);
-    if (!LoadedTexture)
-    {
-        UE_LOG(LogCefContentHttpServer, Error, TEXT("Loaded asset '%s' is not UTexture2D (actual class: %s)"), *NormalizedPath, *LoadedObject->GetClass()->GetName());
-        return false;
-    }
+	UTexture2D* const loadedTexture = Cast<UTexture2D>(loadedObject);
+	if (!loadedTexture)
+	{
+		UE_LOG(LogCefContentHttpServer, Error, TEXT("Loaded asset '%s' is not UTexture2D (actual class: %s)"), *normalizedPath, *loadedObject->GetClass()->GetName());
+		return false;
+	}
 
-    {
-        FScopeLock Lock(&CacheMutex);
-        CachedImagesByPath.Add(NormalizedPath, TStrongObjectPtr<UTexture2D>(LoadedTexture));
-        SET_DWORD_STAT(STAT_CefContentHttpServer_CachedImages, static_cast<uint32>(CachedImagesByPath.Num()));
-        UE_LOG(LogCefContentHttpServer, Log, TEXT("Cached image '%s'. Cached images: %d"), *NormalizedPath, CachedImagesByPath.Num());
-    }
+	{
+		FScopeLock lock(&CacheMutex);
+		CachedImagesByPath.Add(normalizedPath, TStrongObjectPtr<UTexture2D>(loadedTexture));
+		SET_DWORD_STAT(STAT_CefContentHttpServer_CachedImages, static_cast<uint32>(CachedImagesByPath.Num()));
+		UE_LOG(LogCefContentHttpServer, Log, TEXT("Cached image '%s'. Cached images: %d"), *normalizedPath, CachedImagesByPath.Num());
+	}
 
-    OutImage = LoadedTexture;
-    return true;
+	OutImage = loadedTexture;
+	return true;
 }
 
 int32 FCefContentImageCacheService::GetCachedImageCount() const
 {
-    FScopeLock Lock(&CacheMutex);
-    return CachedImagesByPath.Num();
+	FScopeLock lock(&CacheMutex);
+	return CachedImagesByPath.Num();
 }
 
 void FCefContentImageCacheService::ClearCache()
 {
-    FScopeLock Lock(&CacheMutex);
-    const int32 NumCachedBeforeClear = CachedImagesByPath.Num();
-    CachedImagesByPath.Reset();
-    SET_DWORD_STAT(STAT_CefContentHttpServer_CachedImages, 0);
-    UE_LOG(LogCefContentHttpServer, Log, TEXT("Image cache cleared. Removed %d cached images"), NumCachedBeforeClear);
+	FScopeLock lock(&CacheMutex);
+	const int32 numCachedBeforeClear = CachedImagesByPath.Num();
+	CachedImagesByPath.Reset();
+	SET_DWORD_STAT(STAT_CefContentHttpServer_CachedImages, 0);
+	UE_LOG(LogCefContentHttpServer, Log, TEXT("Image cache cleared. Removed %d cached images"), numCachedBeforeClear);
 }
