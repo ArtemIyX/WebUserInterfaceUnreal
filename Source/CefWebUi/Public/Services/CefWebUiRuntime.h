@@ -7,6 +7,7 @@
 
 #include "HAL/PlatformProcess.h"
 #include "Containers/Ticker.h"
+#include "Services/CefSharedMemoryNames.h"
 
 class FCefInputWriter;
 class FCefFrameReader;
@@ -22,7 +23,7 @@ public:
 	~FCefWebUiRuntime();
 
 	/** @brief EnsureStarted API. */
-	void EnsureStarted();
+	void EnsureStarted(const FString& InSessionId);
 	/** @brief Shutdown API. */
 	void Shutdown();
 
@@ -75,5 +76,7 @@ private:
 	FProcHandle HostProcess;
 	/** @brief JobHandle state. */
 	void* JobHandle = nullptr;
+	FString SessionScope;
+	FCefSharedMemoryNames SharedNames;
 };
 

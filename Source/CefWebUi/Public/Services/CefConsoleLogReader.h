@@ -7,6 +7,7 @@
 
 #include "CoreMinimal.h"
 #include "Data/CefConsoleLogLevel.h"
+#include "Services/CefSharedMemoryNames.h"
 
 namespace Windows
 {
@@ -25,7 +26,7 @@ class CEFWEBUI_API FCefConsoleLogReader : public FRunnable
 {
 public:
 	/** @brief FCefConsoleLogReader API. */
-	FCefConsoleLogReader();
+	explicit FCefConsoleLogReader(const FCefSharedMemoryNames& InNames);
 	virtual ~FCefConsoleLogReader() override;
 
 	/** @brief Start API. */
@@ -53,5 +54,6 @@ private:
 	/** @brief Thread state. */
 	FRunnableThread* Thread = nullptr;
 	std::atomic<bool> bRunning{ false };
+	FCefSharedMemoryNames Names;
 };
 

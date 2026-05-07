@@ -8,6 +8,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Services/CefSharedMemoryNames.h"
 
 namespace Windows
 {
@@ -40,7 +41,7 @@ class CEFWEBUI_API FCefInputWriter
 {
 public:
 	/** @brief FCefInputWriter API. */
-	FCefInputWriter();
+	explicit FCefInputWriter(const FCefSharedMemoryNames& InNames);
 	/** @brief FCefInputWriter API. */
 	virtual ~FCefInputWriter();
 
@@ -123,5 +124,6 @@ private:
 
 	/** @brief WriteLock state. */
 	FCriticalSection WriteLock;
+	FCefSharedMemoryNames Names;
 };
 

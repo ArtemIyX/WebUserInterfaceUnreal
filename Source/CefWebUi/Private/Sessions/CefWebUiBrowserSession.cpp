@@ -417,7 +417,7 @@ void UCefWebUiBrowserSession::EnsureRuntimeStarted()
 	{
 		Runtime = MakeUnique<FCefWebUiRuntime>();
 	}
-	Runtime->EnsureStarted();
+	Runtime->EnsureStarted(SessionId.ToString());
 
 	if (!RuntimeFrameReader.IsValid())
 	{

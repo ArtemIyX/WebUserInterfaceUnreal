@@ -16,8 +16,6 @@
 // ---- Mirror of SharedMemoryLayout.h (keep in sync) -------------------------
 
 static constexpr uint32 INPUT_RING_CAPACITY = 256;
-static constexpr const wchar_t* SHM_INPUT_NAME = L"CEFHost_Input";
-static constexpr const wchar_t* EVT_INPUT_READY = L"CEFHost_InputReady";
 
 #pragma pack(push, 1)
 
@@ -66,7 +64,8 @@ struct FInputRingBuffer
 
 // -----------------------------------------------------------------------------
 
-FCefInputWriter::FCefInputWriter()
+FCefInputWriter::FCefInputWriter(const FCefSharedMemoryNames& InNames)
+	: Names(InNames)
 {
 }
 
@@ -77,7 +76,7 @@ FCefInputWriter::~FCefInputWriter()
 
 bool FCefInputWriter::Open()
 {
-	HMap = OpenFileMappingW(FILE_MAP_READ | FILE_MAP_WRITE, Windows::FALSE, SHM_INPUT_NAME);
+	HMap = OpenFileMappingW(FILE_MAP_READ | FILE_MAP_WRITE, Windows::FALSE, *Names.InputMapName);
 	if (!HMap)
 	{
 		UE_LOG(LogCefWebUi, Warning, TEXT("FCefInputWriter: Input shared memory not available yet."));
@@ -92,7 +91,7 @@ bool FCefInputWriter::Open()
 		return false;
 	}
 
-	HEvent = OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE, Windows::FALSE, EVT_INPUT_READY);
+	HEvent = OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE, Windows::FALSE, *Names.InputReadyEventName);
 	if (!HEvent)
 	{
 		UE_LOG(LogCefWebUi, Error, TEXT("FCefInputWriter: OpenEvent failed."));

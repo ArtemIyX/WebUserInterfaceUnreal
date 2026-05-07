@@ -83,7 +83,8 @@ struct FCefFrameHeader
 constexpr uint32 SHM_FRAME_SLOT_COUNT = 3;
 constexpr uint32 SHM_FRAME_TOTAL = sizeof(FCefFrameHeader) + SHM_FRAME_SIZE * SHM_FRAME_SLOT_COUNT;
 
-FCefFrameReader::FCefFrameReader()
+FCefFrameReader::FCefFrameReader(const FCefSharedMemoryNames& InNames)
+	: Names(InNames)
 {
 }
 
@@ -94,7 +95,7 @@ FCefFrameReader::~FCefFrameReader()
 
 bool FCefFrameReader::Start()
 {
-	HMap = OpenFileMappingW(FILE_MAP_READ, false, L"CEFHost_Frame");
+	HMap = OpenFileMappingW(FILE_MAP_READ, false, *Names.FrameMapName);
 	if (!HMap)
 	{
 		UE_LOG(LogCefWebUi, Warning, TEXT("FCefFrameReader: Shared memory not available yet."));
@@ -121,7 +122,7 @@ bool FCefFrameReader::Start()
 	LastKnownLoadStateRaw.store(startupHeader->load_state, std::memory_order_relaxed);
 	LastLoadState = static_cast<ECefLoadState>(startupHeader->load_state);
 
-	HEvent = OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE, false, L"CEFHost_FrameReady");
+	HEvent = OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE, false, *Names.FrameReadyEventName);
 	if (!HEvent)
 	{
 		UE_LOG(LogCefWebUi, Error, TEXT("FCefFrameReader: OpenEvent failed."));

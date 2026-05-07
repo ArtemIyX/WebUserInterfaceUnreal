@@ -10,6 +10,7 @@
 #include "CoreMinimal.h"
 #include "Data/CefCustomCursorType.h"
 #include "Data/CefLoadState.h"
+#include "Services/CefSharedMemoryNames.h"
 
 namespace Windows
 {
@@ -86,7 +87,7 @@ class CEFWEBUI_API FCefFrameReader : public FRunnable
 {
 public:
 	/** @brief FCefFrameReader API. */
-	FCefFrameReader();
+	explicit FCefFrameReader(const FCefSharedMemoryNames& InNames);
 	virtual ~FCefFrameReader() override;
 
 	/**
@@ -158,5 +159,6 @@ private:
 	/** @brief LastDeliveredFrameId state. */
 	uint64 LastDeliveredFrameId = 0;
 	uint64 LastSharedHandle = 0; // track handle value to detect texture recreation
+	FCefSharedMemoryNames Names;
 };
 

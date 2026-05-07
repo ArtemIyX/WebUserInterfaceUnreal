@@ -8,13 +8,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Services/CefSharedMemoryNames.h"
 
 /** @brief Type declaration. */
 class CEFWEBUI_API FCefControlWriter
 {
 public:
 	/** @brief FCefControlWriter API. */
-	FCefControlWriter();
+	explicit FCefControlWriter(const FCefSharedMemoryNames& InNames);
 	/** @brief FCefControlWriter API. */
 	virtual ~FCefControlWriter();
 
@@ -101,5 +102,6 @@ private:
 
 	/** @brief WriteLock state. */
 	FCriticalSection WriteLock;
+	FCefSharedMemoryNames Names;
 };
 
