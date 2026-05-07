@@ -17,15 +17,18 @@ FCefWebUiRuntime::~FCefWebUiRuntime()
 	Shutdown();
 }
 
-void FCefWebUiRuntime::EnsureStarted()
+void FCefWebUiRuntime::EnsureStarted(const FString& InSessionId)
 {
 	if (bStarted)
 		return;
 
-	FrameReader = MakeShared<FCefFrameReader>();
-	InputWriter = MakeShared<FCefInputWriter>();
-	ControlWriter = MakeShared<FCefControlWriter>();
-	ConsoleLogReader = MakeShared<FCefConsoleLogReader>();
+	SessionScope = BuildCefSessionScope(InSessionId);
+	SharedNames = BuildCefSharedMemoryNames(SessionScope);
+
+	FrameReader = MakeShared<FCefFrameReader>(SharedNames);
+	InputWriter = MakeShared<FCefInputWriter>(SharedNames);
+	ControlWriter = MakeShared<FCefControlWriter>(SharedNames);
+	ConsoleLogReader = MakeShared<FCefConsoleLogReader>(SharedNames);
 	bStarted = true;
 	bFrameReaderStarted = false;
 	bConsoleLogReaderStarted = false;
@@ -140,7 +143,10 @@ void FCefWebUiRuntime::LaunchHostProcess()
 	si.cb = sizeof(si);
 	PROCESS_INFORMATION pi = {};
 
-	FString cmdLine = FString::Printf(TEXT("\"%s\""), *hostPath);
+	const FString sessionArg = SessionScope.IsEmpty()
+		? FString()
+		: FString::Printf(TEXT(" --session-id=\"%s\""), *SessionScope);
+	FString cmdLine = FString::Printf(TEXT("\"%s\"%s"), *hostPath, *sessionArg);
 	if (!CreateProcess(
 		nullptr,
 		cmdLine.GetCharArray().GetData(),
@@ -160,7 +166,9 @@ void FCefWebUiRuntime::LaunchHostProcess()
 
 	HostProcess = FProcHandle(pi.hProcess);
 	CloseHandle(pi.hThread);
-	UE_LOG(LogCefWebUi, Log, TEXT("CefWebUi: Host.exe launched from %s"), *hostPath);
+	UE_LOG(LogCefWebUi, Log, TEXT("CefWebUi: Host.exe launched from %s with session '%s'"),
+		*hostPath,
+		SessionScope.IsEmpty() ? TEXT("<legacy>") : *SessionScope);
 }
 
 void FCefWebUiRuntime::KillHostProcess()

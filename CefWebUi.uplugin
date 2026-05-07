@@ -33,6 +33,11 @@
 			"Name": "CefDispatch",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "CefContentHttpServer",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
 		}
 	]
 }

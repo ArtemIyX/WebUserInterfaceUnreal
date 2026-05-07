@@ -13,8 +13,6 @@ namespace
 static constexpr uint32 CEF_CONSOLE_RING_CAPACITY = 256;
 static constexpr uint32 CEF_CONSOLE_MESSAGE_MAX = 1024;
 static constexpr uint32 CEF_CONSOLE_SOURCE_MAX = 256;
-static constexpr const wchar_t* CEF_SHM_CONSOLE_NAME = L"CEFHost_Console";
-static constexpr const wchar_t* CEF_EVT_CONSOLE_READY = L"CEFHost_ConsoleReady";
 
 #pragma pack(push, 1)
 struct FCefConsoleEvent
@@ -37,7 +35,8 @@ struct FCefConsoleRingBuffer
 #pragma pack(pop)
 }
 
-FCefConsoleLogReader::FCefConsoleLogReader()
+FCefConsoleLogReader::FCefConsoleLogReader(const FCefSharedMemoryNames& InNames)
+	: Names(InNames)
 {
 }
 
@@ -48,7 +47,7 @@ FCefConsoleLogReader::~FCefConsoleLogReader()
 
 bool FCefConsoleLogReader::Start()
 {
-	HMap = OpenFileMappingW(FILE_MAP_READ | FILE_MAP_WRITE, false, CEF_SHM_CONSOLE_NAME);
+	HMap = OpenFileMappingW(FILE_MAP_READ | FILE_MAP_WRITE, false, *Names.ConsoleMapName);
 	if (!HMap)
 	{
 		UE_LOG(LogCefWebUi, Verbose, TEXT("FCefConsoleLogReader: Shared memory not available yet."));
@@ -63,7 +62,7 @@ bool FCefConsoleLogReader::Start()
 		return false;
 	}
 
-	HEvent = OpenEventW(SYNCHRONIZE, false, CEF_EVT_CONSOLE_READY);
+	HEvent = OpenEventW(SYNCHRONIZE, false, *Names.ConsoleReadyEventName);
 	if (!HEvent)
 	{
 		UE_LOG(LogCefWebUi, Error, TEXT("FCefConsoleLogReader: OpenEvent failed."));

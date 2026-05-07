@@ -162,6 +162,85 @@ All structures **must** match exactly with the CEF Host side (`SharedMemoryLayou
 
 ---
 
+## 9. CefContentHttpServer Module
+
+This module serves UE assets over HTTP (currently image-focused) and is integrated through a `UGameInstanceSubsystem`.
+
+### Core Runtime Pieces
+
+- `FCefContentHttpServerModule`
+  - Owns module-singleton services:
+    - `FCefContentImageCacheService`
+    - `FCefContentImageEncodeService`
+    - `FCefContentHttpServerRuntimeService`
+  - Exposes:
+    - `GetImageCacher()`
+    - `GetImageEncoder()`
+    - `GetHttpServerService()`
+
+- `UCefContentHttpServerSubsystem`
+  - Starts HTTP server on `Initialize`
+  - Stops HTTP server on `Deinitialize`
+  - Default port: `18080`
+  - Main APIs:
+    - `StartServer(int32 InPortOverride = 0)`
+    - `StopServer()`
+    - `IsServerRunning()`
+    - `SetRequestHandlerClass(...)`
+    - `GetImageByPackagePath(...)`
+    - `ClearCachedImages()`
+    - `GetCachedImageCount()`
+
+- `FCefContentHttpServerRuntimeService`
+  - Binds route: `GET /img`
+  - Parses asset path from:
+    - Query param: `asset` (also accepts `aasset`)
+    - JSON body: `{ "asset": "..." }` (also supports `"asset="` key)
+    - Raw body fallback: `asset=...`
+  - Delegates request to handler UObject
+
+- `UCefContentHttpImageRequestHandler`
+  - Pluggable request strategy (BlueprintNativeEvent)
+  - Contract:
+    - input: `FCefContentHttpImageRequestContext`
+    - output: `FCefContentHttpImageResponse`
+
+- `UCefContentDefaultImageRequestHandler`
+  - Default behavior:
+    1. Resolve `asset` path from request
+    2. Load texture via module cache service
+    3. Encode texture to PNG via module encode service
+    4. Return `200 image/png` bytes
+
+### Route Contract
+
+- Endpoint: `http://localhost:<port>/img`
+- Query usage:
+  - `/img?asset=/Game/Textures/T_Logo.T_Logo`
+- Body usage:
+  - JSON: `{ "asset": "/Game/Textures/T_Logo.T_Logo" }`
+  - Form-like: `asset=/Game/Textures/T_Logo.T_Logo`
+
+### Logging and Stats
+
+- Log category: `LogCefContentHttpServer`
+- Stats:
+  - `STATGROUP_CefContentHttpServer`
+  - `STAT_CefContentHttpServer_CachedImages`
+
+### Build Dependencies (CefContentHttpServer)
+
+- Private:
+  - `HTTPServer`
+  - `ImageWrapper`
+  - `Json`
+
+### Extension Guidance
+
+- For custom request behavior, create a class derived from `UCefContentHttpImageRequestHandler`.
+- Register handler class via subsystem `SetRequestHandlerClass(...)`.
+- Keep module-owned services as singletons; do not transfer ownership to subsystem callers.
+
 You are now an expert on the **UE5 side** of this CEF integration.
 
 When the user asks you to modify, fix, extend, or add features to this UE5 plugin:

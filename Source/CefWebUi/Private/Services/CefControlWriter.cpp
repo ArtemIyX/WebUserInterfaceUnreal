@@ -15,8 +15,6 @@
 
 static constexpr uint32 CONTROL_RING_CAPACITY = 64;
 static constexpr uint32 CONTROL_STRING_MAX = 2048;
-static constexpr const wchar_t* SHM_CONTROL_NAME = L"CEFHost_Control";
-static constexpr const wchar_t* EVT_CONTROL_READY = L"CEFHost_ControlReady";
 
 #pragma pack(push, 1)
 
@@ -77,7 +75,8 @@ struct FControlRingBuffer
 
 #pragma pack(pop)
 
-FCefControlWriter::FCefControlWriter()
+FCefControlWriter::FCefControlWriter(const FCefSharedMemoryNames& InNames)
+	: Names(InNames)
 {
 }
 
@@ -88,7 +87,7 @@ FCefControlWriter::~FCefControlWriter()
 
 bool FCefControlWriter::Open()
 {
-	HMap = OpenFileMappingW(FILE_MAP_READ | FILE_MAP_WRITE, Windows::FALSE, SHM_CONTROL_NAME);
+	HMap = OpenFileMappingW(FILE_MAP_READ | FILE_MAP_WRITE, Windows::FALSE, *Names.ControlMapName);
 	if (!HMap)
 	{
 		UE_LOG(LogCefWebUi, Warning, TEXT("FCefControlWriter: Control shared memory not available yet."));
@@ -103,7 +102,7 @@ bool FCefControlWriter::Open()
 		return false;
 	}
 
-	HEvent = OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE, Windows::FALSE, EVT_CONTROL_READY);
+	HEvent = OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE, Windows::FALSE, *Names.ControlReadyEventName);
 	if (!HEvent)
 	{
 		UE_LOG(LogCefWebUi, Error, TEXT("FCefControlWriter: OpenEvent failed."));
