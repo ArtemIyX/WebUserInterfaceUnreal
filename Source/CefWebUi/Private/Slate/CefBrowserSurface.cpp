@@ -12,6 +12,7 @@
 #include "Sessions/CefWebUiBrowserSession.h"
 #include "Services/CefControlWriter.h"
 #include "Services/CefInputWriter.h"
+#include "Services/CefSharedMemoryNames.h"
 
 #include "Windows/AllowWindowsPlatformTypes.h"
 #include <d3d12.h>
@@ -100,6 +101,15 @@ private:
 	bool bPopupVisible = false;
 	bool bPopupPlane = false;
 };
+
+namespace
+{
+FCefSharedMemoryNames GetSurfaceSharedNames(const TWeakObjectPtr<UCefWebUiBrowserSession>& InSession)
+{
+	const FString sessionId = InSession.IsValid() ? InSession->GetSessionId().ToString() : FString();
+	return BuildCefSharedMemoryNames(BuildCefSessionScope(sessionId));
+}
+}
 
 SCefBrowserSurface::~SCefBrowserSurface()
 {
@@ -748,7 +758,8 @@ bool SCefBrowserSurface::EnsureSharedGpuFence() const
 	}
 
 	HANDLE sharedHandle = nullptr;
-	HRESULT hr = d3dDevice->OpenSharedHandleByName(L"Global\\CEFHost_SharedFence", GENERIC_ALL, &sharedHandle);
+	const FCefSharedMemoryNames names = GetSurfaceSharedNames(BrowserSession);
+	HRESULT hr = d3dDevice->OpenSharedHandleByName(*names.SharedGpuFenceName, GENERIC_ALL, &sharedHandle);
 	if (FAILED(hr) || !sharedHandle)
 	{
 		return false;
@@ -799,9 +810,11 @@ void SCefBrowserSurface::EnsureSharedRhi() const
 	{
 		return;
 	}
+	const FCefSharedMemoryNames sharedNames = GetSurfaceSharedNames(BrowserSession);
+	const FString sharedTexturePrefix = sharedNames.SharedTextureNamePrefix;
 
 	ENQUEUE_RENDER_COMMAND(CefSlateOpenSharedTextures)(
-		[this](FRHICommandListImmediate&)
+		[this, sharedTexturePrefix](FRHICommandListImmediate&)
 		{
 			ID3D12DynamicRHI* d3d12Rhi = GetID3D12DynamicRHI();
 			if (!d3d12Rhi)
@@ -822,10 +835,9 @@ void SCefBrowserSurface::EnsureSharedRhi() const
 					continue;
 				}
 
-				wchar_t name[64];
-				swprintf(name, 64, L"Global\\CEFHost_SharedTex_%u", i);
+				const FString textureName = FString::Printf(TEXT("%s_%u"), *sharedTexturePrefix, i);
 				HANDLE sharedHandle = nullptr;
-				HRESULT hr = d3dDevice->OpenSharedHandleByName(name, GENERIC_ALL, &sharedHandle);
+				HRESULT hr = d3dDevice->OpenSharedHandleByName(*textureName, GENERIC_ALL, &sharedHandle);
 				if (FAILED(hr) || !sharedHandle)
 				{
 					return;
@@ -856,9 +868,11 @@ bool SCefBrowserSurface::EnsurePopupPlaneRhi() const
 	{
 		return true;
 	}
+	const FCefSharedMemoryNames sharedNames = GetSurfaceSharedNames(BrowserSession);
+	const FString popupTextureName = sharedNames.SharedPopupTextureName;
 
 	ENQUEUE_RENDER_COMMAND(CefSlateOpenPopupTexture)(
-		[this](FRHICommandListImmediate&)
+		[this, popupTextureName](FRHICommandListImmediate&)
 		{
 			if (SharedPopupTextureRHI.IsValid())
 			{
@@ -878,7 +892,7 @@ bool SCefBrowserSurface::EnsurePopupPlaneRhi() const
 			}
 
 			HANDLE sharedHandle = nullptr;
-			HRESULT hr = d3dDevice->OpenSharedHandleByName(L"Global\\CEFHost_SharedPopupTex", GENERIC_ALL, &sharedHandle);
+			HRESULT hr = d3dDevice->OpenSharedHandleByName(*popupTextureName, GENERIC_ALL, &sharedHandle);
 			if (FAILED(hr) || !sharedHandle)
 			{
 				return;
