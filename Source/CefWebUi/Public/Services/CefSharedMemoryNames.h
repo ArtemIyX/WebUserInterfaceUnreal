@@ -12,6 +12,9 @@ struct FCefSharedMemoryNames
 	FString InputReadyEventName;
 	FString ControlReadyEventName;
 	FString ConsoleReadyEventName;
+	FString SharedTextureNamePrefix;
+	FString SharedPopupTextureName;
+	FString SharedGpuFenceName;
 };
 
 FString BuildCefSessionScope(const FString& InSessionId);

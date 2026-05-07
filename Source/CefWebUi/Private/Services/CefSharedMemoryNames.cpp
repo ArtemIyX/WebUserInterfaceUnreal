@@ -37,5 +37,8 @@ FCefSharedMemoryNames BuildCefSharedMemoryNames(const FString& InSessionScope)
 	Names.InputReadyEventName = MakeScopedName(TEXT("CEFHost_InputReady"), InSessionScope);
 	Names.ControlReadyEventName = MakeScopedName(TEXT("CEFHost_ControlReady"), InSessionScope);
 	Names.ConsoleReadyEventName = MakeScopedName(TEXT("CEFHost_ConsoleReady"), InSessionScope);
+	Names.SharedTextureNamePrefix = MakeScopedName(TEXT("Global\\CEFHost_SharedTex"), InSessionScope);
+	Names.SharedPopupTextureName = MakeScopedName(TEXT("Global\\CEFHost_SharedPopupTex"), InSessionScope);
+	Names.SharedGpuFenceName = MakeScopedName(TEXT("Global\\CEFHost_SharedFence"), InSessionScope);
 	return Names;
 }
