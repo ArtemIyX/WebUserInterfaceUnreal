@@ -6,6 +6,7 @@ public class CefProtobuf : ModuleRules
     public CefProtobuf(ReadOnlyTargetRules Target) : base(Target)
     {
         PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
+        CppStandard = CppStandardVersion.Cpp20;
 
         PublicDependencyModuleNames.AddRange(
             new string[]
@@ -13,6 +14,8 @@ public class CefProtobuf : ModuleRules
                 "Core",
             }
         );
+
+        PublicDefinitions.Add("PROTOBUF_FORCE_EMPTY_STRING_DYNAMIC_INIT=1");
 
         PrivateDependencyModuleNames.AddRange(
             new string[]
