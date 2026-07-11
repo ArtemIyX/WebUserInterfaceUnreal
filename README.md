@@ -102,12 +102,6 @@ Minimal flow:
    - `Resize`
    - `SetFocus`
 
-If you have a blueprint screenshot for onboarding, add it here:
-
-```md
-![Minimal Blueprint Setup](Resources/Docs/blueprint_quick_start.png)
-```
-
 ---
 
 ## 6) C++ Quick Start
@@ -157,6 +151,7 @@ session->OpenDevTools();
 
 Use it when you want compact, schema-based transport between UE and browser/backend.
 
+[Protocol Buffers v36.0-rc1](https://github.com/protocolbuffers/protobuf/releases#release-v36.0-rc1)
 ---
 
 ## 8) Why `CefDispatch` Module Exists
