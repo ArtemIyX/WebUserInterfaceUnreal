@@ -27,6 +27,7 @@ public class CefProtobuf : ModuleRules
             }
         );
 
+
         string thirdPartyRoot = Path.GetFullPath(Path.Combine(ModuleDirectory, "..", "ThirdParty"));
         string protobufRoot = Path.Combine(thirdPartyRoot, "Protobuf");
         string protobufIncludePath = Path.Combine(protobufRoot, "include");

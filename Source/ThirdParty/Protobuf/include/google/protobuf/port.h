@@ -876,7 +876,7 @@ class alignas(8) GlobalEmptyStringConstexpr {
   // evaluation, not that a constant evaluated instance can leak into runtime.
   // Memory allocated during constant evaluation can't be used for runtime
   // objects.
-#if !defined(PROTOBUF_FORCE_EMPTY_STRING_DYNAMIC_INIT) && !defined(__XTENSA__)
+#if !defined(__XTENSA__)
   // Disable the optimization for Xtensa.
   // Compilation fails on Xtensa: b/467129751
   template <
