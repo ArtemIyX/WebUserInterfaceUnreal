@@ -1,7 +1,7 @@
 ﻿{
 	"FileVersion": 3,
-	"Version": 1,
-	"VersionName": "1.0",
+	"Version": 3,
+	"VersionName": "1.0.3",
 	"FriendlyName": "CefWebUi",
 	"Description": "Web UI (cef as process)",
 	"Category": "Other",
