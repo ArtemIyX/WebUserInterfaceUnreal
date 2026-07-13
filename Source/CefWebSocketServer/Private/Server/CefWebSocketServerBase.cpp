@@ -7,9 +7,8 @@
 #include "Server/CefWebSocketClientBase.h"
 #include "Server/CefWebSocketServerInstance.h"
 
-UCefWebSocketServerBase::UCefWebSocketServerBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
-{
-}
+UCefWebSocketServerBase::UCefWebSocketServerBase(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer) {}
 
 void UCefWebSocketServerBase::BeginDestroy()
 {
@@ -18,8 +17,8 @@ void UCefWebSocketServerBase::BeginDestroy()
 }
 
 bool UCefWebSocketServerBase::StartServerInternal(FName InNameId, int32 InBoundPort,
-                                                  TSubclassOf<UCefWebSocketClientBase> InClientClass,
-                                                  const FCefWebSocketPipelineConfig& InPipelineConfig)
+	TSubclassOf<UCefWebSocketClientBase> InClientClass,
+	const FCefWebSocketPipelineConfig& InPipelineConfig)
 {
 	NameId = InNameId;
 	BoundPort = InBoundPort;
@@ -67,8 +66,8 @@ ECefWebSocketSendResult UCefWebSocketServerBase::SendToClientBytes(int64 InClien
 }
 
 ECefWebSocketSendResult UCefWebSocketServerBase::SendToClientJson(int64 InClientId,
-                                                                  const TSharedPtr<FJsonObject>& InJsonObject,
-                                                                  const TSharedPtr<FJsonValue>& InJsonValue)
+	const TSharedPtr<FJsonObject>& InJsonObject,
+	const TSharedPtr<FJsonValue>& InJsonValue)
 {
 	if (!InJsonObject.IsValid() && !InJsonValue.IsValid())
 	{
@@ -114,7 +113,7 @@ ECefWebSocketSendResult UCefWebSocketServerBase::BroadcastBytes(const TArray<uin
 }
 
 ECefWebSocketSendResult UCefWebSocketServerBase::BroadcastJson(const TSharedPtr<FJsonObject>& InJsonObject,
-                                                               const TSharedPtr<FJsonValue>& InJsonValue)
+	const TSharedPtr<FJsonValue>& InJsonValue)
 {
 	if (!InJsonObject.IsValid() && !InJsonValue.IsValid())
 	{
@@ -142,7 +141,7 @@ ECefWebSocketSendResult UCefWebSocketServerBase::BroadcastJson(const TSharedPtr<
 }
 
 ECefWebSocketSendResult UCefWebSocketServerBase::BroadcastStringExcept(int64 InExcludedClientId,
-                                                                       const FString& InMessage)
+	const FString& InMessage)
 {
 	if (!Instance.IsValid())
 	{
@@ -152,7 +151,7 @@ ECefWebSocketSendResult UCefWebSocketServerBase::BroadcastStringExcept(int64 InE
 }
 
 ECefWebSocketSendResult UCefWebSocketServerBase::BroadcastBytesExcept(int64 InExcludedClientId,
-                                                                      const TArray<uint8>& InBytes)
+	const TArray<uint8>& InBytes)
 {
 	if (!Instance.IsValid())
 	{
@@ -245,8 +244,7 @@ void UCefWebSocketServerBase::NotifyClientConnected(const FCefWebSocketClientInf
 	if (!IsInGameThread())
 	{
 		TWeakObjectPtr<UCefWebSocketServerBase> weakThis(this);
-		AsyncTask(ENamedThreads::GameThread, [weakThis, InClientInfo]()
-		{
+		AsyncTask(ENamedThreads::GameThread, [weakThis, InClientInfo]() {
 			if (weakThis.IsValid())
 			{
 				weakThis->NotifyClientConnected(InClientInfo);
@@ -260,7 +258,7 @@ void UCefWebSocketServerBase::NotifyClientConnected(const FCefWebSocketClientInf
 	if (!ClientObject)
 	{
 		NotifyClientError(InClientInfo.ClientId, ECefWebSocketErrorCode::Unknown,
-		                  TEXT("Failed to create client object"));
+			TEXT("Failed to create client object"));
 		return;
 	}
 
@@ -270,6 +268,7 @@ void UCefWebSocketServerBase::NotifyClientConnected(const FCefWebSocketClientInf
 		ClientObjects.Add(InClientInfo.ClientId, ClientObject);
 	}
 	OnClientConnected.Broadcast(InClientInfo);
+	HandleClientConnected(InClientInfo);
 }
 
 void UCefWebSocketServerBase::NotifyClientDisconnected(int64 InClientId, ECefWebSocketCloseReason InReason)
@@ -277,8 +276,7 @@ void UCefWebSocketServerBase::NotifyClientDisconnected(int64 InClientId, ECefWeb
 	if (!IsInGameThread())
 	{
 		TWeakObjectPtr<UCefWebSocketServerBase> weakThis(this);
-		AsyncTask(ENamedThreads::GameThread, [weakThis, InClientId, InReason]()
-		{
+		AsyncTask(ENamedThreads::GameThread, [weakThis, InClientId, InReason]() {
 			if (weakThis.IsValid())
 			{
 				weakThis->NotifyClientDisconnected(InClientId, InReason);
@@ -292,6 +290,7 @@ void UCefWebSocketServerBase::NotifyClientDisconnected(int64 InClientId, ECefWeb
 		ClientObjects.Remove(InClientId);
 	}
 	OnClientDisconnected.Broadcast(InClientId, InReason);
+	HandleClientDisconnected(InClientId, InReason);
 }
 
 void UCefWebSocketServerBase::NotifyServerError(ECefWebSocketErrorCode InErrorCode, const FString& InMessage)
@@ -299,8 +298,7 @@ void UCefWebSocketServerBase::NotifyServerError(ECefWebSocketErrorCode InErrorCo
 	if (!IsInGameThread())
 	{
 		TWeakObjectPtr<UCefWebSocketServerBase> weakThis(this);
-		AsyncTask(ENamedThreads::GameThread, [weakThis, InErrorCode, InMessage]()
-		{
+		AsyncTask(ENamedThreads::GameThread, [weakThis, InErrorCode, InMessage]() {
 			if (weakThis.IsValid())
 			{
 				weakThis->NotifyServerError(InErrorCode, InMessage);
@@ -309,16 +307,16 @@ void UCefWebSocketServerBase::NotifyServerError(ECefWebSocketErrorCode InErrorCo
 		return;
 	}
 	OnServerError.Broadcast(NameId, InErrorCode, InMessage);
+	HandleServerError(InErrorCode, InMessage);
 }
 
 void UCefWebSocketServerBase::NotifyClientError(int64 InClientId, ECefWebSocketErrorCode InErrorCode,
-                                                const FString& InMessage)
+	const FString& InMessage)
 {
 	if (!IsInGameThread())
 	{
 		TWeakObjectPtr<UCefWebSocketServerBase> weakThis(this);
-		AsyncTask(ENamedThreads::GameThread, [weakThis, InClientId, InErrorCode, InMessage]()
-		{
+		AsyncTask(ENamedThreads::GameThread, [weakThis, InClientId, InErrorCode, InMessage]() {
 			if (weakThis.IsValid())
 			{
 				weakThis->NotifyClientError(InClientId, InErrorCode, InMessage);
@@ -327,6 +325,7 @@ void UCefWebSocketServerBase::NotifyClientError(int64 InClientId, ECefWebSocketE
 		return;
 	}
 	OnClientError.Broadcast(InClientId, InErrorCode, InMessage);
+	HandleClientError(InClientId, InErrorCode, InMessage);
 }
 
 void UCefWebSocketServerBase::NotifyClientMessage(int64 InClientId, const TArray<uint8>& InPayload, bool bInBinary)
@@ -356,15 +355,18 @@ void UCefWebSocketServerBase::NotifyClientMessage(int64 InClientId, const TArray
 	}
 }
 
-void UCefWebSocketServerBase::HandleClientBytes(UCefWebSocketClientBase* InClient, const TArray<uint8>& InData)
-{
-}
+void UCefWebSocketServerBase::HandleClientConnected(const FCefWebSocketClientInfo& InClientInfo) {}
 
-void UCefWebSocketServerBase::HandleClientString(UCefWebSocketClientBase* InClient, const FString& InMessage)
-{
-}
+void UCefWebSocketServerBase::HandleClientDisconnected(int64 InClientId, ECefWebSocketCloseReason InReason) {}
 
-void UCefWebSocketServerBase::ServerInitialized()
-{
-	
-}
+void UCefWebSocketServerBase::HandleServerError(ECefWebSocketErrorCode InErrorCode, const FString& InMessage) {}
+
+void UCefWebSocketServerBase::HandleClientError(int64 InClientId, ECefWebSocketErrorCode InErrorCode, const FString& InMessage) {}
+
+void UCefWebSocketServerBase::HandleClientMessage(int64 InClientId, const TArray<uint8>& InPayload, bool bInBinary) {}
+
+void UCefWebSocketServerBase::HandleClientBytes(UCefWebSocketClientBase* InClient, const TArray<uint8>& InData) {}
+
+void UCefWebSocketServerBase::HandleClientString(UCefWebSocketClientBase* InClient, const FString& InMessage) {}
+
+void UCefWebSocketServerBase::ServerInitialized() {}
