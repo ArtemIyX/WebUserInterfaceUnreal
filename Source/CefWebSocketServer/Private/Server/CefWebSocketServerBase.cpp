@@ -38,7 +38,7 @@ bool UCefWebSocketServerBase::StartServerInternal(FName InNameId, int32 InBoundP
 	return Instance->Start();
 }
 
-void UCefWebSocketServerBase::AttachInstance(TSharedPtr<FCefWebSocketServerInstance> InInstance)
+void UCefWebSocketServerBase::AttachInstance(const TSharedPtr<FCefWebSocketServerInstance>& InInstance)
 {
 	Instance = InInstance;
 }
@@ -362,4 +362,9 @@ void UCefWebSocketServerBase::HandleClientBytes(UCefWebSocketClientBase* InClien
 
 void UCefWebSocketServerBase::HandleClientString(UCefWebSocketClientBase* InClient, const FString& InMessage)
 {
+}
+
+void UCefWebSocketServerBase::ServerInitialized()
+{
+	
 }

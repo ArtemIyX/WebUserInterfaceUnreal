@@ -7,6 +7,7 @@
 
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
+#include "Dispatch/CefDispatchHandlerRegistry.h"
 #include "Dispatch/CefDispatchRegistry.h"
 #include "Dispatch/CefDispatchRegistration.h"
 #include "Dispatch/CefDispatchValue.h"
@@ -24,12 +25,16 @@ public:
 	virtual void ShutdownModule() override;
 
 	TSharedPtr<class FCefDispatchRegistry> GetRegistry() const { return Registry; }
+	TSharedPtr<class FCefDispatchHandlerRegistry> GetHandlerRegistry() const { return HandlerRegistry; }
 	static void RegisterDeferredFactory(uint32 InMessageType, FCefDispatchRegistry::FCefDispatchFactory InFactory,
 	                                    /** @brief Function API. */
+	                                    bool bInAllowReplace = false);
+	static void RegisterDeferredHandler(uint32 InMessageType, FCefDispatchHandlerRegistry::FCefDispatchHandler InHandler,
 	                                    bool bInAllowReplace = false);
 
 private:
 	/** @brief Registry state. */
 	TSharedPtr<class FCefDispatchRegistry> Registry;
+	/** @brief HandlerRegistry state. */
+	TSharedPtr<class FCefDispatchHandlerRegistry> HandlerRegistry;
 };
-
