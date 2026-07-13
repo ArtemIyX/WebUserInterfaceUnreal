@@ -156,6 +156,12 @@ protected:
 	void NotifyClientError(int64 InClientId, ECefWebSocketErrorCode InErrorCode, const FString& InMessage);
 	/** @brief NotifyClientMessage API. */
 	void NotifyClientMessage(int64 InClientId, const TArray<uint8>& InPayload, bool bInBinary);
+	
+	virtual void HandleClientConnected(const FCefWebSocketClientInfo& InClientInfo);
+	virtual void HandleClientDisconnected(int64 InClientId, ECefWebSocketCloseReason InReason);
+	virtual void HandleServerError(ECefWebSocketErrorCode InErrorCode, const FString& InMessage);
+	virtual void HandleClientError(int64 InClientId, ECefWebSocketErrorCode InErrorCode, const FString& InMessage);
+	virtual void HandleClientMessage(int64 InClientId, const TArray<uint8>& InPayload, bool bInBinary);
 #pragma endregion
 
 private:
