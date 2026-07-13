@@ -59,6 +59,31 @@ if (result == ECefDispatchFactoryResult::Ok && value.IsValid())
 }
 ```
 
+## Typed Handler Registration
+```cpp
+CEF_DISPATCH_REGISTER_TYPED_HANDLER(2001, FString,
+	[](const FString& InText)
+	{
+		UE_LOG(LogTemp, Log, TEXT("Handled text: %s"), *InText);
+	});
+```
+
+```cpp
+TSharedPtr<FCefDispatchHandlerRegistry> handlerRegistry = FCefDispatchModule::Get().GetHandlerRegistry();
+FString error;
+const ECefDispatchHandlerResult result = handlerRegistry->Dispatch(2001, bytes, error);
+```
+
+Typed handlers can use any of these signatures:
+- `void(const T&)`
+- `bool(const T&)`
+- `void(uint32, const T&)`
+- `bool(uint32, const T&)`
+- `void(const T&, FString&)`
+- `bool(const T&, FString&)`
+- `void(uint32, const T&, FString&)`
+- `bool(uint32, const T&, FString&)`
+
 ## Protobuf Note
 For protobuf route factory:
 1. parse payload into `MyProto::Message`

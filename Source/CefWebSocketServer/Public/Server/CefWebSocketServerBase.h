@@ -28,7 +28,8 @@ public:
 public:
 #pragma region Lifecycle
 	virtual void BeginDestroy() override;
-#pragma endregion
+
+	#pragma endregion
 
 public:
 #pragma region BlueprintEvents
@@ -125,10 +126,14 @@ public:
 	/** @brief SetPacketCodec API. */
 	void SetPacketCodec(const TSharedPtr<ICefWebSocketPacketCodec>& InCodec);
 
+protected:
 	/** @brief HandleClientBytes API. */
 	virtual void HandleClientBytes(UCefWebSocketClientBase* InClient, const TArray<uint8>& InData);
 	/** @brief HandleClientString API. */
 	virtual void HandleClientString(UCefWebSocketClientBase* InClient, const FString& InMessage);
+	
+	/** @brief Called after */
+	virtual void ServerInitialized();
 #pragma endregion
 
 protected:
@@ -140,7 +145,7 @@ protected:
 	bool StartServerInternal(FName InNameId, int32 InBoundPort, TSubclassOf<UCefWebSocketClientBase> InClientClass,
 	                         const FCefWebSocketPipelineConfig& InPipelineConfig);
 	/** @brief AttachInstance API. */
-	void AttachInstance(TSharedPtr<FCefWebSocketServerInstance> InInstance);
+	void AttachInstance(const TSharedPtr<FCefWebSocketServerInstance>& InInstance);
 	/** @brief NotifyClientConnected API. */
 	void NotifyClientConnected(const FCefWebSocketClientInfo& InClientInfo);
 	/** @brief NotifyClientDisconnected API. */

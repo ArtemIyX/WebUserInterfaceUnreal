@@ -39,4 +39,3 @@ struct CEFPROTOBUF_API FCefWsEnvelope
 	/** @brief Payload state. */
 	TArray<uint8> Payload;
 };
-

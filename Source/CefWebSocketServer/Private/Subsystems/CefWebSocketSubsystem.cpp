@@ -75,6 +75,8 @@ FCefWebSocketServerCreateResult UCefWebSocketSubsystem::CreateOrGetServer(
 			out.BoundPort = NewServer->GetBoundPort();
 			out.Result = (Attempt > 0 || bInitialAdjusted) ? ECefWebSocketCreateResult::PortAutoAdjusted : ECefWebSocketCreateResult::Created;
 			UE_LOG(LogCefWebSocketServer, Log, TEXT("CreateOrGetServer: Started '%s' on port %d"), *InOptions.NameId.ToString(), out.BoundPort);
+			
+			NewServer->ServerInitialized();
 			return out;
 		}
 	}
