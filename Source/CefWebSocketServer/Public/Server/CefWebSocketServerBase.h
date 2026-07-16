@@ -181,6 +181,7 @@ private:
 	/** @brief ClientObjectsLock state. */
 	mutable FCriticalSection ClientObjectsLock;
 	/** @brief ClientObjects state. */
+	UPROPERTY()
 	TMap<int64, TObjectPtr<UCefWebSocketClientBase>> ClientObjects;
 	/** @brief Instance state. */
 	TSharedPtr<FCefWebSocketServerInstance> Instance;
