@@ -338,7 +338,7 @@ void UCefWebSocketServerBase::NotifyClientMessage(int64 InClientId, const TArray
 			Client = *Found;
 		}
 	}
-	if (!Client)
+	if (!IsValid(Client))
 	{
 		return;
 	}
