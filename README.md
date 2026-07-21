@@ -3,6 +3,8 @@
 CEF-powered Web UI + local WebSocket stack for Unreal Engine, with an external `Host.exe` renderer process.
 <img width="1280" height="720" alt="blueprints" src="https://github.com/user-attachments/assets/4343cb57-61c4-46dc-b007-44e4aad9597a" />
 
+> [!IMPORTANT]
+> Readme [WIKI](https://github.com/ArtemIyX/WebUserInterfaceUnreal/wiki) before using plugin
 
 ---
 
