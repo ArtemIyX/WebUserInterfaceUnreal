@@ -17,8 +17,6 @@ This plugin is split into 5 runtime modules:
   - Browser session API, shared-memory IPC, input/control writers, frame reader, Slate browser surface.
 - `CefWebSocketServer`
   - Local websocket server subsystem with threaded pipeline and pluggable payload codecs.
-- `CefProtobuf`
-  - Binary websocket envelope/codec helpers intended for protobuf-based payloads.
 - `CefDispatch`
   - Format-agnostic `MessageType(uint32) -> Factory` registry (works with protobuf or any custom type).
 - `CefContentHttpServer`
