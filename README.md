@@ -1,7 +1,10 @@
-# CefWebUi Plugin
+# CEF WebUI Plugin
+> [!IMPORTANT]
+> Read [WIKI](https://github.com/ArtemIyX/WebUserInterfaceUnreal/wiki) before using plugin
 
-CEF-powered Web UI + local WebSocket stack for Unreal Engine, with an external `Host.exe` renderer process.
 <img width="1280" height="720" alt="blueprints" src="https://github.com/user-attachments/assets/4343cb57-61c4-46dc-b007-44e4aad9597a" />
+
+> CEF-powered Web UI + local WebSocket stack for Unreal Engine, with an external `Host.exe` renderer process.
 
 
 ---
@@ -102,12 +105,6 @@ Minimal flow:
    - `Resize`
    - `SetFocus`
 
-If you have a blueprint screenshot for onboarding, add it here:
-
-```md
-![Minimal Blueprint Setup](Resources/Docs/blueprint_quick_start.png)
-```
-
 ---
 
 ## 6) C++ Quick Start
@@ -147,16 +144,13 @@ session->OpenDevTools();
 
 ---
 
-## 7) Why `CefProtobuf` Module Exists
+## 7) Protobuf
 
-`CefProtobuf` gives a ready binary envelope/codec layer for websocket payloads where:
+You can use [LinkProtobuf Plugin](https://github.com/DarkestLink-Dev/UE-LinkProtobuf)
 
-- payloads are binary, not plain JSON text,
-- message routing is done with typed envelope metadata (for example message type ids),
-- protobuf serialization/deserialization is desired.
+Or build manually and connect to project (.lib + .dll):
 
-Use it when you want compact, schema-based transport between UE and browser/backend.
-
+> [**Protocol Buffers v36.0-rc1**](https://github.com/protocolbuffers/protobuf/releases#release-v36.0-rc1)
 ---
 
 ## 8) Why `CefDispatch` Module Exists
