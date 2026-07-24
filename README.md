@@ -144,17 +144,13 @@ session->OpenDevTools();
 
 ---
 
-## 7) Why `CefProtobuf` Module Exists
+## 7) Protobuf
 
-`CefProtobuf` gives a ready binary envelope/codec layer for websocket payloads where:
+You can use [LinkProtobuf Plugin](https://github.com/DarkestLink-Dev/UE-LinkProtobuf)
 
-- payloads are binary, not plain JSON text,
-- message routing is done with typed envelope metadata (for example message type ids),
-- protobuf serialization/deserialization is desired.
+Or build manually and connect to project (.lib + .dll):
 
-Use it when you want compact, schema-based transport between UE and browser/backend.
-
-[Protocol Buffers v36.0-rc1](https://github.com/protocolbuffers/protobuf/releases#release-v36.0-rc1)
+> [**Protocol Buffers v36.0-rc1**](https://github.com/protocolbuffers/protobuf/releases#release-v36.0-rc1)
 ---
 
 ## 8) Why `CefDispatch` Module Exists
