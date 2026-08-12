@@ -8,7 +8,7 @@
 #include "Handlers/CefContentHttpImageRequestHandler.h"
 #include "CefContentDefaultImageRequestHandler.generated.h"
 
-/** @brief Default handler: cache lookup -> png encode -> HTTP payload. */
+/** @brief Default handler that resolves cached image content and converts it into an HTTP response payload. */
 UCLASS(BlueprintType, DisplayName = "Default Image Handler")
 class CEFCONTENTHTTPSERVER_API UCefContentDefaultImageRequestHandler : public UCefContentHttpImageRequestHandler
 {
