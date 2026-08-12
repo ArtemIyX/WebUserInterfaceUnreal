@@ -16,9 +16,7 @@
 #pragma region Lifecycle
 
 UCefWebUiBrowserSession::UCefWebUiBrowserSession(const FObjectInitializer& InObjectInitializer)
-	: Super(InObjectInitializer)
-{
-}
+	: Super(InObjectInitializer) {}
 
 void UCefWebUiBrowserSession::BeginDestroy()
 {
@@ -31,6 +29,37 @@ void UCefWebUiBrowserSession::Initialize(UCefWebUiGameInstanceSubsystem* InInOwn
 	OwnerSubsystem = InInOwnerSubsystem;
 	SessionId = InInSessionId;
 	EnsureRuntimeStarted();
+}
+
+FCefWebUiMarkerDelegate& UCefWebUiBrowserSession::OnMarker(const FGameplayTag& InMarkerTag)
+{
+	if (!ensureMsgf(InMarkerTag.IsValid(), TEXT("Cannot bind an invalid browser-session marker tag")))
+	{
+		return InvalidMarkerDelegate;
+	}
+
+	return MarkerDelegates.FindOrAdd(InMarkerTag);
+}
+
+void UCefWebUiBrowserSession::BindMarker(const FGameplayTag& InMarkerTag, const FCefWebUiMarkerCallback& InCallback)
+{
+	if (!ensureMsgf(InMarkerTag.IsValid(), TEXT("Cannot bind an invalid browser-session marker tag")) ||
+		!InCallback.IsBound())
+	{
+		return;
+	}
+
+	BlueprintMarkerDelegates.Add(InMarkerTag, InCallback);
+}
+
+void UCefWebUiBrowserSession::UnbindMarker(const FGameplayTag& InMarkerTag)
+{
+	if (!ensureMsgf(InMarkerTag.IsValid(), TEXT("Cannot unbind an invalid browser-session marker tag")))
+	{
+		return;
+	}
+
+	BlueprintMarkerDelegates.Remove(InMarkerTag);
 }
 
 #pragma endregion
@@ -53,9 +82,9 @@ void UCefWebUiBrowserSession::ShowInViewport(
 	if (!BrowserSurfaceWidget.IsValid())
 	{
 		SAssignNew(BrowserSurfaceWidget, SCefBrowserSurface)
-			.BrowserSession(this)
-			.BrowserWidth(FMath::Max(1, InBrowserWidth))
-			.BrowserHeight(FMath::Max(1, InBrowserHeight));
+		.BrowserSession(this)
+		.BrowserWidth(FMath::Max(1, InBrowserWidth))
+		.BrowserHeight(FMath::Max(1, InBrowserHeight));
 	}
 	else
 	{
@@ -81,7 +110,7 @@ void UCefWebUiBrowserSession::ShowInViewport(
 	}
 
 	SAssignNew(ViewportWidgetHost, SWeakWidget)
-		.PossiblyNullContent(BrowserSurfaceWidget.ToSharedRef());
+	.PossiblyNullContent(BrowserSurfaceWidget.ToSharedRef());
 	gameViewportClient->AddViewportWidgetContent(ViewportWidgetHost.ToSharedRef(), InZOrder);
 }
 
@@ -356,55 +385,89 @@ void UCefWebUiBrowserSession::HandleWidgetLoadStateChanged(uint8 InInState)
 
 void UCefWebUiBrowserSession::HandleConsoleLogMessage(
 	ECefConsoleLogLevel InInLevel,
-	const FString& InInMessage,
+	const FString& InMessage,
 	const FString& InInSource,
 	int32 InInLine)
 {
 	const TCHAR* levelText = TEXT("Log");
 	switch (InInLevel)
 	{
-	case ECefConsoleLogLevel::Warning:
-		levelText = TEXT("Warning");
-		break;
-	case ECefConsoleLogLevel::Error:
-		levelText = TEXT("Error");
-		break;
-	default:
-		break;
+		case ECefConsoleLogLevel::Warning:
+			levelText = TEXT("Warning");
+			break;
+		case ECefConsoleLogLevel::Error:
+			levelText = TEXT("Error");
+			break;
+		default:
+			break;
 	}
 
 	switch (InInLevel)
 	{
-	case ECefConsoleLogLevel::Warning:
-		UE_LOG(LogCefWebUiJsConsole, Warning,
-			TEXT("[%s][%s] %s (%s:%d)"),
-			*SessionId.ToString(),
-			levelText,
-			*InInMessage,
-			*InInSource,
-			InInLine);
-		break;
-	case ECefConsoleLogLevel::Error:
-		UE_LOG(LogCefWebUiJsConsole, Error,
-			TEXT("[%s][%s] %s (%s:%d)"),
-			*SessionId.ToString(),
-			levelText,
-			*InInMessage,
-			*InInSource,
-			InInLine);
-		break;
-	default:
-		UE_LOG(LogCefWebUiJsConsole, Log,
-			TEXT("[%s][%s] %s (%s:%d)"),
-			*SessionId.ToString(),
-			levelText,
-			*InInMessage,
-			*InInSource,
-			InInLine);
-		break;
+		case ECefConsoleLogLevel::Warning:
+			UE_LOG(LogCefWebUiJsConsole, Warning,
+				TEXT("[%s][%s] %s (%s:%d)"),
+				*SessionId.ToString(),
+				levelText,
+				*InMessage,
+				*InInSource,
+				InInLine);
+			break;
+		case ECefConsoleLogLevel::Error:
+			UE_LOG(LogCefWebUiJsConsole, Error,
+				TEXT("[%s][%s] %s (%s:%d)"),
+				*SessionId.ToString(),
+				levelText,
+				*InMessage,
+				*InInSource,
+				InInLine);
+			break;
+		default:
+			UE_LOG(LogCefWebUiJsConsole, Log,
+				TEXT("[%s][%s] %s (%s:%d)"),
+				*SessionId.ToString(),
+				levelText,
+				*InMessage,
+				*InInSource,
+				InInLine);
+			break;
 	}
 
-	OnConsoleMessage.Broadcast(InInLevel, InInMessage, InInSource, InInLine);
+	OnConsoleMessage.Broadcast(InInLevel, InMessage, InInSource, InInLine);
+
+	if (!MarkerMap.IsEmpty())
+	{
+		TArray<TTuple<FString, FGameplayTag>> foundMarkers;
+		for (const TTuple<FString, FGameplayTag>& el : MarkerMap)
+		{
+			if (InMessage.Contains(el.Key))
+			{
+				foundMarkers.Add(el);
+			}
+		}
+
+		for (const TTuple<FString, FGameplayTag>& el : foundMarkers)
+		{
+			if (FCefWebUiMarkerDelegate* markerDelegate = MarkerDelegates.Find(el.Value);
+				markerDelegate && markerDelegate->IsBound())
+			{
+				FCefWebUiMarkerDelegate markerDelegateCopy = *markerDelegate;
+				markerDelegateCopy.Execute(InMessage);
+			}
+
+			if (FCefWebUiMarkerCallback* blueprintMarkerDelegate = BlueprintMarkerDelegates.Find(el.Value);
+				blueprintMarkerDelegate && blueprintMarkerDelegate->IsBound())
+			{
+				FCefWebUiMarkerCallback blueprintMarkerDelegateCopy = *blueprintMarkerDelegate;
+				blueprintMarkerDelegateCopy.Execute(InMessage);
+			}
+		}
+
+		for (const TTuple<FString, FGameplayTag>& el : foundMarkers)
+		{
+			OnConsoleMarker.Broadcast(InMessage, el.Value);
+		}
+	}
 }
 
 #pragma endregion
