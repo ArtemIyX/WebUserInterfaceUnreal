@@ -2,6 +2,7 @@
 
 #include "Async/Async.h"
 #include "Data/CefWebSocketStructs.h"
+#include "Logging/CefWebSocketLog.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
 #include "Server/CefWebSocketClientBase.h"
@@ -177,6 +178,7 @@ void UCefWebSocketServerBase::StopServer()
 	}
 	FScopeLock lock(&ClientObjectsLock);
 	ClientObjects.Empty();
+	PendingClientMessages.Empty();
 }
 
 TArray<UCefWebSocketClientBase*> UCefWebSocketServerBase::GetClients() const
@@ -241,6 +243,11 @@ void UCefWebSocketServerBase::SetPacketCodec(const TSharedPtr<ICefWebSocketPacke
 
 void UCefWebSocketServerBase::NotifyClientConnected(const FCefWebSocketClientInfo& InClientInfo)
 {
+	{
+		FScopeLock lock(&ClientObjectsLock);
+		PendingClientMessages.FindOrAdd(InClientInfo.ClientId);
+	}
+
 	if (!IsInGameThread())
 	{
 		TWeakObjectPtr<UCefWebSocketServerBase> weakThis(this);
@@ -257,22 +264,42 @@ void UCefWebSocketServerBase::NotifyClientConnected(const FCefWebSocketClientInf
 	UCefWebSocketClientBase* ClientObject = NewObject<UCefWebSocketClientBase>(this, ClientUClass);
 	if (!ClientObject)
 	{
+		{
+			FScopeLock lock(&ClientObjectsLock);
+			PendingClientMessages.Remove(InClientInfo.ClientId);
+		}
 		NotifyClientError(InClientInfo.ClientId, ECefWebSocketErrorCode::Unknown,
 			TEXT("Failed to create client object"));
 		return;
 	}
 
+	TArray<FCefWebSocketInboundPacket> pendingMessages;
 	ClientObject->InitializeClient(this, InClientInfo);
 	{
 		FScopeLock lock(&ClientObjectsLock);
 		ClientObjects.Add(InClientInfo.ClientId, ClientObject);
+		if (TArray<FCefWebSocketInboundPacket>* FoundPendingMessages = PendingClientMessages.Find(InClientInfo.ClientId))
+		{
+			pendingMessages = MoveTemp(*FoundPendingMessages);
+			PendingClientMessages.Remove(InClientInfo.ClientId);
+		}
 	}
 	OnClientConnected.Broadcast(InClientInfo);
 	HandleClientConnected(InClientInfo);
+
+	for (const FCefWebSocketInboundPacket& pendingMessage : pendingMessages)
+	{
+		NotifyClientMessage(pendingMessage.ClientId, pendingMessage.Payload, pendingMessage.bBinary);
+	}
 }
 
 void UCefWebSocketServerBase::NotifyClientDisconnected(int64 InClientId, ECefWebSocketCloseReason InReason)
 {
+	{
+		FScopeLock lock(&ClientObjectsLock);
+		PendingClientMessages.Remove(InClientId);
+	}
+
 	if (!IsInGameThread())
 	{
 		TWeakObjectPtr<UCefWebSocketServerBase> weakThis(this);
@@ -337,9 +364,19 @@ void UCefWebSocketServerBase::NotifyClientMessage(int64 InClientId, const TArray
 		{
 			Client = *Found;
 		}
+		else if (PendingClientMessages.Contains(InClientId))
+		{
+			FCefWebSocketInboundPacket& pendingMessage = PendingClientMessages.FindOrAdd(InClientId).AddDefaulted_GetRef();
+			pendingMessage.ClientId = InClientId;
+			pendingMessage.Payload = InPayload;
+			pendingMessage.bBinary = bInBinary;
+			return;
+		}
 	}
 	if (!IsValid(Client))
 	{
+		UE_LOG(LogCefWebSocketServer, Verbose,
+			TEXT("Discarded message for unknown client %lld"), InClientId);
 		return;
 	}
 
