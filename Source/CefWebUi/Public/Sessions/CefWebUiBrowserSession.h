@@ -178,9 +178,14 @@ public:
 
 
 	/** @brief HandleWidgetLoadStateChanged API. */
-	void HandleWidgetLoadStateChanged(uint8 InState);
-	void HandleConsoleLogMessage(ECefConsoleLogLevel InLevel, const FString& InMessage, const FString& InSource,
-	                             int32 InLine);
+	virtual void HandleWidgetLoadStateChanged(uint8 InState);
+
+	/**
+	 * @brief Handle web browser console messages (probably called by JS)
+	 * @note Game Thread
+	 */
+	virtual void HandleConsoleLogMessage(ECefConsoleLogLevel InLevel, const FString& InMessage, const FString& InSource,
+		int32 InLine);
 #pragma endregion
 
 
