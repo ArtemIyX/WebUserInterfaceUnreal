@@ -7,4 +7,3 @@ FCefDispatchFactoryRegistrar::FCefDispatchFactoryRegistrar(uint32 InMessageType,
 {
 	FCefDispatchModule::RegisterDeferredFactory(InMessageType, MoveTemp(InFactory), bInAllowReplace);
 }
-

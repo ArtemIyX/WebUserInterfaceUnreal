@@ -35,4 +35,3 @@ public:
 	static FCefDispatchFactoryRegistrar CEF_DISPATCH_CONCAT(GCefDispatchFactoryRegistrarReplace_, __LINE__)(     \
 		InMessageType, InFactory, true);                                                                          \
 	}
-
