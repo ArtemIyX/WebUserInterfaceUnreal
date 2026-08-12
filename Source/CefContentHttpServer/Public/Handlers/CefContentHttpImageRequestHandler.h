@@ -14,12 +14,15 @@ struct CEFCONTENTHTTPSERVER_API FCefContentHttpImageRequestContext
 {
 	GENERATED_BODY()
 
+	/** Asset path extracted from the request, typically used as the image lookup key. */
 	UPROPERTY(BlueprintReadOnly, Category = "CefContentHttpServer")
 	FString AssetPath;
 
+	/** Raw HTTP request body forwarded to the handler when needed. */
 	UPROPERTY(BlueprintReadOnly, Category = "CefContentHttpServer")
 	FString RawBody;
 
+	/** Parsed query-string parameters associated with the image request. */
 	UPROPERTY(BlueprintReadOnly, Category = "CefContentHttpServer")
 	TMap<FString, FString> QueryParams;
 };
@@ -30,12 +33,15 @@ struct CEFCONTENTHTTPSERVER_API FCefContentHttpImageResponse
 {
 	GENERATED_BODY()
 
+	/** HTTP-style status code returned by the handler. */
 	UPROPERTY(BlueprintReadWrite, Category = "CefContentHttpServer")
 	int32 StatusCode = 200;
 
+	/** MIME type of the response body bytes. */
 	UPROPERTY(BlueprintReadWrite, Category = "CefContentHttpServer")
 	FString ContentType = TEXT("application/octet-stream");
 
+	/** Binary body payload returned to the HTTP layer. */
 	UPROPERTY(BlueprintReadWrite, Category = "CefContentHttpServer")
 	TArray<uint8> Body;
 };

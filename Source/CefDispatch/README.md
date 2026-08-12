@@ -1,12 +1,14 @@
 # CefDispatch
 
-`CefDispatch` is a format-agnostic `MessageType(uint32) -> Factory` module.
+`CefDispatch` provides format-agnostic `MessageType(uint32) -> Factory` and typed handler routing.
 
 ## Core
 - `FCefDispatchRegistry`
 - `ICefDispatchValue`
 - `TCefDispatchValue<T>`
 - `MakeCefDispatchValue(...)`
+
+`FCefDispatchRegistry` is shared by the module and stores message factories. Handler registries are not global. Each server object must create its own `FCefDispatchHandlerRegistry`, pass the shared decode registry to it, and register its handlers during server initialization.
 
 Factories return `TUniquePtr<ICefDispatchValue>`, so payload type can be anything:
 - protobuf message
@@ -16,7 +18,7 @@ Factories return `TUniquePtr<ICefDispatchValue>`, so payload type can be anythin
 
 ## Manual Registration
 ```cpp
-TSharedPtr<FCefDispatchRegistry> registry = FCefDispatchModule::Get().GetRegistry();
+TSharedPtr<FCefDispatchRegistry> registry = FCefDispatchModule::Get().GetDispatchRegistry();
 registry->RegisterFactory(1001,
 	[](uint32 InMessageType, const TArray<uint8>& InPayload, FString& OutError) -> TUniquePtr<ICefDispatchValue>
 	{
@@ -59,19 +61,27 @@ if (result == ECefDispatchFactoryResult::Ok && value.IsValid())
 }
 ```
 
-## Typed Handler Registration
+## Server-Owned Handler Registration
 ```cpp
-CEF_DISPATCH_REGISTER_TYPED_HANDLER(2001, FString,
-	[](const FString& InText)
-	{
-		UE_LOG(LogTemp, Log, TEXT("Handled text: %s"), *InText);
-	});
+// Server initialization.
+HandlerRegistry = MakeShared<FCefDispatchHandlerRegistry>(GetDispatchRegistry());
+RegisterHandlers();
+
+void RegisterHandlers()
+{
+	HandlerRegistry->RegisterTypedHandler<FString>(2001,
+		[](const FString& InText)
+		{
+			// Handle the message for this server instance.
+		});
+}
 ```
 
+Dispatch messages through that same server-owned registry:
+
 ```cpp
-TSharedPtr<FCefDispatchHandlerRegistry> handlerRegistry = FCefDispatchModule::Get().GetHandlerRegistry();
 FString error;
-const ECefDispatchHandlerResult result = handlerRegistry->Dispatch(2001, bytes, error);
+const ECefDispatchHandlerResult result = HandlerRegistry->Dispatch(2001, bytes, error);
 ```
 
 Typed handlers can use any of these signatures:

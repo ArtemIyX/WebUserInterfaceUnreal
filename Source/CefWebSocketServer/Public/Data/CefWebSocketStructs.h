@@ -139,4 +139,3 @@ struct CEFWEBSOCKETSERVER_API FCefWebSocketServerStats
 	/** @brief InWriteQueueDepth state. */
 	int64 InWriteQueueDepth = 0;
 };
-

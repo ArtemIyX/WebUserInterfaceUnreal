@@ -6,6 +6,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
 #include "Data/CefConsoleLogLevel.h"
 #include "Services/CefWebUiRuntime.h"
 #include "Templates/UniquePtr.h"
@@ -30,8 +31,14 @@ DECLARE_DYNAMIC_DELEGATE_OneParam(FCefWebUiWhenFinishedLoadingDelegate, UCefWebU
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FCefWebUiFinishedLoadingEvent, UCefWebUiBrowserSession*, Session);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FCefWebUiConsoleMessageEvent,
-                                              ECefConsoleLogLevel, Level, const FString&, Message, const FString&,
-                                              Source, int32, Line);
+	ECefConsoleLogLevel, Level, const FString&, Message, const FString&,
+	Source, int32, Line);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FCefWebUiConsoleMarkerEvent, const FString&, OrigLog, const FGameplayTag&, Marker);
+
+DECLARE_DYNAMIC_DELEGATE_OneParam(FCefWebUiMarkerCallback, const FString&, Message);
+
+DECLARE_DELEGATE_OneParam(FCefWebUiMarkerDelegate, const FString&);
 #pragma endregion
 
 UCLASS(BlueprintType)
@@ -41,15 +48,32 @@ class CEFWEBUI_API UCefWebUiBrowserSession : public UObject
 	GENERATED_BODY()
 
 public:
-#pragma region Lifecycle
+	#pragma region Lifecycle
 	/** @brief UCefWebUiBrowserSession API. */
 	UCefWebUiBrowserSession(const FObjectInitializer& InObjectInitializer);
 	virtual void BeginDestroy() override;
 	/** @brief Initialize API. */
 	void Initialize(UCefWebUiGameInstanceSubsystem* InOwnerSubsystem, FName InSessionId);
-#pragma endregion
+	#pragma endregion
 
-#pragma region Widget
+public:
+	#pragma region Markers
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="CefWebUi")
+	TMap<FString, FGameplayTag> MarkerMap;
+
+	/** @brief OnMarker API. */
+	FCefWebUiMarkerDelegate& OnMarker(const FGameplayTag& InMarkerTag);
+
+	/** @brief BindMarker API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Markers", meta=(AutoCreateRefTerm="Callback"))
+	void BindMarker(const FGameplayTag& InMarkerTag, const FCefWebUiMarkerCallback& InCallback);
+
+	/** @brief UnbindMarker API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Markers")
+	void UnbindMarker(const FGameplayTag& InMarkerTag);
+	#pragma endregion
+
+	#pragma region Widget
 	UFUNCTION(BlueprintPure, Category="CefWebUi")
 	FName GetSessionId() const { return SessionId; }
 
@@ -60,113 +84,115 @@ public:
 		int32 InBrowserWidth = 1920,
 		int32 InBrowserHeight = 1080);
 
-	UFUNCTION(BlueprintCallable, Category="CefWebUi")
 	/** @brief HideFromViewport API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi")
 	void HideFromViewport();
 
-	UFUNCTION(BlueprintCallable, Category="CefWebUi")
 	/** @brief Shutdown API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi")
 	void Shutdown();
 
-	UFUNCTION(BlueprintPure, Category="CefWebUi")
 	/** @brief IsShownInViewport API. */
+	UFUNCTION(BlueprintPure, Category="CefWebUi")
 	bool IsShownInViewport() const;
 
 	TSharedPtr<SCefBrowserSurface> GetSlateWidget() const { return BrowserSurfaceWidget; }
-#pragma endregion
+	#pragma endregion
 
-#pragma region Runtime Access
+	#pragma region Runtime Access
 	/** @brief GetFrameReaderPtr API. */
 	TWeakPtr<FCefFrameReader> GetFrameReaderPtr() const;
+
 	/** @brief GetInputWriterPtr API. */
 	TWeakPtr<FCefInputWriter> GetInputWriterPtr() const;
+
 	/** @brief GetControlWriterPtr API. */
 	TWeakPtr<FCefControlWriter> GetControlWriterPtr() const;
-#pragma endregion
+	#pragma endregion
 
-#pragma region Control
+	#pragma region Control
 	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	/** @brief GoBack API. */
 	void GoBack();
 
-	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	/** @brief GoForward API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	void GoForward();
 
-	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	/** @brief StopLoad API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	void StopLoad();
 
-	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	/** @brief Reload API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	void Reload();
 
-	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	/** @brief SetUrl API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	void SetUrl(const FString& InUrl);
 
-	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	/** @brief SetPaused API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	void SetPaused(bool bInPaused);
 
-	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	/** @brief SetHidden API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	void SetHidden(bool bInHidden);
 
-	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	/** @brief SetFocus API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	void SetFocus(bool bInFocus);
 
-	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	/** @brief SetZoomLevel API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	void SetZoomLevel(float InLevel);
 
-	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	/** @brief SetFrameRate API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	void SetFrameRate(int32 InRate);
 
-	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	/** @brief ScrollTo API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	void ScrollTo(int32 InX, int32 InY);
 
-	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	/** @brief Resize API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	void Resize(int32 InWidth, int32 InHeight);
 
-	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	/** @brief SetMuted API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	void SetMuted(bool bInMuted);
 
-	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	/** @brief OpenDevTools API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	void OpenDevTools();
 
-	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	/** @brief CloseDevTools API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	void CloseDevTools();
 
-	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	/** @brief SetInputEnabled API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	void SetInputEnabled(bool bInEnabled);
 
-	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	/** @brief ExecuteJs API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	void ExecuteJs(const FString& InScript);
 
-	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	/** @brief OpenLocalFile API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	void OpenLocalFile(const FString& InLocalFilePath);
 
-	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	/** @brief LoadHtmlString API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	void LoadHtmlString(const FString& InHtml);
 
-	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	/** @brief ClearCookies API. */
+	UFUNCTION(BlueprintCallable, Category="CefWebUi|Control")
 	void ClearCookies();
-#pragma endregion
+	#pragma endregion
 
-#pragma region Loading
+	#pragma region Loading
 
 public:
 	UFUNCTION(BlueprintCallable, Category="CefWebUi", meta=(AutoCreateRefTerm="Callback"))
@@ -178,26 +204,33 @@ public:
 
 
 	/** @brief HandleWidgetLoadStateChanged API. */
-	void HandleWidgetLoadStateChanged(uint8 InState);
-	void HandleConsoleLogMessage(ECefConsoleLogLevel InLevel, const FString& InMessage, const FString& InSource,
-	                             int32 InLine);
-#pragma endregion
+	virtual void HandleWidgetLoadStateChanged(uint8 InState);
+
+	/**
+	 * @brief Handle web browser console messages (probably called by JS)
+	 * @note Game Thread
+	 */
+	virtual void HandleConsoleLogMessage(ECefConsoleLogLevel InLevel, const FString& InMessage, const FString& InSource,
+		int32 InLine);
+	#pragma endregion
 
 
-#pragma region Events
+	#pragma region Events
 
-	UPROPERTY(BlueprintAssignable, Category="CefWebUi")
 	/** @brief OnFinishedLoading state. */
+	UPROPERTY(BlueprintAssignable, Category="CefWebUi|Events")
 	FCefWebUiFinishedLoadingEvent OnFinishedLoading;
 
-	UPROPERTY(BlueprintAssignable, Category="CefWebUi")
 	/** @brief OnConsoleMessage state. */
+	UPROPERTY(BlueprintAssignable, Category="CefWebUi|Events")
 	FCefWebUiConsoleMessageEvent OnConsoleMessage;
 
-#pragma endregion
+	UPROPERTY(BlueprintAssignable, Category="CefWebUi|Events")
+	FCefWebUiConsoleMarkerEvent OnConsoleMarker;
+	#pragma endregion
 
 private:
-#pragma region Runtime Internal
+	#pragma region Runtime Internal
 	/** @brief EnsureRuntimeStarted API. */
 	void EnsureRuntimeStarted();
 	/** @brief ShutdownRuntime API. */
@@ -206,10 +239,10 @@ private:
 	TSharedPtr<FCefControlWriter> GetOrOpenControlWriter();
 	/** @brief GetGameViewportClient API. */
 	UGameViewportClient* GetGameViewportClient() const;
-#pragma endregion
+	#pragma endregion
 
 private:
-#pragma region State
+	#pragma region State
 	/** @brief OwnerSubsystem state. */
 	TWeakObjectPtr<UCefWebUiGameInstanceSubsystem> OwnerSubsystem;
 	/** @brief SessionId state. */
@@ -234,6 +267,13 @@ private:
 	FDelegateHandle LoadStateDelegateHandle;
 	/** @brief ConsoleLogDelegateHandle state. */
 	FDelegateHandle ConsoleLogDelegateHandle;
-#pragma endregion
-};
 
+	/** @brief MarkerDelegates state. */
+	TMap<FGameplayTag, FCefWebUiMarkerDelegate> MarkerDelegates;
+	/** @brief BlueprintMarkerDelegates state. */
+	UPROPERTY()
+	TMap<FGameplayTag, FCefWebUiMarkerCallback> BlueprintMarkerDelegates;
+	/** @brief InvalidMarkerDelegate state. */
+	FCefWebUiMarkerDelegate InvalidMarkerDelegate;
+	#pragma endregion
+};

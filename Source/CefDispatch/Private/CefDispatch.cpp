@@ -3,24 +3,15 @@
 
 namespace
 {
-struct FCefDeferredFactoryEntry
-{
-	uint32 MessageType = 0;
-	FCefDispatchRegistry::FCefDispatchFactory Factory;
-	bool bAllowReplace = false;
-};
+	struct FCefDeferredFactoryEntry
+	{
+		uint32 MessageType = 0;
+		FCefDispatchRegistry::FCefDispatchFactory Factory;
+		bool bAllowReplace = false;
+	};
 
-struct FCefDeferredHandlerEntry
-{
-	uint32 MessageType = 0;
-	FCefDispatchHandlerRegistry::FCefDispatchHandler Handler;
-	bool bAllowReplace = false;
-};
-
-FCriticalSection GDeferredFactoriesLock;
-TArray<FCefDeferredFactoryEntry> GDeferredFactories;
-FCriticalSection GDeferredHandlersLock;
-TArray<FCefDeferredHandlerEntry> GDeferredHandlers;
+	FCriticalSection GDeferredFactoriesLock;
+	TArray<FCefDeferredFactoryEntry> GDeferredFactories;
 }
 
 #define LOCTEXT_NAMESPACE "FCefDispatchModule"
@@ -36,14 +27,14 @@ bool FCefDispatchModule::IsAvailable()
 }
 
 void FCefDispatchModule::RegisterDeferredFactory(uint32 InMessageType, FCefDispatchRegistry::FCefDispatchFactory InFactory,
-                                                 bool bInAllowReplace)
+	bool bInAllowReplace)
 {
 	if (IsAvailable())
 	{
 		FCefDispatchModule& module = Get();
-		if (module.Registry.IsValid())
+		if (module.DispatchRegistry.IsValid())
 		{
-			module.Registry->RegisterFactory(InMessageType, MoveTemp(InFactory), bInAllowReplace);
+			module.DispatchRegistry->RegisterFactory(InMessageType, MoveTemp(InFactory), bInAllowReplace);
 			return;
 		}
 	}
@@ -57,32 +48,9 @@ void FCefDispatchModule::RegisterDeferredFactory(uint32 InMessageType, FCefDispa
 	GDeferredFactories.Add(MoveTemp(deferredEntry));
 }
 
-void FCefDispatchModule::RegisterDeferredHandler(uint32 InMessageType, FCefDispatchHandlerRegistry::FCefDispatchHandler InHandler,
-                                                 bool bInAllowReplace)
-{
-	if (IsAvailable())
-	{
-		FCefDispatchModule& module = Get();
-		if (module.HandlerRegistry.IsValid())
-		{
-			module.HandlerRegistry->RegisterHandler(InMessageType, MoveTemp(InHandler), bInAllowReplace);
-			return;
-		}
-	}
-
-	FCefDeferredHandlerEntry deferredEntry;
-	deferredEntry.MessageType = InMessageType;
-	deferredEntry.Handler = MoveTemp(InHandler);
-	deferredEntry.bAllowReplace = bInAllowReplace;
-
-	FScopeLock lock(&GDeferredHandlersLock);
-	GDeferredHandlers.Add(MoveTemp(deferredEntry));
-}
-
 void FCefDispatchModule::StartupModule()
 {
-	Registry = MakeShared<FCefDispatchRegistry>();
-	HandlerRegistry = MakeShared<FCefDispatchHandlerRegistry>(Registry);
+	DispatchRegistry = MakeShared<FCefDispatchRegistry>();
 
 	TArray<FCefDeferredFactoryEntry> pendingEntries;
 	{
@@ -91,28 +59,16 @@ void FCefDispatchModule::StartupModule()
 		GDeferredFactories.Reset();
 	}
 
-	TArray<FCefDeferredHandlerEntry> pendingHandlers;
-	{
-		FScopeLock lock(&GDeferredHandlersLock);
-		pendingHandlers = MoveTemp(GDeferredHandlers);
-		GDeferredHandlers.Reset();
-	}
-
 	for (FCefDeferredFactoryEntry& entry : pendingEntries)
 	{
-		Registry->RegisterFactory(entry.MessageType, MoveTemp(entry.Factory), entry.bAllowReplace);
+		DispatchRegistry->RegisterFactory(entry.MessageType, MoveTemp(entry.Factory), entry.bAllowReplace);
 	}
 
-	for (FCefDeferredHandlerEntry& entry : pendingHandlers)
-	{
-		HandlerRegistry->RegisterHandler(entry.MessageType, MoveTemp(entry.Handler), entry.bAllowReplace);
-	}
 }
 
 void FCefDispatchModule::ShutdownModule()
 {
-	HandlerRegistry.Reset();
-	Registry.Reset();
+	DispatchRegistry.Reset();
 }
 
 #undef LOCTEXT_NAMESPACE

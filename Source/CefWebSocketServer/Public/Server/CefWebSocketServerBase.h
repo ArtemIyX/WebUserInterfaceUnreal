@@ -10,6 +10,7 @@
 #include "Data/CefWebSocketDelegates.h"
 #include "Data/CefWebSocketStructs.h"
 #include "Data/CefWebSocketEnums.h"
+#include "Pipeline/CefWebSocketPipelineTypes.h"
 #include "CefWebSocketServerBase.generated.h"
 
 class UCefWebSocketClientBase;
@@ -183,6 +184,8 @@ private:
 	/** @brief ClientObjects state. */
 	UPROPERTY()
 	TMap<int64, TObjectPtr<UCefWebSocketClientBase>> ClientObjects;
+	/** @brief Messages received before their game-thread client object was created. */
+	TMap<int64, TArray<FCefWebSocketInboundPacket>> PendingClientMessages;
 	/** @brief Instance state. */
 	TSharedPtr<FCefWebSocketServerInstance> Instance;
 #pragma endregion
