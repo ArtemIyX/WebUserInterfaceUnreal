@@ -22,7 +22,7 @@ public:
 	virtual void ShutdownModule() override;
 
 	TSharedPtr<class FCefDispatchRegistry> GetDispatchRegistry() const { return DispatchRegistry; }
-	static void RegisterDeferredFactory(uint32 InMessageType, FCefDispatchRegistry::FCefDispatchFactory InFactory,
+	static void RegisterDeferredFactory(FCefDispatchRouteKey InRouteKey, FCefDispatchRegistry::FCefDispatchFactory InFactory,
 	                                    /** @brief Function API. */
 	                                    bool bInAllowReplace = false);
 

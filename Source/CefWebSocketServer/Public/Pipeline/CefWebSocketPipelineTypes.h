@@ -1,51 +1,50 @@
 ﻿/**
  * @file CefWebSocketServer\Public\Pipeline\CefWebSocketPipelineTypes.h
- * @brief Declares CefWebSocketPipelineTypes for module CefWebSocketServer\Public\Pipeline\CefWebSocketPipelineTypes.h.
- * @details Contains websocket server components used by the plugin runtime and gameplay-facing systems.
+ * @brief Defines packet structures exchanged by the WebSocket pipeline.
  */
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Data/CefWebSocketEnums.h"
 
-/** @brief Type declaration. */
+/** @brief A packet received from a connected client. */
 struct CEFWEBSOCKETSERVER_API FCefWebSocketInboundPacket
 {
-	/** @brief ClientId state. */
+	/** Identifier of the client that sent the packet. */
 	int64 ClientId = 0;
-	/** @brief Payload state. */
+	/** Packet payload bytes. */
 	TArray<uint8> Payload;
-	/** @brief bBinary state. */
+	/** Whether the original packet used the binary wire format. */
 	bool bBinary = true;
-	/** @brief FDateTime::UtcNow API. */
+	/** UTC time at which the packet was received. */
 	FDateTime ReceivedAtUtc = FDateTime::UtcNow();
 };
 
-/** @brief Type declaration. */
+/** @brief A request to encode and send data to one or more clients. */
 struct CEFWEBSOCKETSERVER_API FCefWebSocketSendRequest
 {
-	/** @brief TargetClientIds state. */
+	/** Explicit destination client identifiers. */
 	TArray<int64> TargetClientIds;
-	/** @brief bBroadcast state. */
+	/** Whether the request targets all clients. */
 	bool bBroadcast = false;
-	/** @brief ExcludedClientId state. */
+	/** Client excluded from broadcast delivery. */
 	int64 ExcludedClientId = 0;
-	/** @brief PayloadFormat state. */
+	/** Encoding to use for the outgoing payload. */
 	ECefWebSocketPayloadFormat PayloadFormat = ECefWebSocketPayloadFormat::Binary;
-	/** @brief BytesPayload state. */
+	/** Binary payload, used for binary-compatible formats. */
 	TArray<uint8> BytesPayload;
-	/** @brief TextPayload state. */
+	/** Text payload, used for string-compatible formats. */
 	FString TextPayload;
 };
 
-/** @brief Type declaration. */
+/** @brief A payload ready for writing to a specific client connection. */
 struct CEFWEBSOCKETSERVER_API FCefWebSocketWritePacket
 {
-	/** @brief ClientId state. */
+	/** Destination client identifier. */
 	int64 ClientId = 0;
-	/** @brief Payload state. */
+	/** Encoded payload bytes. */
 	TArray<uint8> Payload;
-	/** @brief bBinary state. */
+	/** Whether the payload must be written as binary data. */
 	bool bBinary = true;
 };
 

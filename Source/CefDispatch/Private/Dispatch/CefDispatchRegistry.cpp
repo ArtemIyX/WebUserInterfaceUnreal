@@ -1,32 +1,34 @@
 #include "Dispatch/CefDispatchRegistry.h"
 
-bool FCefDispatchRegistry::RegisterFactory(uint32 InMessageType, FCefDispatchFactory InFactory, bool bInAllowReplace)
+bool FCefDispatchRegistry::RegisterFactory(const FCefDispatchRouteKey& InRouteKey, FCefDispatchFactory InFactory, bool bInAllowReplace)
 {
-	if (!InFactory)
+	if (!InRouteKey.IsValid() || !InFactory)
 	{
 		return false;
 	}
 
 	FWriteScopeLock writeLock(RoutesLock);
-	if (!bInAllowReplace && Routes.Contains(InMessageType))
+	if (!bInAllowReplace && Routes.Contains(InRouteKey))
 	{
 		return false;
 	}
 
-	Routes.Add(InMessageType, MoveTemp(InFactory));
+	Routes.Add(InRouteKey, MoveTemp(InFactory));
 	return true;
 }
 
-bool FCefDispatchRegistry::UnregisterFactory(uint32 InMessageType)
+bool FCefDispatchRegistry::UnregisterFactory(const FCefDispatchRouteKey& InRouteKey)
 {
+	if (!InRouteKey.IsValid()) return false;
 	FWriteScopeLock writeLock(RoutesLock);
-	return Routes.Remove(InMessageType) > 0;
+	return Routes.Remove(InRouteKey) > 0;
 }
 
-bool FCefDispatchRegistry::HasFactory(uint32 InMessageType) const
+bool FCefDispatchRegistry::HasFactory(const FCefDispatchRouteKey& InRouteKey) const
 {
+	if (!InRouteKey.IsValid()) return false;
 	FReadScopeLock readLock(RoutesLock);
-	return Routes.Contains(InMessageType);
+	return Routes.Contains(InRouteKey);
 }
 
 int32 FCefDispatchRegistry::GetFactoryCount() const
@@ -35,17 +37,23 @@ int32 FCefDispatchRegistry::GetFactoryCount() const
 	return Routes.Num();
 }
 
-ECefDispatchFactoryResult FCefDispatchRegistry::Decode(uint32 InMessageType, const TArray<uint8>& InPayload,
+ECefDispatchFactoryResult FCefDispatchRegistry::Decode(const FCefDispatchRouteKey& InRouteKey, const TArray<uint8>& InPayload,
                                                        TUniquePtr<ICefDispatchValue>& OutValue, FString& OutError) const
 {
+	if (!InRouteKey.IsValid())
+	{
+		OutValue.Reset();
+		OutError = TEXT("Invalid dispatch route key");
+		return ECefDispatchFactoryResult::InvalidRouteKey;
+	}
 	FCefDispatchFactory routeFactory;
 	{
 		FReadScopeLock readLock(RoutesLock);
-		const FCefDispatchFactory* foundFactory = Routes.Find(InMessageType);
+		const FCefDispatchFactory* foundFactory = Routes.Find(InRouteKey);
 		if (!foundFactory)
 		{
 			OutValue.Reset();
-			OutError = FString::Printf(TEXT("No dispatch factory for MessageType=%u"), InMessageType);
+			OutError = FString::Printf(TEXT("No dispatch factory for route %s"), *InRouteKey.GetDiagnosticText());
 			return ECefDispatchFactoryResult::RouteNotFound;
 		}
 		routeFactory = *foundFactory;
@@ -54,16 +62,16 @@ ECefDispatchFactoryResult FCefDispatchRegistry::Decode(uint32 InMessageType, con
 	if (!routeFactory)
 	{
 		OutValue.Reset();
-		OutError = FString::Printf(TEXT("Invalid dispatch factory for MessageType=%u"), InMessageType);
+		OutError = FString::Printf(TEXT("Invalid dispatch factory for route %s"), *InRouteKey.GetDiagnosticText());
 		return ECefDispatchFactoryResult::InvalidFactory;
 	}
 
-	OutValue = routeFactory(InMessageType, InPayload, OutError);
+	OutValue = routeFactory(InRouteKey, InPayload, OutError);
 	if (!OutValue.IsValid())
 	{
 		if (OutError.IsEmpty())
 		{
-			OutError = FString::Printf(TEXT("Factory returned null for MessageType=%u"), InMessageType);
+			OutError = FString::Printf(TEXT("Factory returned null for route %s"), *InRouteKey.GetDiagnosticText());
 		}
 		return ECefDispatchFactoryResult::FactoryFailed;
 	}

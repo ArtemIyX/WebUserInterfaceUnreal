@@ -1,9 +1,9 @@
 #include "Dispatch/CefDispatchRegistration.h"
 #include "CefDispatch.h"
 
-FCefDispatchFactoryRegistrar::FCefDispatchFactoryRegistrar(uint32 InMessageType,
+FCefDispatchFactoryRegistrar::FCefDispatchFactoryRegistrar(FCefDispatchRouteKey InRouteKey,
                                                            FCefDispatchRegistry::FCefDispatchFactory InFactory,
                                                            bool bInAllowReplace)
 {
-	FCefDispatchModule::RegisterDeferredFactory(InMessageType, MoveTemp(InFactory), bInAllowReplace);
+	FCefDispatchModule::RegisterDeferredFactory(MoveTemp(InRouteKey), MoveTemp(InFactory), bInAllowReplace);
 }

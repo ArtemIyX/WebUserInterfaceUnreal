@@ -406,4 +406,4 @@ void UCefWebSocketServerBase::HandleClientBytes(UCefWebSocketClientBase* InClien
 
 void UCefWebSocketServerBase::HandleClientString(UCefWebSocketClientBase* InClient, const FString& InMessage) {}
 
-void UCefWebSocketServerBase::ServerInitialized() {}
+void UCefWebSocketServerBase::ServerInitialized(UCefWebSocketSubsystem* InCefSubsystem) {}
