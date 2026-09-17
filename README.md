@@ -161,6 +161,92 @@ Or build manually and connect to project (.lib + .dll):
 
 This keeps transport and business object creation decoupled.
 
+### Route-Key Example
+
+Scalar routes remain valid, but applications can also use composite value types. A
+route type must be copyable and provide `operator==` and `GetTypeHash`:
+
+```cpp
+#include "CefDispatch.h"
+#include "Dispatch/CefDispatchRouteKey.h"
+
+struct FMessageRoute
+{
+	uint8 Channel = 0;
+	FName Message;
+
+	bool operator==(const FMessageRoute&) const = default;
+};
+
+uint32 GetTypeHash(const FMessageRoute& InRoute)
+{
+	return HashCombine(::GetTypeHash(InRoute.Channel), ::GetTypeHash(InRoute.Message));
+}
+
+const FMessageRoute Route{2, TEXT("Inventory.Update")};
+TSharedPtr<FCefDispatchRegistry> Registry = FCefDispatchModule::Get().GetDispatchRegistry();
+
+Registry->RegisterFactory(
+	Route,
+	[](const FCefDispatchRouteKey& InRouteKey, const TArray<uint8>& InPayload,
+		FString& OutError) -> TUniquePtr<ICefDispatchValue>
+	{
+		const FMessageRoute* TypedRoute = InRouteKey.TryGet<FMessageRoute>();
+		if (!TypedRoute)
+		{
+			OutError = TEXT("Unexpected route-key type");
+			return nullptr;
+		}
+
+		return MakeCefDispatchValue(TypedRoute->Message);
+	});
+```
+
+Key matching uses both the concrete C++ type and its value. Matching is exact:
+there is no implicit parent, prefix, or wildcard fallback. Keys own an immutable
+copy of their value and should not contain raw UObject pointers or transient
+addresses.
+
+### Optional Handler Metadata
+
+Dispatch calls can carry immutable, type-erased metadata without changing the
+route key or decoded payload type:
+
+```cpp
+#include "Dispatch/CefDispatchHandlerRegistry.h"
+#include "Dispatch/CefDispatchMetadata.h"
+
+FCefDispatchHandlerRegistry Handlers(Registry);
+
+Handlers.RegisterTypedHandler<FName>(
+	Route,
+	[](const FName& InMessage, const ICefDispatchMetadata* InMetadata)
+	{
+		const FName* Source = CefDispatchTryGetMetadata<FName>(InMetadata);
+		return Source && *Source == FName(TEXT("Browser")) &&
+			InMessage == FName(TEXT("Inventory.Update"));
+	});
+
+FString Error;
+const TSharedPtr<const ICefDispatchMetadata> Metadata =
+	MakeCefDispatchMetadata(FName(TEXT("Browser")));
+
+const ECefDispatchHandlerResult Result =
+	Handlers.Dispatch(Route, PayloadBytes, Metadata, Error);
+```
+
+Metadata is optional. Existing typed handlers that accept only the decoded value
+continue to work.
+
+### Migrating to 1.5
+
+- Factory and route-aware handler callbacks now receive
+  `const FCefDispatchRouteKey&` instead of `uint32`.
+- Scalar calls such as `RegisterFactory(1001, ...)` and `Dispatch(1001, ...)`
+  remain supported by templated overloads.
+- Overrides of `UCefWebSocketServerBase::ServerInitialized()` must accept the
+  owning `UCefWebSocketSubsystem*` argument.
+
 ---
 
 ## 9) Protobuf + Dispatch Integration Pattern
