@@ -18,7 +18,7 @@ This plugin is split into 5 runtime modules:
 - `CefWebSocketServer`
   - Local websocket server subsystem with threaded pipeline and pluggable payload codecs.
 - `CefDispatch`
-  - Format-agnostic `MessageType(uint32) -> Factory` registry (works with protobuf or any custom type).
+  - Format-agnostic exact route-key -> factory registry (works with protobuf or any custom type).
 - `CefContentHttpServer`
   - Local HTTP image endpoint (`/img`) with pluggable request handler strategy.
 
@@ -153,10 +153,10 @@ Or build manually and connect to project (.lib + .dll):
 
 ## 8) Why `CefDispatch` Module Exists
 
-`CefDispatch` solves routing/creation of typed runtime objects from message ids:
+`CefDispatch` solves routing/creation of typed runtime objects from application-owned route keys:
 
-- Register factory per `uint32 MessageType`.
-- Decode inbound bytes by message type.
+- Register a factory per exact route key. A scalar such as `1001` remains valid.
+- Decode inbound bytes by route key.
 - Return any value type (`protobuf object`, custom struct, `FString`, raw wrapper, etc.).
 
 This keeps transport and business object creation decoupled.
@@ -167,9 +167,8 @@ This keeps transport and business object creation decoupled.
 
 Typical pattern for binary protocol:
 
-1. Websocket codec (`CefProtobuf`) extracts envelope:
-   - `MessageType`, payload bytes.
-2. Dispatch registry (`CefDispatch`) uses `MessageType` factory:
+1. Websocket codec (`CefProtobuf`) extracts its envelope and constructs the agreed C++ route key.
+2. Dispatch registry (`CefDispatch`) uses the exact route-key factory:
    - parse payload into desired object.
 3. Application consumes typed value.
 
@@ -177,6 +176,11 @@ This supports both:
 
 - fully protobuf messages
 - mixed payload ecosystem (protobuf + custom binary/text)
+
+Route keys are immutable value identities. Composite keys provide type-safe routing when
+`GetTypeHash` and equality are defined. `FGameplayTag` is supported from a consumer
+module with its own `GameplayTags` dependency. Do not use raw UObject pointers or
+transient addresses as keys. Parent and wildcard fallback are not implicit.
 
 ---
 

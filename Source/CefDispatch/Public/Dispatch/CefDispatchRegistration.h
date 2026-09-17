@@ -12,7 +12,7 @@
 class CEFDISPATCH_API FCefDispatchFactoryRegistrar
 {
 public:
-	FCefDispatchFactoryRegistrar(uint32 InMessageType, FCefDispatchRegistry::FCefDispatchFactory InFactory,
+	FCefDispatchFactoryRegistrar(FCefDispatchRouteKey InRouteKey, FCefDispatchRegistry::FCefDispatchFactory InFactory,
 	                             /** @brief Function API. */
 	                             bool bInAllowReplace = false);
 };
@@ -26,12 +26,12 @@ public:
 	namespace                                                                                                      \
 	{                                                                                                              \
 	static FCefDispatchFactoryRegistrar CEF_DISPATCH_CONCAT(GCefDispatchFactoryRegistrar_, __LINE__)(            \
-		InMessageType, InFactory, false);                                                                         \
+		MakeCefDispatchRouteKey(InMessageType), InFactory, false);                                                \
 	}
 
 #define CEF_DISPATCH_REGISTER_FACTORY_REPLACE(InMessageType, InFactory)                                             \
 	namespace                                                                                                      \
 	{                                                                                                              \
 	static FCefDispatchFactoryRegistrar CEF_DISPATCH_CONCAT(GCefDispatchFactoryRegistrarReplace_, __LINE__)(     \
-		InMessageType, InFactory, true);                                                                          \
+		MakeCefDispatchRouteKey(InMessageType), InFactory, true);                                                 \
 	}

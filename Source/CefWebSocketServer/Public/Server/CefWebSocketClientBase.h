@@ -1,7 +1,6 @@
 ﻿/**
  * @file CefWebSocketServer\Public\Server\CefWebSocketClientBase.h
- * @brief Declares CefWebSocketClientBase for module CefWebSocketServer\Public\Server\CefWebSocketClientBase.h.
- * @details Contains websocket server components used by the plugin runtime and gameplay-facing systems.
+ * @brief Declares the UObject wrapper for a connected WebSocket client.
  */
 #pragma once
 
@@ -13,54 +12,57 @@
 
 class UCefWebSocketServerBase;
 
+/** @brief UObject representation of one connected WebSocket client. */
 UCLASS(BlueprintType, Blueprintable)
-/** @brief Type declaration. */
 class CEFWEBSOCKETSERVER_API UCefWebSocketClientBase : public UObject
 {
 	GENERATED_BODY()
 
 public:
-	/** @brief UCefWebSocketClientBase API. */
+	/** @brief Constructs the client wrapper. @param InInitializer Unreal object initializer. */
 	UCefWebSocketClientBase(const FObjectInitializer& InInitializer);
 public:
 #pragma region PublicApi
+	/** @brief Returns the server-assigned client identifier. */
 	UFUNCTION(BlueprintPure, Category = "CefWebSocket")
 	int64 GetClientId() const { return ClientInfo.ClientId; }
 
+	/** @brief Returns the client's remote network address. */
 	UFUNCTION(BlueprintPure, Category = "CefWebSocket")
 	FString GetRemoteAddress() const { return ClientInfo.RemoteAddress; }
 
+	/** @brief Returns the time at which the client connected. */
 	UFUNCTION(BlueprintPure, Category = "CefWebSocket")
 	FDateTime GetConnectedAt() const { return ClientInfo.ConnectedAt; }
 
+	/** @brief Sends a UTF-8 string to this client. @param InMessage Message text. @return Result of the send operation. */
 	UFUNCTION(BlueprintCallable, Category = "CefWebSocket")
-	/** @brief SendString API. */
 	ECefWebSocketSendResult SendString(const FString& InMessage);
 
+	/** @brief Sends binary data to this client. @param InBytes Payload bytes. @return Result of the send operation. */
 	UFUNCTION(BlueprintCallable, Category = "CefWebSocket")
-	/** @brief SendBytes API. */
 	ECefWebSocketSendResult SendBytes(const TArray<uint8>& InBytes);
 
+	/** @brief Disconnects this client. @param InReason Close reason. @return Result of the disconnect operation. */
 	UFUNCTION(BlueprintCallable, Category = "CefWebSocket")
-	/** @brief Disconnect API. */
 	ECefWebSocketSendResult Disconnect(ECefWebSocketCloseReason InReason = ECefWebSocketCloseReason::Kicked);
 
-	/** @brief HandleBytesFromClient API. */
+	/** @brief Handles binary data received from this client. @param InData Received bytes. */
 	virtual void HandleBytesFromClient(const TArray<uint8>& InData);
-	/** @brief HandleStringFromClient API. */
+	/** @brief Handles text data received from this client. @param InMessage Received text. */
 	virtual void HandleStringFromClient(const FString& InMessage);
 #pragma endregion
 
 private:
 #pragma region Internal
-	/** @brief UCefWebSocketServerBase state. */
+	/** Grants the owning server access to internal client state. */
 	friend class UCefWebSocketServerBase;
-	/** @brief InitializeClient API. */
+	/** Initializes this wrapper with its owning server and connection information. */
 	void InitializeClient(TWeakObjectPtr<UCefWebSocketServerBase> InOwnerServer, const FCefWebSocketClientInfo& InInfo);
 
-	/** @brief OwnerServer state. */
+	/** Server that owns this client wrapper. */
 	TWeakObjectPtr<UCefWebSocketServerBase> OwnerServer;
-	/** @brief ClientInfo state. */
+	/** Connection identity and timing information. */
 	FCefWebSocketClientInfo ClientInfo;
 #pragma endregion
 };

@@ -5,7 +5,7 @@ namespace
 {
 	struct FCefDeferredFactoryEntry
 	{
-		uint32 MessageType = 0;
+		FCefDispatchRouteKey RouteKey;
 		FCefDispatchRegistry::FCefDispatchFactory Factory;
 		bool bAllowReplace = false;
 	};
@@ -26,7 +26,7 @@ bool FCefDispatchModule::IsAvailable()
 	return FModuleManager::Get().IsModuleLoaded("CefDispatch");
 }
 
-void FCefDispatchModule::RegisterDeferredFactory(uint32 InMessageType, FCefDispatchRegistry::FCefDispatchFactory InFactory,
+void FCefDispatchModule::RegisterDeferredFactory(FCefDispatchRouteKey InRouteKey, FCefDispatchRegistry::FCefDispatchFactory InFactory,
 	bool bInAllowReplace)
 {
 	if (IsAvailable())
@@ -34,13 +34,13 @@ void FCefDispatchModule::RegisterDeferredFactory(uint32 InMessageType, FCefDispa
 		FCefDispatchModule& module = Get();
 		if (module.DispatchRegistry.IsValid())
 		{
-			module.DispatchRegistry->RegisterFactory(InMessageType, MoveTemp(InFactory), bInAllowReplace);
+			module.DispatchRegistry->RegisterFactory(InRouteKey, MoveTemp(InFactory), bInAllowReplace);
 			return;
 		}
 	}
 
 	FCefDeferredFactoryEntry deferredEntry;
-	deferredEntry.MessageType = InMessageType;
+	deferredEntry.RouteKey = MoveTemp(InRouteKey);
 	deferredEntry.Factory = MoveTemp(InFactory);
 	deferredEntry.bAllowReplace = bInAllowReplace;
 
@@ -61,7 +61,7 @@ void FCefDispatchModule::StartupModule()
 
 	for (FCefDeferredFactoryEntry& entry : pendingEntries)
 	{
-		DispatchRegistry->RegisterFactory(entry.MessageType, MoveTemp(entry.Factory), entry.bAllowReplace);
+		DispatchRegistry->RegisterFactory(entry.RouteKey, MoveTemp(entry.Factory), entry.bAllowReplace);
 	}
 
 }
