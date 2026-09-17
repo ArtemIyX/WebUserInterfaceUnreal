@@ -11,7 +11,7 @@
 
 ## 1) What This Plugin Includes
 
-This plugin is split into 5 runtime modules:
+This plugin is split into 4 runtime modules:
 
 - `CefWebUi`
   - Browser session API, shared-memory IPC, input/control writers, frame reader, Slate browser surface.
