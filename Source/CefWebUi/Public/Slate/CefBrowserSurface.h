@@ -14,13 +14,12 @@
 #include "Services/CefFrameReader.h"
 #include "Services/CefInputWriter.h"
 
-struct ID3D12Fence;
-
 class FCefInputWriter;
 class FCefFrameReader;
 class FCefControlWriter;
 class UCefWebUiBrowserSession;
 class FCefBrowserSurfaceDrawer;
+class FCefBrowserSurfaceResourceState;
 
 /** @brief Type declaration. */
 class CEFWEBUI_API SCefBrowserSurface : public SLeafWidget
@@ -50,6 +49,7 @@ public:
 #pragma endregion
 
 #pragma region SWidget
+private:
 	virtual int32 OnPaint(
 		const FPaintArgs& InArgs,
 		const FGeometry& InAllottedGeometry,
@@ -58,10 +58,14 @@ public:
 		int32 InLayerId,
 		const FWidgetStyle& InWidgetStyle,
 		bool bInParentEnabled) const override;
+public:
 	virtual void Tick(const FGeometry& InAllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 
+private:
 	virtual FVector2D ComputeDesiredSize(float InLayoutScaleMultiplier) const override;
-	virtual bool ComputeVolatility() const override { return true; }
+protected:
+	virtual bool ComputeVolatility() const override { return false; }
+public:
 	virtual bool SupportsKeyboardFocus() const override { return true; }
 
 	virtual FReply OnMouseMove(const FGeometry& InMyGeometry, const FPointerEvent& InMouseEvent) override;
@@ -77,6 +81,8 @@ private:
 #pragma region InternalMethods
 	/** @brief HandleActiveTimer API. */
 	EActiveTimerReturnType HandleActiveTimer(double InCurrentTime, float InDeltaTime);
+	/** @brief StartActiveTimer API. */
+	void StartActiveTimer() const;
 	/** @brief HandleFrameReady API. */
 	void HandleFrameReady();
 	/** @brief UnbindFrameReaderDelegate API. */
@@ -102,9 +108,9 @@ private:
 	/** @brief MarkInputEvent API. */
 	void MarkInputEvent();
 	/** @brief EnsureSharedRhi API. */
-	void EnsureSharedRhi() const;
+	void EnsureSharedRhi(const FCefSharedFrame& InFrame) const;
 	/** @brief EnsurePopupPlaneRhi API. */
-	bool EnsurePopupPlaneRhi() const;
+	bool EnsurePopupPlaneRhi(const FCefSharedFrame& InFrame) const;
 	/** @brief EnsureSharedGpuFence API. */
 	bool EnsureSharedGpuFence() const;
 	/** @brief IsFrameGpuReady API. */
@@ -117,6 +123,16 @@ private:
 	void HandleAppliedFrameSize(int32 InFrameWidth, int32 InFrameHeight) const;
 	/** @brief ReleaseResources API. */
 	void ReleaseResources();
+	/** @brief ResetResourceState API. */
+	void ResetResourceState() const;
+	/** @brief HasPendingResourceWork API. */
+	bool HasPendingResourceWork() const;
+	/** @brief GetSharedTexture API. */
+	FTextureRHIRef GetSharedTexture(uint32 InSlot) const;
+	/** @brief GetSharedPopupTexture API. */
+	FTextureRHIRef GetSharedPopupTexture() const;
+	/** @brief GetResourceGeneration API. */
+	uint64 GetResourceGeneration() const;
 	/** @brief GetBrowserCoords API. */
 	void GetBrowserCoords(const FGeometry& InGeometry, const FVector2D& InScreenPosition, int32& OutX, int32& OutY) const;
 	/** @brief SlateButtonToCef API. */
@@ -179,15 +195,22 @@ private:
 	mutable uint32 DeferredRetryCount = 0;
 	/** @brief SharedSlotCount state. */
 	mutable uint32 SharedSlotCount = 2;
-	mutable FTextureRHIRef SharedTextureRHI[MaxSharedSlots];
-	/** @brief SharedPopupTextureRHI state. */
-	mutable FTextureRHIRef SharedPopupTextureRHI;
-	/** @brief SharedGpuFence state. */
-	mutable ID3D12Fence* SharedGpuFence = nullptr;
-	/** @brief bTriedOpenSharedGpuFence state. */
-	mutable bool bTriedOpenSharedGpuFence = false;
 	/** @brief bSharedTexturesReopenPending state. */
 	mutable bool bSharedTexturesReopenPending = false;
+	/** @brief bActiveTimerRegistered state. */
+	mutable bool bActiveTimerRegistered = false;
+	/** @brief LastSubmittedFrameId state. */
+	mutable uint64 LastSubmittedFrameId = 0;
+	/** @brief LastSubmittedGeneration state. */
+	mutable uint64 LastSubmittedGeneration = 0;
+	/** @brief LastSubmittedDestRect state. */
+	mutable FIntRect LastSubmittedDestRect;
+	/** @brief LastSubmittedPopupRect state. */
+	mutable FIntRect LastSubmittedPopupRect;
+	/** @brief LastSubmittedPopupVisible state. */
+	mutable bool bLastSubmittedPopupVisible = false;
+	/** @brief ResourceState state. */
+	mutable TSharedPtr<FCefBrowserSurfaceResourceState, ESPMode::ThreadSafe> ResourceState;
 	/** @brief CustomDrawer state. */
 	mutable TSharedPtr<FCefBrowserSurfaceDrawer, ESPMode::ThreadSafe> CustomDrawer;
 	/** @brief LastConsumerFrameTimeSec state. */

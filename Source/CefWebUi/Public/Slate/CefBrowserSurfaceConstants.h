@@ -43,6 +43,8 @@ inline constexpr double AutoResizeDebouncePeriodSec = 0.20;
 inline constexpr double AutoResizeApplyTimeoutSec = 0.50;
 /** @brief AutoResizeMaxRetries state. */
 inline constexpr int32 AutoResizeMaxRetries = 2;
+/** @brief ResourceOpenMaxRetries state. */
+inline constexpr uint32 ResourceOpenMaxRetries = 8;
 
 /** @brief CefEventFlagCapsLockOn state. */
 inline constexpr uint32 CefEventFlagCapsLockOn = 1u << 0;

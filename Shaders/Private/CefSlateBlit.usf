@@ -11,7 +11,10 @@ float2 SrcTexSize;
 void MainPS(float4 svPos : SV_POSITION, out float4 outColor : SV_Target0)
 {
 	float2 local = (svPos.xy - DestMin) / max(DestSize, float2(1.0, 1.0));
-	float2 srcPixel = SrcMin + saturate(local) * SrcSize;
-	float2 uv = (srcPixel + 0.5) / max(SrcTexSize, float2(1.0, 1.0));
-	outColor = InputTexture.Sample(InputSampler, uv);
+	float2 srcPixel = SrcMin + local * SrcSize;
+	float2 uv = srcPixel / max(SrcTexSize, float2(1.0, 1.0));
+	float2 uvMin = (SrcMin + 0.5) / max(SrcTexSize, float2(1.0, 1.0));
+	float2 uvMax = (SrcMin + SrcSize - 0.5) / max(SrcTexSize, float2(1.0, 1.0));
+	uv = clamp(uv, uvMin, uvMax);
+	outColor = InputTexture.SampleLevel(InputSampler, uv, 0.0);
 }

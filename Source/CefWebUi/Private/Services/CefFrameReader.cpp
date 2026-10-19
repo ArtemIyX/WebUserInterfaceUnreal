@@ -3,6 +3,8 @@
 #include "Services/CefFrameReader.h"
 #include "CefWebUi.h"
 #include "Async/Async.h"
+#include "Slate/CefBrowserSurfaceFunctions.h"
+#include "Logging/StructuredLog.h"
 #include <atomic>
 
 #include "Windows/AllowWindowsPlatformTypes.h"
@@ -164,6 +166,7 @@ void FCefFrameReader::Stop()
 		PendingFrames.Reset();
 		PendingFrameCount.store(0, std::memory_order_relaxed);
 	}
+	bFrameReadyDispatchPending.store(false, std::memory_order_relaxed);
 
 	CloseHandles();
 	UE_LOG(LogCefWebUi, Log, TEXT("FCefFrameReader: Stopped."));
@@ -215,9 +218,7 @@ uint32 FCefFrameReader::Run()
 
 		LastSequence = endSequence;
 
-		uint32 slotCount = headerSnapshot.slot_count;
-		if (slotCount == 0 || slotCount > CEF_SHM_MAX_SLOTS)
-			slotCount = CEF_SHM_MAX_SLOTS;
+		const uint32 slotCount = headerSnapshot.slot_count;
 
 		const bool bFrameGap = (LastFrameId != 0 && headerSnapshot.frame_id != (LastFrameId + 1));
 		const bool bForceFull = bFrameGap ||
@@ -264,15 +265,25 @@ uint32 FCefFrameReader::Run()
 			}
 			queuedFrame.CursorType = static_cast<ECefCustomCursorType>(headerSnapshot.cursor_type);
 			queuedFrame.LoadState = static_cast<ECefLoadState>(headerSnapshot.load_state);
+			if (!CefWebUi::BrowserSurface::SanitizeSharedFrameMetadata(queuedFrame))
+			{
+				UE_LOGFMT(LogCefWebUi, Warning,
+					"FCefFrameReader: Rejected invalid frame metadata frame_id={0}", queuedFrame.FrameId);
+				continue;
+			}
 			PendingFrames.Add(queuedFrame);
 			PendingFrameCount.store(static_cast<uint32>(PendingFrames.Num()), std::memory_order_relaxed);
 		}
 		LastKnownLoadStateRaw.store(headerSnapshot.load_state, std::memory_order_relaxed);
 
-		AsyncTask(ENamedThreads::GameThread, [this]()
+		if (!bFrameReadyDispatchPending.exchange(true, std::memory_order_acq_rel))
 		{
-			OnFrameReady.Broadcast();
-		});
+			AsyncTask(ENamedThreads::GameThread, [this]()
+			{
+				bFrameReadyDispatchPending.store(false, std::memory_order_release);
+				OnFrameReady.Broadcast();
+			});
+		}
 
 		// Fire load state delegate on game thread if changed
 		ECefLoadState currentLoad = static_cast<ECefLoadState>(headerSnapshot.load_state);
