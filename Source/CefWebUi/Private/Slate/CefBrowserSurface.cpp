@@ -13,42 +13,61 @@
 #include "Services/CefControlWriter.h"
 #include "Services/CefInputWriter.h"
 #include "Services/CefSharedMemoryNames.h"
+#include "Logging/StructuredLog.h"
+#include "Misc/ScopeLock.h"
 
 #include "Windows/AllowWindowsPlatformTypes.h"
 #include <d3d12.h>
 #include "Windows/HideWindowsPlatformTypes.h"
 
+class FCefBrowserSurfaceResourceState : public TSharedFromThis<FCefBrowserSurfaceResourceState, ESPMode::ThreadSafe>
+{
+public:
+	FCriticalSection Lock;
+	FTextureRHIRef MainTextures[3];
+	FTextureRHIRef PopupTexture;
+	TRefCountPtr<ID3D12Fence> SharedGpuFence;
+	uint64 Generation = 1;
+	uint64 LastFrameId = 0;
+	uint32 OpenRetryCount = 0;
+	bool bMainOpenPending = false;
+	bool bPopupOpenPending = false;
+	bool bFenceOpenPending = false;
+	bool bRetryPending = false;
+};
+
 class FCefBrowserSurfaceDrawer : public ICustomSlateElement, public TSharedFromThis<FCefBrowserSurfaceDrawer, ESPMode::ThreadSafe>
 {
 public:
 	void EnqueueUpdate(
-		const FTextureRHIRef& inMainTexture,
-		const FTextureRHIRef& inPopupTexture,
-		const FCefSharedFrame& inFrame,
-		const FIntRect& inDestRect)
+		const FTextureRHIRef& InMainTexture,
+		const FTextureRHIRef& InPopupTexture,
+		const FCefSharedFrame& InFrame,
+		const FIntRect& InDestRect,
+		uint64 InGeneration)
 	{
 		TSharedRef<FCefBrowserSurfaceDrawer, ESPMode::ThreadSafe> self = AsShared();
-		const FIntPoint sourceSize(
-			FMath::Max(1, static_cast<int32>(inFrame.Width)),
-			FMath::Max(1, static_cast<int32>(inFrame.Height)));
-		const bool popupPlane = ((inFrame.Flags & CefFrameFlag_PopupPlane) != 0);
-		const bool popupVisible = inFrame.bPopupVisible;
+		const FIntPoint SourceSize(
+			FMath::Max(1, static_cast<int32>(InFrame.Width)),
+			FMath::Max(1, static_cast<int32>(InFrame.Height)));
+		const bool bInPopupPlane = ((InFrame.Flags & CefFrameFlag_PopupPlane) != 0);
+		const bool bInPopupVisible = InFrame.bPopupVisible;
 		const FIntRect popupRectangle(
-			inFrame.PopupRect.X,
-			inFrame.PopupRect.Y,
-			inFrame.PopupRect.X + inFrame.PopupRect.W,
-			inFrame.PopupRect.Y + inFrame.PopupRect.H);
+			InFrame.PopupRect.X,
+			InFrame.PopupRect.Y,
+			InFrame.PopupRect.X + InFrame.PopupRect.W,
+			InFrame.PopupRect.Y + InFrame.PopupRect.H);
 
 		ENQUEUE_RENDER_COMMAND(CefSlateDrawerUpdate)(
-			[self, inMainTexture, inPopupTexture, inDestRect, sourceSize, popupRectangle, popupVisible, popupPlane](FRHICommandListImmediate&)
-			{
-				self->mainTexture = inMainTexture;
-				self->popupTexture = inPopupTexture;
-				self->destRect = inDestRect;
-				self->srcSize = sourceSize;
+			[self, InMainTexture, InPopupTexture, InDestRect, SourceSize, popupRectangle, bInPopupVisible, bInPopupPlane, InGeneration](FRHICommandListImmediate&) {
+				self->mainTexture = InMainTexture;
+				self->popupTexture = InPopupTexture;
+				self->destRect = InDestRect;
+				self->srcSize = SourceSize;
 				self->popupRect = popupRectangle;
-				self->bPopupVisible = popupVisible;
-				self->bPopupPlane = popupPlane;
+				self->bPopupVisible = bInPopupVisible;
+				self->bPopupPlane = bInPopupPlane;
+				self->generation = InGeneration;
 			});
 	}
 
@@ -60,36 +79,50 @@ public:
 		}
 
 		const FIntRect outputRect(FIntPoint::ZeroValue, inputs.OutputTexture->Desc.Extent);
-		FIntRect clippedDest = CefWebUi::BrowserSurface::MakeIntersection(CefWebUi::BrowserSurface::MakeIntersection(destRect, inputs.SceneViewRect), outputRect);
+		const FIntRect clippedDest = CefWebUi::BrowserSurface::MakeIntersection(CefWebUi::BrowserSurface::MakeIntersection(destRect, inputs.SceneViewRect), outputRect);
 		if (clippedDest.Width() <= 0 || clippedDest.Height() <= 0)
 		{
 			return;
 		}
 
 		FRDGTextureRef mainTex = RegisterExternalTexture(graphBuilder, mainTexture.GetReference(), TEXT("CefSlateMainTex"), ERDGTextureFlags::ForceImmediateFirstBarrier);
-		const FIntRect srcRect(0, 0, srcSize.X, srcSize.Y);
-		CefWebUi::BrowserSurface::AddCefSlateBlitPass(graphBuilder, mainTex, inputs.OutputTexture, clippedDest, srcRect, srcSize);
+		const FIntPoint mainExtent = mainTex->Desc.Extent;
+		const FIntRect srcRect(0, 0, FMath::Min(srcSize.X, mainExtent.X), FMath::Min(srcSize.Y, mainExtent.Y));
+		CefWebUi::BrowserSurface::AddCefSlateBlitPass(
+			graphBuilder,
+			mainTex,
+			inputs.OutputTexture,
+			destRect,
+			clippedDest,
+			srcRect,
+			mainExtent,
+			CefWebUi::BrowserSurface::ECefSlateBlitPlane::Main);
 
 		if (!bPopupPlane || !bPopupVisible || !popupTexture.IsValid() || popupRect.Width() <= 0 || popupRect.Height() <= 0)
 		{
 			return;
 		}
 
-		const float sx = static_cast<float>(FMath::Max(1, destRect.Width())) / static_cast<float>(FMath::Max(1, srcSize.X));
-		const float sy = static_cast<float>(FMath::Max(1, destRect.Height())) / static_cast<float>(FMath::Max(1, srcSize.Y));
-		FIntRect popupDest(
-			destRect.Min.X + FMath::RoundToInt(static_cast<float>(popupRect.Min.X) * sx),
-			destRect.Min.Y + FMath::RoundToInt(static_cast<float>(popupRect.Min.Y) * sy),
-			destRect.Min.X + FMath::RoundToInt(static_cast<float>(popupRect.Max.X) * sx),
-			destRect.Min.Y + FMath::RoundToInt(static_cast<float>(popupRect.Max.Y) * sy));
-		popupDest = CefWebUi::BrowserSurface::MakeIntersection(CefWebUi::BrowserSurface::MakeIntersection(popupDest, clippedDest), outputRect);
-		if (popupDest.Width() <= 0 || popupDest.Height() <= 0)
+		const FIntRect popupMappingDest = CefWebUi::BrowserSurface::MapSourceRectToDestRect(popupRect, FIntRect(0, 0, srcSize.X, srcSize.Y), destRect);
+		const FIntRect popupDrawDest = CefWebUi::BrowserSurface::MakeIntersection(
+			CefWebUi::BrowserSurface::MakeIntersection(popupMappingDest, clippedDest),
+			outputRect);
+		if (popupDrawDest.Width() <= 0 || popupDrawDest.Height() <= 0)
 		{
 			return;
 		}
 
 		FRDGTextureRef popupTex = RegisterExternalTexture(graphBuilder, popupTexture.GetReference(), TEXT("CefSlatePopupTex"), ERDGTextureFlags::ForceImmediateFirstBarrier);
-		CefWebUi::BrowserSurface::AddCefSlateBlitPass(graphBuilder, popupTex, inputs.OutputTexture, popupDest, popupRect, srcSize);
+		const FIntPoint popupExtent = popupTex->Desc.Extent;
+		CefWebUi::BrowserSurface::AddCefSlateBlitPass(
+			graphBuilder,
+			popupTex,
+			inputs.OutputTexture,
+			popupMappingDest,
+			popupDrawDest,
+			popupRect,
+			popupExtent,
+			CefWebUi::BrowserSurface::ECefSlateBlitPlane::Popup);
 	}
 
 private:
@@ -100,15 +133,16 @@ private:
 	FIntPoint srcSize = FIntPoint::ZeroValue;
 	bool bPopupVisible = false;
 	bool bPopupPlane = false;
+	uint64 generation = 0;
 };
 
 namespace
 {
-FCefSharedMemoryNames GetSurfaceSharedNames(const TWeakObjectPtr<UCefWebUiBrowserSession>& InSession)
-{
-	const FString sessionId = InSession.IsValid() ? InSession->GetSessionId().ToString() : FString();
-	return BuildCefSharedMemoryNames(BuildCefSessionScope(sessionId));
-}
+	FCefSharedMemoryNames GetSurfaceSharedNames(const TWeakObjectPtr<UCefWebUiBrowserSession>& InSession)
+	{
+		const FString sessionId = InSession.IsValid() ? InSession->GetSessionId().ToString() : FString();
+		return BuildCefSharedMemoryNames(BuildCefSessionScope(sessionId));
+	}
 }
 
 SCefBrowserSurface::~SCefBrowserSurface()
@@ -118,6 +152,7 @@ SCefBrowserSurface::~SCefBrowserSurface()
 
 void SCefBrowserSurface::Construct(const FArguments& inArgs)
 {
+	ResourceState = MakeShared<FCefBrowserSurfaceResourceState, ESPMode::ThreadSafe>();
 	BrowserSession = inArgs._BrowserSession;
 	DesiredBrowserWidth = FMath::Max(1, inArgs._BrowserWidth);
 	DesiredBrowserHeight = FMath::Max(1, inArgs._BrowserHeight);
@@ -161,11 +196,25 @@ void SCefBrowserSurface::Construct(const FArguments& inArgs)
 	SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMs, 0);
 	SET_DWORD_STAT(STAT_CefTel_InputToFrameLatencyMaxMs, 0);
 	SET_DWORD_STAT(STAT_CefTel_FenceNotReady, 0);
-	RegisterActiveTimer(CefWebUi::BrowserSurface::ActiveRepaintPeriodSec, FWidgetActiveTimerDelegate::CreateSP(this, &SCefBrowserSurface::HandleActiveTimer));
 }
 
 void SCefBrowserSurface::SetBrowserSession(TWeakObjectPtr<UCefWebUiBrowserSession> inBrowserSession)
 {
+	if (BrowserSession == inBrowserSession)
+	{
+		return;
+	}
+
+	ResetResourceState();
+	LastFrame = FCefSharedFrame();
+	DeferredFrame = FCefSharedFrame();
+	bHasFrame = false;
+	bHasDeferredFrame = false;
+	DeferredRetryCount = 0;
+	LastSeenFrameId = 0;
+	LastSubmittedFrameId = 0;
+	LastSubmittedGeneration = 0;
+	bSharedTexturesReopenPending = false;
 	BrowserSession = inBrowserSession;
 	UnbindFrameReaderDelegate();
 	FrameReader.Reset();
@@ -176,8 +225,6 @@ void SCefBrowserSurface::SetBrowserSize(int32 inBrowserWidth, int32 inBrowserHei
 {
 	DesiredBrowserWidth = FMath::Max(1, inBrowserWidth);
 	DesiredBrowserHeight = FMath::Max(1, inBrowserHeight);
-	AppliedBrowserWidth = DesiredBrowserWidth;
-	AppliedBrowserHeight = DesiredBrowserHeight;
 	TargetBrowserWidth = DesiredBrowserWidth;
 	TargetBrowserHeight = DesiredBrowserHeight;
 	LastSentBrowserWidth = DesiredBrowserWidth;
@@ -189,6 +236,7 @@ void SCefBrowserSurface::SetBrowserSize(int32 inBrowserWidth, int32 inBrowserHei
 	LastAutoResizeObservedTimeSec = 0.0;
 	LastAutoResizeSentTimeSec = 0.0;
 	LastAutoResizeAwaitStartTimeSec = 0.0;
+	Invalidate(EInvalidateWidgetReason::Paint);
 }
 
 int32 SCefBrowserSurface::OnPaint(
@@ -217,7 +265,8 @@ int32 SCefBrowserSurface::OnPaint(
 
 	const uint32 slotCount = FMath::Clamp(SharedSlotCount, 1u, MaxSharedSlots);
 	const uint32 slot = LastFrame.WriteSlot % slotCount;
-	if (!SharedTextureRHI[slot].IsValid())
+	const FTextureRHIRef mainTexture = GetSharedTexture(slot);
+	if (!mainTexture.IsValid())
 	{
 		return layerId;
 	}
@@ -230,7 +279,7 @@ int32 SCefBrowserSurface::OnPaint(
 	const bool usePopupPlane = ((LastFrame.Flags & CefFrameFlag_PopupPlane) != 0);
 	if (usePopupPlane)
 	{
-		const bool bPopupPlaneReady = EnsurePopupPlaneRhi();
+		const bool bPopupPlaneReady = EnsurePopupPlaneRhi(LastFrame);
 		if (!bPopupPlaneReady)
 		{
 			return layerId;
@@ -243,11 +292,34 @@ int32 SCefBrowserSurface::OnPaint(
 		FMath::RoundToInt(renderRect.Top),
 		FMath::RoundToInt(renderRect.Right),
 		FMath::RoundToInt(renderRect.Bottom));
-	CustomDrawer->EnqueueUpdate(
-		SharedTextureRHI[slot],
-		SharedPopupTextureRHI,
-		LastFrame,
-		destRect);
+	const uint64 generation = GetResourceGeneration();
+	const bool bNeedsUpdate = LastSubmittedFrameId != LastFrame.FrameId ||
+		LastSubmittedGeneration != generation ||
+		LastSubmittedDestRect != destRect ||
+		LastSubmittedPopupRect != FIntRect(
+			LastFrame.PopupRect.X,
+			LastFrame.PopupRect.Y,
+			LastFrame.PopupRect.X + LastFrame.PopupRect.W,
+			LastFrame.PopupRect.Y + LastFrame.PopupRect.H) ||
+		bLastSubmittedPopupVisible != LastFrame.bPopupVisible;
+	if (bNeedsUpdate)
+	{
+		CustomDrawer->EnqueueUpdate(
+			mainTexture,
+			GetSharedPopupTexture(),
+			LastFrame,
+			destRect,
+			generation);
+		LastSubmittedFrameId = LastFrame.FrameId;
+		LastSubmittedGeneration = generation;
+		LastSubmittedDestRect = destRect;
+		LastSubmittedPopupRect = FIntRect(
+			LastFrame.PopupRect.X,
+			LastFrame.PopupRect.Y,
+			LastFrame.PopupRect.X + LastFrame.PopupRect.W,
+			LastFrame.PopupRect.Y + LastFrame.PopupRect.H);
+		bLastSubmittedPopupVisible = LastFrame.bPopupVisible;
+	}
 
 	FSlateDrawElement::MakeCustom(outDrawElements, layerId, CustomDrawer);
 	return layerId + 1;
@@ -259,7 +331,6 @@ void SCefBrowserSurface::Tick(const FGeometry& allottedGeometry, const double in
 	++TelemetryTickCalls;
 	MaybeQueueAutoResize(allottedGeometry, inCurrentTime);
 	MaybeSendAutoResize(inCurrentTime);
-	Invalidate(EInvalidateWidgetReason::Paint);
 }
 
 FVector2D SCefBrowserSurface::ComputeDesiredSize(float layoutScaleMultiplier) const
@@ -398,9 +469,30 @@ void SCefBrowserSurface::HandleFrameReady()
 
 EActiveTimerReturnType SCefBrowserSurface::HandleActiveTimer(double currentTime, float deltaTime)
 {
+	(void)currentTime;
+	(void)deltaTime;
 	++TelemetryTimerCalls;
+	if (!HasPendingResourceWork())
+	{
+		bActiveTimerRegistered = false;
+		return EActiveTimerReturnType::Stop;
+	}
+
 	Invalidate(EInvalidateWidgetReason::Paint);
 	return EActiveTimerReturnType::Continue;
+}
+
+void SCefBrowserSurface::StartActiveTimer() const
+{
+	if (bActiveTimerRegistered)
+	{
+		return;
+	}
+
+	bActiveTimerRegistered = true;
+	const_cast<SCefBrowserSurface*>(this)->RegisterActiveTimer(
+		CefWebUi::BrowserSurface::ActiveRepaintPeriodSec,
+		FWidgetActiveTimerDelegate::CreateSP(const_cast<SCefBrowserSurface*>(this), &SCefBrowserSurface::HandleActiveTimer));
 }
 
 void SCefBrowserSurface::UnbindFrameReaderDelegate()
@@ -643,9 +735,9 @@ void SCefBrowserSurface::PollLatestFrame() const
 	if (bHasDeferredFrame)
 	{
 		const bool ready = IsFrameGpuReady(DeferredFrame);
-		if (!ready && DeferredRetryCount == 0)
+		if (!ready)
 		{
-			++DeferredRetryCount;
+			DeferredRetryCount = FMath::Min(DeferredRetryCount + 1u, MAX_uint32);
 			++TelemetryFenceNotReadyCount;
 			SET_DWORD_STAT(STAT_CefTel_FenceNotReady, TelemetryFenceNotReadyCount);
 			return;
@@ -657,6 +749,12 @@ void SCefBrowserSurface::PollLatestFrame() const
 	}
 	else if (frameReader->PollSharedTexture(frame))
 	{
+		if (!CefWebUi::BrowserSurface::SanitizeSharedFrameMetadata(frame))
+		{
+			UE_LOGFMT(LogCefWebUiTelemetry, Warning,
+				"[CefSlate] rejected invalid frame metadata frame_id={0}", frame.FrameId);
+			return;
+		}
 		++TelemetryPollSuccess;
 		if (!IsFrameGpuReady(frame))
 		{
@@ -710,24 +808,19 @@ void SCefBrowserSurface::PollLatestFrame() const
 	HandleAppliedFrameSize(static_cast<int32>(LastFrame.Width), static_cast<int32>(LastFrame.Height));
 	if (bSharedTexturesReopenPending)
 	{
-		for (uint32 i = 0; i < MaxSharedSlots; ++i)
-		{
-			SharedTextureRHI[i] = nullptr;
-		}
-		SharedPopupTextureRHI = nullptr;
+		ResetResourceState();
 		bSharedTexturesReopenPending = false;
 		UE_LOG(LogCefWebUiTelemetry, Log,
 			TEXT("[CefAutoResize] shared textures reopen requested"));
 	}
 
 	SharedSlotCount = FMath::Clamp(LastFrame.SlotCount, 1u, MaxSharedSlots);
-	EnsureSharedRhi();
+	EnsureSharedRhi(LastFrame);
 	if ((LastFrame.Flags & CefFrameFlag_PopupPlane) != 0)
 	{
-		const bool bPopupPlaneReady = EnsurePopupPlaneRhi();
+		const bool bPopupPlaneReady = EnsurePopupPlaneRhi(LastFrame);
 		if (!bPopupPlaneReady)
 		{
-			bHasFrame = false;
 			return;
 		}
 	}
@@ -735,186 +828,361 @@ void SCefBrowserSurface::PollLatestFrame() const
 
 bool SCefBrowserSurface::EnsureSharedGpuFence() const
 {
-	if (SharedGpuFence)
+	if (!CefWebUi::BrowserSurface::UseGpuFenceCheck || !ResourceState.IsValid())
 	{
-		return true;
-	}
-	if (bTriedOpenSharedGpuFence)
-	{
-		return false;
-	}
-	bTriedOpenSharedGpuFence = true;
-
-	ID3D12DynamicRHI* d3d12Rhi = GetID3D12DynamicRHI();
-	if (!d3d12Rhi)
-	{
-		return false;
+		return !CefWebUi::BrowserSurface::UseGpuFenceCheck;
 	}
 
-	ID3D12Device* d3dDevice = d3d12Rhi->RHIGetDevice(0);
-	if (!d3dDevice)
+	const TSharedRef<FCefBrowserSurfaceResourceState, ESPMode::ThreadSafe> state = ResourceState.ToSharedRef();
+	uint64 generation = 0;
+	FString fenceName;
 	{
-		return false;
+		FScopeLock lock(&state->Lock);
+		if (state->SharedGpuFence.IsValid())
+		{
+			return true;
+		}
+		if (state->bFenceOpenPending || state->OpenRetryCount >= CefWebUi::BrowserSurface::ResourceOpenMaxRetries)
+		{
+			return false;
+		}
+		state->bFenceOpenPending = true;
+		generation = state->Generation;
+		fenceName = GetSurfaceSharedNames(BrowserSession).SharedGpuFenceName;
 	}
 
-	HANDLE sharedHandle = nullptr;
-	const FCefSharedMemoryNames names = GetSurfaceSharedNames(BrowserSession);
-	HRESULT hr = d3dDevice->OpenSharedHandleByName(*names.SharedGpuFenceName, GENERIC_ALL, &sharedHandle);
-	if (FAILED(hr) || !sharedHandle)
-	{
-		return false;
-	}
+	StartActiveTimer();
+	ENQUEUE_RENDER_COMMAND(CefSlateOpenSharedFence)(
+		[state, fenceName, generation](FRHICommandListImmediate&) mutable {
+			TRefCountPtr<ID3D12Fence> importedFence;
+			if (ID3D12DynamicRHI* d3d12Rhi = GetID3D12DynamicRHI())
+			{
+				if (ID3D12Device* d3dDevice = d3d12Rhi->RHIGetDevice(0))
+				{
+					HANDLE sharedHandle = nullptr;
+					if (SUCCEEDED(d3dDevice->OpenSharedHandleByName(*fenceName, GENERIC_ALL, &sharedHandle)) && sharedHandle)
+					{
+						ID3D12Fence* fence = nullptr;
+						if (SUCCEEDED(d3dDevice->OpenSharedHandle(sharedHandle, IID_PPV_ARGS(&fence))) && fence)
+						{
+							importedFence = fence;
+							fence->Release();
+						}
+						CloseHandle(sharedHandle);
+					}
+				}
+			}
 
-	ID3D12Fence* fence = nullptr;
-	hr = d3dDevice->OpenSharedHandle(sharedHandle, IID_PPV_ARGS(&fence));
-	CloseHandle(sharedHandle);
-	if (FAILED(hr) || !fence)
-	{
-		return false;
-	}
-
-	SharedGpuFence = fence;
-	return true;
+			FScopeLock lock(&state->Lock);
+			if (state->Generation != generation)
+			{
+				return;
+			}
+			state->bFenceOpenPending = false;
+			if (importedFence.IsValid())
+			{
+				state->SharedGpuFence = importedFence;
+				state->OpenRetryCount = 0;
+				state->bRetryPending = false;
+			}
+			else
+			{
+				++state->OpenRetryCount;
+				state->bRetryPending = state->OpenRetryCount < CefWebUi::BrowserSurface::ResourceOpenMaxRetries;
+			}
+		});
+	return false;
 }
 
 bool SCefBrowserSurface::IsFrameGpuReady(const FCefSharedFrame& frame) const
 {
-	if (!CefWebUi::BrowserSurface::UseGpuFenceCheck)
+	if (!CefWebUi::BrowserSurface::UseGpuFenceCheck || frame.GpuFenceValue == 0)
 	{
 		return true;
 	}
-	if (frame.GpuFenceValue == 0)
+	if (!EnsureSharedGpuFence() || !ResourceState.IsValid())
 	{
-		return true;
-	}
-	if (!EnsureSharedGpuFence())
-	{
-		return true;
+		return false;
 	}
 
-	return SharedGpuFence->GetCompletedValue() >= frame.GpuFenceValue;
+	TRefCountPtr<ID3D12Fence> fence;
+	{
+		FScopeLock lock(&ResourceState->Lock);
+		fence = ResourceState->SharedGpuFence;
+	}
+	return fence.IsValid() && fence->GetCompletedValue() >= frame.GpuFenceValue;
 }
 
-void SCefBrowserSurface::EnsureSharedRhi() const
+void SCefBrowserSurface::EnsureSharedRhi(const FCefSharedFrame& InFrame) const
 {
-	bool bReady = true;
-	for (uint32 i = 0; i < SharedSlotCount; ++i)
-	{
-		if (!SharedTextureRHI[i].IsValid())
-		{
-			bReady = false;
-			break;
-		}
-	}
-	if (bReady)
+	if (!ResourceState.IsValid())
 	{
 		return;
 	}
-	const FCefSharedMemoryNames sharedNames = GetSurfaceSharedNames(BrowserSession);
-	const FString sharedTexturePrefix = sharedNames.SharedTextureNamePrefix;
 
-	ENQUEUE_RENDER_COMMAND(CefSlateOpenSharedTextures)(
-		[this, sharedTexturePrefix](FRHICommandListImmediate&)
+	const TSharedRef<FCefBrowserSurfaceResourceState, ESPMode::ThreadSafe> state = ResourceState.ToSharedRef();
+	const uint32 slotCount = FMath::Clamp(InFrame.SlotCount, 1u, MaxSharedSlots);
+	uint64 generation = 0;
+	FString texturePrefix;
+	{
+		FScopeLock lock(&state->Lock);
+		if (state->LastFrameId != InFrame.FrameId)
 		{
-			ID3D12DynamicRHI* d3d12Rhi = GetID3D12DynamicRHI();
-			if (!d3d12Rhi)
+			state->LastFrameId = InFrame.FrameId;
+			state->OpenRetryCount = 0;
+			state->bRetryPending = false;
+		}
+		bool bReady = true;
+		for (uint32 Index = 0; Index < slotCount; ++Index)
+		{
+			bReady &= state->MainTextures[Index].IsValid();
+		}
+		if (bReady || state->bMainOpenPending || state->OpenRetryCount >= CefWebUi::BrowserSurface::ResourceOpenMaxRetries)
+		{
+			return;
+		}
+		state->bMainOpenPending = true;
+		generation = state->Generation;
+		texturePrefix = GetSurfaceSharedNames(BrowserSession).SharedTextureNamePrefix;
+	}
+
+	StartActiveTimer();
+	ENQUEUE_RENDER_COMMAND(CefSlateOpenSharedTextures)(
+		[state, texturePrefix, generation, slotCount](FRHICommandListImmediate&) mutable {
+			FTextureRHIRef importedTextures[MaxSharedSlots];
+			if (ID3D12DynamicRHI* d3d12Rhi = GetID3D12DynamicRHI())
+			{
+				if (ID3D12Device* d3dDevice = d3d12Rhi->RHIGetDevice(0))
+				{
+					for (uint32 Index = 0; Index < slotCount; ++Index)
+					{
+						const FString textureName = FString::Printf(TEXT("%s_%u"), *texturePrefix, Index);
+						HANDLE sharedHandle = nullptr;
+						if (FAILED(d3dDevice->OpenSharedHandleByName(*textureName, GENERIC_ALL, &sharedHandle)) || !sharedHandle)
+						{
+							break;
+						}
+
+						ID3D12Resource* d3dResource = nullptr;
+						const HRESULT hr = d3dDevice->OpenSharedHandle(sharedHandle, IID_PPV_ARGS(&d3dResource));
+						CloseHandle(sharedHandle);
+						if (FAILED(hr) || !d3dResource)
+						{
+							break;
+						}
+
+						const D3D12_RESOURCE_DESC desc = d3dResource->GetDesc();
+						if (desc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE2D || desc.MipLevels == 0)
+						{
+							d3dResource->Release();
+							break;
+						}
+
+						importedTextures[Index] = d3d12Rhi->RHICreateTexture2DFromResource(
+							PF_B8G8R8A8,
+							ETextureCreateFlags::External | ETextureCreateFlags::ShaderResource,
+							FClearValueBinding::None,
+							d3dResource);
+						d3dResource->Release();
+					}
+				}
+			}
+
+			FScopeLock lock(&state->Lock);
+			if (state->Generation != generation)
 			{
 				return;
 			}
-
-			ID3D12Device* d3dDevice = d3d12Rhi->RHIGetDevice(0);
-			if (!d3dDevice)
+			state->bMainOpenPending = false;
+			for (uint32 Index = 0; Index < slotCount; ++Index)
 			{
-				return;
+				if (importedTextures[Index].IsValid())
+				{
+					state->MainTextures[Index] = importedTextures[Index];
+				}
 			}
-
-			for (uint32 i = 0; i < SharedSlotCount; ++i)
+			bool bReady = true;
+			for (uint32 Index = 0; Index < slotCount; ++Index)
 			{
-				if (SharedTextureRHI[i].IsValid())
-				{
-					continue;
-				}
-
-				const FString textureName = FString::Printf(TEXT("%s_%u"), *sharedTexturePrefix, i);
-				HANDLE sharedHandle = nullptr;
-				HRESULT hr = d3dDevice->OpenSharedHandleByName(*textureName, GENERIC_ALL, &sharedHandle);
-				if (FAILED(hr) || !sharedHandle)
-				{
-					return;
-				}
-
-				ID3D12Resource* d3dResource = nullptr;
-				hr = d3dDevice->OpenSharedHandle(sharedHandle, IID_PPV_ARGS(&d3dResource));
-				CloseHandle(sharedHandle);
-				if (FAILED(hr) || !d3dResource)
-				{
-					return;
-				}
-
-				SharedTextureRHI[i] = d3d12Rhi->RHICreateTexture2DFromResource(
-					PF_B8G8R8A8,
-					ETextureCreateFlags::External | ETextureCreateFlags::ShaderResource,
-					FClearValueBinding::None,
-					d3dResource);
-				d3dResource->Release();
+				bReady &= state->MainTextures[Index].IsValid();
+			}
+			if (bReady)
+			{
+				state->OpenRetryCount = 0;
+				state->bRetryPending = false;
+			}
+			else
+			{
+				++state->OpenRetryCount;
+				state->bRetryPending = state->OpenRetryCount < CefWebUi::BrowserSurface::ResourceOpenMaxRetries;
 			}
 		});
-	FlushRenderingCommands();
 }
 
-bool SCefBrowserSurface::EnsurePopupPlaneRhi() const
+bool SCefBrowserSurface::EnsurePopupPlaneRhi(const FCefSharedFrame& InFrame) const
 {
-	if (SharedPopupTextureRHI.IsValid())
+	(void)InFrame;
+	if (!ResourceState.IsValid())
 	{
-		return true;
+		return false;
 	}
-	const FCefSharedMemoryNames sharedNames = GetSurfaceSharedNames(BrowserSession);
-	const FString popupTextureName = sharedNames.SharedPopupTextureName;
 
-	ENQUEUE_RENDER_COMMAND(CefSlateOpenPopupTexture)(
-		[this, popupTextureName](FRHICommandListImmediate&)
+	const TSharedRef<FCefBrowserSurfaceResourceState, ESPMode::ThreadSafe> state = ResourceState.ToSharedRef();
+	uint64 generation = 0;
+	FString popupTextureName;
+	{
+		FScopeLock lock(&state->Lock);
+		if (state->PopupTexture.IsValid())
 		{
-			if (SharedPopupTextureRHI.IsValid())
+			return true;
+		}
+		if (state->bPopupOpenPending || state->OpenRetryCount >= CefWebUi::BrowserSurface::ResourceOpenMaxRetries)
+		{
+			return false;
+		}
+		state->bPopupOpenPending = true;
+		generation = state->Generation;
+		popupTextureName = GetSurfaceSharedNames(BrowserSession).SharedPopupTextureName;
+	}
+
+	StartActiveTimer();
+	ENQUEUE_RENDER_COMMAND(CefSlateOpenPopupTexture)(
+		[state, popupTextureName, generation](FRHICommandListImmediate&) mutable {
+			FTextureRHIRef importedTexture;
+			if (ID3D12DynamicRHI* d3d12Rhi = GetID3D12DynamicRHI())
+			{
+				if (ID3D12Device* d3dDevice = d3d12Rhi->RHIGetDevice(0))
+				{
+					HANDLE sharedHandle = nullptr;
+					if (SUCCEEDED(d3dDevice->OpenSharedHandleByName(*popupTextureName, GENERIC_ALL, &sharedHandle)) && sharedHandle)
+					{
+						ID3D12Resource* d3dResource = nullptr;
+						const HRESULT hr = d3dDevice->OpenSharedHandle(sharedHandle, IID_PPV_ARGS(&d3dResource));
+						CloseHandle(sharedHandle);
+						if (SUCCEEDED(hr) && d3dResource)
+						{
+							const D3D12_RESOURCE_DESC desc = d3dResource->GetDesc();
+							if (desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D && desc.MipLevels > 0)
+							{
+								importedTexture = d3d12Rhi->RHICreateTexture2DFromResource(
+									PF_B8G8R8A8,
+									ETextureCreateFlags::External | ETextureCreateFlags::ShaderResource,
+									FClearValueBinding::None,
+									d3dResource);
+							}
+							d3dResource->Release();
+						}
+					}
+				}
+			}
+
+			FScopeLock lock(&state->Lock);
+			if (state->Generation != generation)
 			{
 				return;
 			}
-
-			ID3D12DynamicRHI* d3d12Rhi = GetID3D12DynamicRHI();
-			if (!d3d12Rhi)
+			state->bPopupOpenPending = false;
+			if (importedTexture.IsValid())
 			{
-				return;
+				state->PopupTexture = importedTexture;
+				state->OpenRetryCount = 0;
+				state->bRetryPending = false;
 			}
-
-			ID3D12Device* d3dDevice = d3d12Rhi->RHIGetDevice(0);
-			if (!d3dDevice)
+			else
 			{
-				return;
+				++state->OpenRetryCount;
+				state->bRetryPending = state->OpenRetryCount < CefWebUi::BrowserSurface::ResourceOpenMaxRetries;
 			}
-
-			HANDLE sharedHandle = nullptr;
-			HRESULT hr = d3dDevice->OpenSharedHandleByName(*popupTextureName, GENERIC_ALL, &sharedHandle);
-			if (FAILED(hr) || !sharedHandle)
-			{
-				return;
-			}
-
-			ID3D12Resource* d3dResource = nullptr;
-			hr = d3dDevice->OpenSharedHandle(sharedHandle, IID_PPV_ARGS(&d3dResource));
-			CloseHandle(sharedHandle);
-			if (FAILED(hr) || !d3dResource)
-			{
-				return;
-			}
-
-			SharedPopupTextureRHI = d3d12Rhi->RHICreateTexture2DFromResource(
-				PF_B8G8R8A8,
-				ETextureCreateFlags::External | ETextureCreateFlags::ShaderResource,
-				FClearValueBinding::None,
-				d3dResource);
-			d3dResource->Release();
 		});
-	FlushRenderingCommands();
-	return SharedPopupTextureRHI.IsValid();
+	return false;
+}
+
+bool SCefBrowserSurface::HasPendingResourceWork() const
+{
+	if (bHasDeferredFrame || !ResourceState.IsValid())
+	{
+		return bHasDeferredFrame;
+	}
+
+	FScopeLock lock(&ResourceState->Lock);
+	return ResourceState->bMainOpenPending || ResourceState->bPopupOpenPending || ResourceState->bFenceOpenPending ||
+		(ResourceState->bRetryPending && ResourceState->OpenRetryCount < CefWebUi::BrowserSurface::ResourceOpenMaxRetries);
+}
+
+FTextureRHIRef SCefBrowserSurface::GetSharedTexture(uint32 InSlot) const
+{
+	if (!ResourceState.IsValid() || InSlot >= MaxSharedSlots)
+	{
+		return nullptr;
+	}
+
+	FScopeLock lock(&ResourceState->Lock);
+	return ResourceState->MainTextures[InSlot];
+}
+
+FTextureRHIRef SCefBrowserSurface::GetSharedPopupTexture() const
+{
+	if (!ResourceState.IsValid())
+	{
+		return nullptr;
+	}
+
+	FScopeLock lock(&ResourceState->Lock);
+	return ResourceState->PopupTexture;
+}
+
+uint64 SCefBrowserSurface::GetResourceGeneration() const
+{
+	if (!ResourceState.IsValid())
+	{
+		return 0;
+	}
+
+	FScopeLock lock(&ResourceState->Lock);
+	return ResourceState->Generation;
+}
+
+void SCefBrowserSurface::ResetResourceState() const
+{
+	if (!ResourceState.IsValid())
+	{
+		return;
+	}
+
+	FTextureRHIRef oldMainTextures[MaxSharedSlots];
+	FTextureRHIRef oldPopupTexture;
+	TRefCountPtr<ID3D12Fence> oldFence;
+	{
+		FScopeLock lock(&ResourceState->Lock);
+		ResourceState->Generation = CefWebUi::BrowserSurface::AdvanceResourceGeneration(ResourceState->Generation);
+		ResourceState->LastFrameId = 0;
+		ResourceState->OpenRetryCount = 0;
+		ResourceState->bMainOpenPending = false;
+		ResourceState->bPopupOpenPending = false;
+		ResourceState->bFenceOpenPending = false;
+		ResourceState->bRetryPending = false;
+		for (uint32 Index = 0; Index < MaxSharedSlots; ++Index)
+		{
+			oldMainTextures[Index] = ResourceState->MainTextures[Index];
+			ResourceState->MainTextures[Index] = nullptr;
+		}
+		oldPopupTexture = ResourceState->PopupTexture;
+		ResourceState->PopupTexture = nullptr;
+		oldFence = ResourceState->SharedGpuFence;
+		ResourceState->SharedGpuFence = nullptr;
+	}
+
+	ENQUEUE_RENDER_COMMAND(CefSlateReleaseSharedResources)(
+		[oldMain0 = oldMainTextures[0], oldMain1 = oldMainTextures[1], oldMain2 = oldMainTextures[2], oldPopupTexture, oldFence](FRHICommandListImmediate&) mutable {
+			oldMain0.SafeRelease();
+			oldMain1.SafeRelease();
+			oldMain2.SafeRelease();
+			oldPopupTexture.SafeRelease();
+			oldFence.SafeRelease();
+		});
+
+	LastSubmittedFrameId = 0;
+	LastSubmittedGeneration = 0;
 }
 
 void SCefBrowserSurface::ReleaseResources()
@@ -925,42 +1193,19 @@ void SCefBrowserSurface::ReleaseResources()
 	if (drawer.IsValid())
 	{
 		ENQUEUE_RENDER_COMMAND(CefSlateReleaseDrawer)(
-			[drawer](FRHICommandListImmediate&) mutable
-			{
+			[drawer](FRHICommandListImmediate&) mutable {
 				drawer.Reset();
 			});
 		CustomDrawer.Reset();
 	}
 
-	FTextureRHIRef oldMain0 = SharedTextureRHI[0];
-	FTextureRHIRef oldMain1 = SharedTextureRHI[1];
-	FTextureRHIRef oldMain2 = SharedTextureRHI[2];
-	FTextureRHIRef oldPopup = SharedPopupTextureRHI;
-	ENQUEUE_RENDER_COMMAND(CefSlateReleaseSharedTextures)(
-		[oldMain0, oldMain1, oldMain2, oldPopup](FRHICommandListImmediate&) mutable
-		{
-			oldMain0.SafeRelease();
-			oldMain1.SafeRelease();
-			oldMain2.SafeRelease();
-			oldPopup.SafeRelease();
-		});
-
-	for (uint32 i = 0; i < MaxSharedSlots; ++i)
-	{
-		SharedTextureRHI[i] = nullptr;
-	}
-	SharedPopupTextureRHI = nullptr;
+	ResetResourceState();
 	bHasFrame = false;
 	bHasDeferredFrame = false;
 	DeferredRetryCount = 0;
 	FrameReader.Reset();
 	ControlWriter.Reset();
-	if (SharedGpuFence)
-	{
-		SharedGpuFence->Release();
-		SharedGpuFence = nullptr;
-	}
-	bTriedOpenSharedGpuFence = false;
+	ResourceState.Reset();
 }
 
 void SCefBrowserSurface::MaybeQueueAutoResize(const FGeometry& inAllottedGeometry, double inNowSec)
@@ -970,9 +1215,11 @@ void SCefBrowserSurface::MaybeQueueAutoResize(const FGeometry& inAllottedGeometr
 		return;
 	}
 
-	const FVector2D localSize = inAllottedGeometry.GetLocalSize();
-	const int32 rawWidth = FMath::RoundToInt(localSize.X);
-	const int32 rawHeight = FMath::RoundToInt(localSize.Y);
+	const FSlateRect renderRect = inAllottedGeometry.GetRenderBoundingRect();
+	const FIntPoint physicalSize = CefWebUi::BrowserSurface::ComputePhysicalTargetSize(
+		FVector2D(renderRect.Right - renderRect.Left, renderRect.Bottom - renderRect.Top));
+	const int32 rawWidth = physicalSize.X;
+	const int32 rawHeight = physicalSize.Y;
 	if (rawWidth < CefWebUi::BrowserSurface::AutoResizeMinDimensionPx ||
 		rawHeight < CefWebUi::BrowserSurface::AutoResizeMinDimensionPx)
 	{
@@ -1139,21 +1386,21 @@ void SCefBrowserSurface::GetBrowserCoords(const FGeometry& inGeometry, const FVe
 	outY = FMath::Clamp(FMath::RoundToInt(normalizedY * static_cast<float>(browserHeight - 1)), 0, browserHeight - 1);
 }
 
-bool SCefBrowserSurface::SlateButtonToCef(const FKey& inKey, ECefMouseButton& outButton)
+bool SCefBrowserSurface::SlateButtonToCef(const FKey& InKey, ECefMouseButton& OutButton)
 {
-	if (inKey == EKeys::LeftMouseButton)
+	if (InKey == EKeys::LeftMouseButton)
 	{
-		outButton = ECefMouseButton::Left;
+		OutButton = ECefMouseButton::Left;
 		return true;
 	}
-	if (inKey == EKeys::MiddleMouseButton)
+	if (InKey == EKeys::MiddleMouseButton)
 	{
-		outButton = ECefMouseButton::Middle;
+		OutButton = ECefMouseButton::Middle;
 		return true;
 	}
-	if (inKey == EKeys::RightMouseButton)
+	if (InKey == EKeys::RightMouseButton)
 	{
-		outButton = ECefMouseButton::Right;
+		OutButton = ECefMouseButton::Right;
 		return true;
 	}
 	return false;

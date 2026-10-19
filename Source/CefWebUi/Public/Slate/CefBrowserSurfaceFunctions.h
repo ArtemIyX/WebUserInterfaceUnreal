@@ -9,18 +9,36 @@
 #include "Input/Events.h"
 #include "RenderGraphFwd.h"
 
+struct FCefSharedFrame;
+
 namespace CefWebUi::BrowserSurface
 {
+enum class ECefSlateBlitPlane : uint8
+{
+	Main,
+	Popup,
+};
+
 /** @brief BuildCefKeyModifiers API. */
 uint32 BuildCefKeyModifiers(const FKeyEvent& InKeyEvent);
 /** @brief MakeIntersection API. */
 FIntRect MakeIntersection(const FIntRect& InA, const FIntRect& InB);
+FIntRect ClampSourceRect(const FIntRect& InSourceRect, const FIntPoint& InSourceExtent);
+FIntRect MapSourceRectToDestRect(
+	const FIntRect& InSourceRect,
+	const FIntRect& InSourceExtent,
+	const FIntRect& InDestRect);
+FIntPoint ComputePhysicalTargetSize(const FVector2D& InRenderSize);
+bool SanitizeSharedFrameMetadata(FCefSharedFrame& InOutFrame);
+uint64 AdvanceResourceGeneration(uint64 InGeneration);
 void AddCefSlateBlitPass(
 	FRDGBuilder& OutGraphBuilder,
 	FRDGTextureRef InputTexture,
 	FRDGTextureRef OutputTexture,
-	const FIntRect& InDestRect,
+	const FIntRect& InMappingDestRect,
+	const FIntRect& InDrawRect,
 	const FIntRect& InSrcRect,
-	const FIntPoint& InSrcExtent);
+	const FIntPoint& InSrcExtent,
+	ECefSlateBlitPlane InPlane);
 }
 
