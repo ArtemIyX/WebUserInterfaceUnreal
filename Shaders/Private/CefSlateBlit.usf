@@ -1,0 +1,17 @@
+#include "/Engine/Public/Platform.ush"
+
+Texture2D InputTexture;
+SamplerState InputSampler;
+float2 DestMin;
+float2 DestSize;
+float2 SrcMin;
+float2 SrcSize;
+float2 SrcTexSize;
+
+void MainPS(float4 svPos : SV_POSITION, out float4 outColor : SV_Target0)
+{
+	float2 local = (svPos.xy - DestMin) / max(DestSize, float2(1.0, 1.0));
+	float2 srcPixel = SrcMin + saturate(local) * SrcSize;
+	float2 uv = (srcPixel + 0.5) / max(SrcTexSize, float2(1.0, 1.0));
+	outColor = InputTexture.Sample(InputSampler, uv);
+}
