@@ -16,6 +16,8 @@ DECLARE_DWORD_COUNTER_STAT(TEXT("Queue Depth"), STAT_CefWs_QueueDepth, STATGROUP
 DECLARE_DWORD_COUNTER_STAT(TEXT("Inbound Queue Depth"), STAT_CefWs_InboundQueueDepth, STATGROUP_CefWebSocket);
 DECLARE_DWORD_COUNTER_STAT(TEXT("Send Queue Depth"), STAT_CefWs_SendQueueDepth, STATGROUP_CefWebSocket);
 DECLARE_DWORD_COUNTER_STAT(TEXT("Write Queue Depth"), STAT_CefWs_WriteQueueDepth, STATGROUP_CefWebSocket);
+DECLARE_DWORD_COUNTER_STAT(TEXT("Game Thread Event Queue Depth"), STAT_CefWs_GameThreadEventQueueDepth, STATGROUP_CefWebSocket);
+DECLARE_DWORD_COUNTER_STAT(TEXT("Dropped Game Thread Events"), STAT_CefWs_DroppedGameThreadEvents, STATGROUP_CefWebSocket);
 DECLARE_CYCLE_STAT(TEXT("Read Pump"), STAT_CefWs_ReadPump, STATGROUP_CefWebSocket);
 DECLARE_CYCLE_STAT(TEXT("Handle Pump"), STAT_CefWs_HandlePump, STATGROUP_CefWebSocket);
 DECLARE_CYCLE_STAT(TEXT("Send Pump"), STAT_CefWs_SendPump, STATGROUP_CefWebSocket);

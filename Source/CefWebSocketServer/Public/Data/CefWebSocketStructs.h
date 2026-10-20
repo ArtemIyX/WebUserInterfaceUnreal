@@ -137,4 +137,12 @@ struct CEFWEBSOCKETSERVER_API FCefWebSocketServerStats
 	/** Current per-client write queue depth. */
 	UPROPERTY(BlueprintReadOnly, Category = "CefWebSocket|Stats")
 	int64 InWriteQueueDepth = 0;
+
+	/** Current game-thread event queue depth. */
+	UPROPERTY(BlueprintReadOnly, Category = "CefWebSocket|Stats")
+	int64 GameThreadEventQueueDepth = 0;
+
+	/** Number of dropped game-thread events. */
+	UPROPERTY(BlueprintReadOnly, Category = "CefWebSocket|Stats")
+	int64 DroppedGameThreadEvents = 0;
 };
