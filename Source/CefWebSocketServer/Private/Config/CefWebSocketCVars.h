@@ -41,6 +41,10 @@ namespace CefWebSocketCVars
 	int32 GetShutdownTimeoutMs();
 	/** @brief GetMaxPortScan API. */
 	int32 GetMaxPortScan();
+	/** @brief Returns the maximum number of game-thread events dispatched per frame. */
+	int32 GetGameThreadEventsPerTick();
+	/** @brief Returns the maximum number of queued game-thread events per server. */
+	int32 GetGameThreadEventQueueMax();
 	/** @brief GetHeartbeatIntervalSec API. */
 	float GetHeartbeatIntervalSec();
 	/** @brief GetIdleTimeoutSec API. */

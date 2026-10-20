@@ -4,6 +4,11 @@
 #include "Logging/CefWebSocketLog.h"
 #include "Server/CefWebSocketServerBase.h"
 
+UCefWebSocketSubsystem::UCefWebSocketSubsystem()
+	: FTickableGameObject(ETickableTickType::NewObject)
+{
+}
+
 bool UCefWebSocketSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 {
 	if (const UGameInstance* GI = Cast<UGameInstance>(Outer))
@@ -16,8 +21,17 @@ bool UCefWebSocketSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 	return true;
 }
 
+void UCefWebSocketSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+{
+	Super::Initialize(Collection);
+	bInitialized = true;
+	SetTickableTickType(ETickableTickType::Conditional);
+}
+
 void UCefWebSocketSubsystem::Deinitialize()
 {
+	bInitialized = false;
+	SetTickableTickType(ETickableTickType::Never);
 	StopAllServers();
 	Super::Deinitialize();
 }
@@ -28,6 +42,7 @@ FCefWebSocketServerCreateResult UCefWebSocketSubsystem::CreateOrGetServer(
 	TSubclassOf<UCefWebSocketClientBase> InClientClass,
 	UCefWebSocketServerBase*& OutServer)
 {
+	check(IsInGameThread());
 	FCefWebSocketServerCreateResult out;
 	out.Result = ECefWebSocketCreateResult::Failed;
 	out.BoundPort = 0;
@@ -76,6 +91,7 @@ FCefWebSocketServerCreateResult UCefWebSocketSubsystem::CreateOrGetServer(
 			out.Result = (Attempt > 0 || bInitialAdjusted) ? ECefWebSocketCreateResult::PortAutoAdjusted : ECefWebSocketCreateResult::Created;
 			UE_LOG(LogCefWebSocketServer, Log, TEXT("CreateOrGetServer: Started '%s' on port %d"), *InOptions.NameId.ToString(), out.BoundPort);
 			
+			check(IsInGameThread());
 			NewServer->ServerInitialized(this);
 			return out;
 		}
@@ -96,6 +112,7 @@ UCefWebSocketServerBase* UCefWebSocketSubsystem::GetServer(FName InNameId) const
 
 bool UCefWebSocketSubsystem::StopServer(FName InNameId)
 {
+	check(IsInGameThread());
 	TObjectPtr<UCefWebSocketServerBase>* Found = Servers.Find(InNameId);
 	if (!Found || !*Found)
 	{
@@ -109,6 +126,7 @@ bool UCefWebSocketSubsystem::StopServer(FName InNameId)
 
 void UCefWebSocketSubsystem::StopAllServers()
 {
+	check(IsInGameThread());
 	for (const TPair<FName, TObjectPtr<UCefWebSocketServerBase>>& Pair : Servers)
 	{
 		if (Pair.Value)
@@ -117,6 +135,78 @@ void UCefWebSocketSubsystem::StopAllServers()
 		}
 	}
 	Servers.Empty();
+	RoundRobinStartIndex = 0;
+}
+
+void UCefWebSocketSubsystem::Tick(float InDeltaTime)
+{
+	check(IsInGameThread());
+	(void)InDeltaTime;
+
+	int32 remainingBudget = FMath::Max(0, CefWebSocketCVars::GetGameThreadEventsPerTick());
+	if (remainingBudget == 0)
+	{
+		return;
+	}
+
+	const TArray<UCefWebSocketServerBase*> servers = GetAllServers();
+	if (servers.IsEmpty())
+	{
+		RoundRobinStartIndex = 0;
+		return;
+	}
+
+	const int32 serverCount = servers.Num();
+	const int32 startIndex = RoundRobinStartIndex % serverCount;
+	while (remainingBudget > 0)
+	{
+		bool bDispatchedAny = false;
+		for (int32 offset = 0; offset < serverCount && remainingBudget > 0; ++offset)
+		{
+			UCefWebSocketServerBase* server = servers[(startIndex + offset) % serverCount];
+			if (!IsValid(server))
+			{
+				continue;
+			}
+			if (server->ConsumeControlEventOverflowStopRequest())
+			{
+				// A lost lifecycle event is more dangerous than dropping the affected server.
+				server->StopServer();
+				continue;
+			}
+			if (server->GetGameThreadEventQueueDepth() <= 0)
+			{
+				continue;
+			}
+
+			const int32 drainedCount = server->DrainGameThreadEvents(1);
+			remainingBudget -= drainedCount;
+			bDispatchedAny |= drainedCount > 0;
+		}
+
+		if (!bDispatchedAny)
+		{
+			break;
+		}
+	}
+
+	RoundRobinStartIndex = (startIndex + 1) % serverCount;
+}
+
+TStatId UCefWebSocketSubsystem::GetStatId() const
+{
+	RETURN_QUICK_DECLARE_CYCLE_STAT(UCefWebSocketSubsystem, STATGROUP_Tickables);
+}
+
+bool UCefWebSocketSubsystem::IsTickable() const
+{
+	return bInitialized && !IsTemplate() && GetGameInstance() != nullptr;
+}
+
+UWorld* UCefWebSocketSubsystem::GetTickableGameObjectWorld() const
+{
+	// A game-instance subsystem owns one global dispatch budget across its worlds.
+	return nullptr;
 }
 
 TArray<UCefWebSocketServerBase*> UCefWebSocketSubsystem::GetAllServers() const

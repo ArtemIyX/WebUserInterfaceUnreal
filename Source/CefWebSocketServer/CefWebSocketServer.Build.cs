@@ -10,6 +10,7 @@ public class CefWebSocketServer : ModuleRules
             new string[]
             {
                 "Core",
+                "Engine",
                 "WebSockets",
                 "Sockets"
             }
@@ -19,7 +20,6 @@ public class CefWebSocketServer : ModuleRules
             new string[]
             {
                 "CoreUObject",
-                "Engine",
                 "NetCore",
                 "EngineSettings",
                 "ImageCore",

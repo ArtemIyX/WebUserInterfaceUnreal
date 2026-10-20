@@ -17,6 +17,14 @@ class UCefWebSocketSubsystem;
 class UCefWebSocketClientBase;
 class FCefWebSocketServerInstance;
 class ICefWebSocketPacketCodec;
+struct FCefGameThreadEvent;
+struct FCefClientConnectedEvent;
+struct FCefClientDisconnectedEvent;
+struct FCefServerErrorEvent;
+struct FCefClientErrorEvent;
+struct FCefClientMessageEvent;
+class FCefGameThreadEventState;
+class FCefWebSocketGameThreadEventTestAccess;
 
 /** @brief Type declaration. */
 UCLASS(BlueprintType, Blueprintable)
@@ -27,6 +35,8 @@ class CEFWEBSOCKETSERVER_API UCefWebSocketServerBase : public UObject
 public:
 
 	UCefWebSocketServerBase(const FObjectInitializer& ObjectInitializer);
+	/** @brief Releases the opaque event queue state after producer shutdown. */
+	virtual ~UCefWebSocketServerBase() override;
 public:
 #pragma region Lifecycle
 
@@ -210,6 +220,7 @@ protected:
 	 * @param InClient Client that sent the message.
 	 * @param InData Decoded binary payload.
 	 * @note Override this to implement application-level binary message handling. The base implementation is a no-op.
+	 * @note Called only on the game thread.
 	 */
 	virtual void HandleClientBytes(UCefWebSocketClientBase* InClient, const TArray<uint8>& InData);
 	/**
@@ -217,6 +228,7 @@ protected:
 	 * @param InClient Client that sent the message.
 	 * @param InMessage Decoded text payload.
 	 * @note Override this to implement application-level text message handling. The base implementation is a no-op.
+	 * @note Called only on the game thread.
 	 */
 	virtual void HandleClientString(UCefWebSocketClientBase* InClient, const FString& InMessage);
 	
@@ -224,6 +236,7 @@ protected:
 	 * @brief Notifies the derived server object that the runtime server has initialized.
 	 * @param InCefSubsystem WebSocket subsystem that owns the initialized runtime.
 	 * @note This is called by the subsystem before normal client traffic is processed. The base implementation is a no-op.
+	 * @note Called only on the game thread.
 	 */
 	virtual void ServerInitialized(UCefWebSocketSubsystem* InCefSubsystem);
 #pragma endregion
@@ -234,6 +247,8 @@ protected:
 	friend class UCefWebSocketSubsystem;
 	/** @brief FCefWebSocketServerInstance state. */
 	friend class FCefWebSocketServerInstance;
+	/** @brief Test-only access to the event queue seam. */
+	friend class FCefWebSocketGameThreadEventTestAccess;
 	/**
 	 * @brief Starts the internal server runtime with the supplied configuration.
 	 * @param InNameId Stable identifier used to identify this server.
@@ -287,6 +302,7 @@ protected:
 	 * @brief Receives a newly connected client notification after base bookkeeping.
 	 * @param InClientInfo Identity and connection metadata for the client.
 	 * @note The base implementation does nothing. Override to add server-specific connection handling.
+	 * @note Called only on the game thread.
 	 */
 	virtual void HandleClientConnected(const FCefWebSocketClientInfo& InClientInfo);
 	/**
@@ -294,6 +310,7 @@ protected:
 	 * @param InClientId Identifier of the disconnected client.
 	 * @param InReason Reason reported for the disconnection.
 	 * @note The base implementation does nothing. Override to add server-specific cleanup.
+	 * @note Called only on the game thread.
 	 */
 	virtual void HandleClientDisconnected(int64 InClientId, ECefWebSocketCloseReason InReason);
 	/**
@@ -301,6 +318,7 @@ protected:
 	 * @param InErrorCode Runtime error code.
 	 * @param InMessage Human-readable error description.
 	 * @note The base implementation does nothing. Override to add application logging or recovery.
+	 * @note Called only on the game thread.
 	 */
 	virtual void HandleServerError(ECefWebSocketErrorCode InErrorCode, const FString& InMessage);
 	/**
@@ -309,6 +327,7 @@ protected:
 	 * @param InErrorCode Runtime error code.
 	 * @param InMessage Human-readable error description.
 	 * @note The base implementation does nothing. Override to add application logging or recovery.
+	 * @note Called only on the game thread.
 	 */
 	virtual void HandleClientError(int64 InClientId, ECefWebSocketErrorCode InErrorCode, const FString& InMessage);
 	/**
@@ -317,12 +336,36 @@ protected:
 	 * @param InPayload Message bytes.
 	 * @param bInBinary true for binary data; false for text data.
 	 * @note The base implementation does nothing. Override to implement application protocol handling.
+	 * @note Called only on the game thread.
 	 */
 	virtual void HandleClientMessage(int64 InClientId, const TArray<uint8>& InPayload, bool bInBinary);
 #pragma endregion
 
 private:
 #pragma region InternalState
+	/** @brief Enqueues an owned event from a producer thread. */
+	bool EnqueueGameThreadEvent(FCefGameThreadEvent&& InEvent);
+	/** @brief Drains at most the requested number of events on the game thread. */
+	int32 DrainGameThreadEvents(int32 InMaxEvents);
+	/** @brief Dispatches one generation-validated event on the game thread. */
+	void DispatchGameThreadEvent(FCefGameThreadEvent&& InEvent);
+	/** @brief Applies a client-connected event and flushes messages buffered before connection. */
+	void DispatchClientConnectedEvent(const FCefClientConnectedEvent& InEvent);
+	/** @brief Applies a client-disconnected event before broadcasting lifecycle callbacks. */
+	void DispatchClientDisconnectedEvent(const FCefClientDisconnectedEvent& InEvent);
+	/** @brief Broadcasts a server error and invokes the native server error hook. */
+	void DispatchServerErrorEvent(const FCefServerErrorEvent& InEvent);
+	/** @brief Broadcasts a client error and invokes the native client error hook. */
+	void DispatchClientErrorEvent(const FCefClientErrorEvent& InEvent);
+	/** @brief Routes a client message to the generic, byte, and text handlers. */
+	void DispatchClientMessageEvent(const FCefClientMessageEvent& InEvent);
+	/** @brief Removes all queued events after producer threads have stopped. */
+	void ClearGameThreadEvents();
+	/** @brief Returns the current queued event count. */
+	int32 GetGameThreadEventQueueDepth() const;
+	/** @brief Consumes a control-event overflow stop request. */
+	bool ConsumeControlEventOverflowStopRequest();
+
 	/** @brief NameId state. */
 	FName NameId = NAME_None;
 	/** @brief BoundPort state. */
@@ -344,6 +387,8 @@ private:
 	TMap<int64, TArray<FCefWebSocketInboundPacket>> PendingClientMessages;
 	/** @brief Instance state. */
 	TSharedPtr<FCefWebSocketServerInstance> Instance;
+	/** @brief Cross-thread event queue state kept opaque to public consumers. */
+	TUniquePtr<FCefGameThreadEventState> GameThreadEventState;
 #pragma endregion
 };
 

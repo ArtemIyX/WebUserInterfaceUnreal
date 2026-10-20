@@ -157,7 +157,7 @@ void FCefWebSocketDebugCommands::HandleList(const TArray<FString>& InArgs) const
 		UE_LOG(
 			LogCefWebSocketServer,
 			Log,
-			TEXT("  name=%s port=%d running=%s format=%d clients=%d queue=%lld inbound=%lld send=%lld write=%lld"),
+			TEXT("  name=%s port=%d running=%s format=%d clients=%d queue=%lld inbound=%lld send=%lld write=%lld game_events=%lld dropped_game_events=%lld"),
 			*server->GetServerNameId().ToString(),
 			server->GetBoundPort(),
 			server->IsRunning() ? TEXT("true") : TEXT("false"),
@@ -166,7 +166,9 @@ void FCefWebSocketDebugCommands::HandleList(const TArray<FString>& InArgs) const
 			stats.QueueDepth,
 			stats.InInboundQueueDepth,
 			stats.InSendQueueDepth,
-			stats.InWriteQueueDepth);
+			stats.InWriteQueueDepth,
+			stats.GameThreadEventQueueDepth,
+			stats.DroppedGameThreadEvents);
 	}
 }
 
@@ -251,7 +253,7 @@ void FCefWebSocketDebugCommands::HandleStats(const TArray<FString>& InArgs) cons
 	UE_LOG(
 		LogCefWebSocketServer,
 		Log,
-		TEXT("ws.stats: name=%s format=%d clients=%d rx=%lld tx=%lld rx_s=%.2f tx_s=%.2f dropped=%lld queue=%lld avg_queue=%.2f inbound=%lld handle=%lld send=%lld write=%lld"),
+		TEXT("ws.stats: name=%s format=%d clients=%d rx=%lld tx=%lld rx_s=%.2f tx_s=%.2f dropped=%lld queue=%lld avg_queue=%.2f inbound=%lld handle=%lld send=%lld write=%lld game_events=%lld dropped_game_events=%lld"),
 		*nameId.ToString(),
 		static_cast<int32>(server->GetPayloadFormat()),
 		stats.ActiveClients,
@@ -265,7 +267,9 @@ void FCefWebSocketDebugCommands::HandleStats(const TArray<FString>& InArgs) cons
 		stats.InInboundQueueDepth,
 		stats.InHandleQueueDepth,
 		stats.InSendQueueDepth,
-		stats.InWriteQueueDepth);
+		stats.InWriteQueueDepth,
+		stats.GameThreadEventQueueDepth,
+		stats.DroppedGameThreadEvents);
 }
 
 void FCefWebSocketDebugCommands::HandleClients(const TArray<FString>& InArgs) const
@@ -308,7 +312,7 @@ void FCefWebSocketDebugCommands::HandleCVars(const TArray<FString>& InArgs) cons
 {
 	(void)InArgs;
 	UE_LOG(LogCefWebSocketServer, Log,
-		TEXT("ws.cvars: max_msg=%d max_text=%d max_out=%d q_drop=%d in_q=%d send_q=%d write_q=%d hb=%.1f idle=%.1f"),
+		TEXT("ws.cvars: max_msg=%d max_text=%d max_out=%d q_drop=%d in_q=%d send_q=%d write_q=%d game_events_per_tick=%d game_event_queue_max=%d hb=%.1f idle=%.1f"),
 		CefWebSocketCVars::GetMaxMessageBytes(),
 		CefWebSocketCVars::GetMaxTextMessageBytes(),
 		CefWebSocketCVars::GetMaxOutboundMessageBytes(),
@@ -316,6 +320,8 @@ void FCefWebSocketDebugCommands::HandleCVars(const TArray<FString>& InArgs) cons
 		CefWebSocketCVars::GetMaxQueueMessagesPerClient(),
 		CefWebSocketCVars::GetWriteBatchMaxMessages(),
 		CefWebSocketCVars::GetWriteBatchMaxBytes(),
+		CefWebSocketCVars::GetGameThreadEventsPerTick(),
+		CefWebSocketCVars::GetGameThreadEventQueueMax(),
 		CefWebSocketCVars::GetHeartbeatIntervalSec(),
 		CefWebSocketCVars::GetIdleTimeoutSec());
 }
